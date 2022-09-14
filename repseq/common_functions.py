@@ -22,3 +22,15 @@ def combine_metadata_from_folders(folders, metadata_filename="metadata.txt"):
             curr_metadata["#file.name"] = curr_metadata["#file.name"].apply(lambda x: os.path.join(folder, x))
         list_of_metadata_dfs.append(curr_metadata)
     return pd.concat(list_of_metadata_dfs)
+
+def run_parallel_calculation(function, tasks, program_name):
+    result_list = []
+    tasks_total = len(tasks)
+    tasks_done = 0
+    print_progress_bar(tasks_done, tasks_total, program_name)
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        for result in executor.map(function, tasks):
+            result_list.append(result)
+            tasks_done+=1
+            print_progress_bar(tasks_done, tasks_total, program_name)
+    return result_list

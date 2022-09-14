@@ -1,4 +1,5 @@
 from .common_functions import print_progress_bar, combine_metadata_from_folders
+from .processing_stats import pool_metadata
 import pandas as pd
 import re
 import os

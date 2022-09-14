@@ -4,7 +4,7 @@ from .migec import checkout_stats
 
 def check_number_of_clonotypes(folders, samples_list=[], metadata_filename="vdjtools_metadata.txt", add_total=True):
     all_metadata = pool_metadata(folders, metadata_filename, samples_list)
-        
+    
     sample_ids=[]
     number_of_functional_clonotypes=[]
     number_of_clonotypes_total=[]
@@ -26,6 +26,10 @@ def check_number_of_clonotypes(folders, samples_list=[], metadata_filename="vdjt
     clonotypes_num_df.reset_index(drop=True, inplace=True)
     clonotypes_num_df["functional_not_singletons"] = clonotypes_num_df["functional_clonotypes"] - clonotypes_num_df["singletons"]
     
+    if "old.sample.id" in all_metadata.columns:
+        clonotypes_num_df = clonotypes_num_df.merge(all_metadata.rename(columns={"sample.id": "sample_id",
+                         "old.sample.id": "old_sample_id"})[["sample_id", "old_sample_id"]])
+
     # add TOTAL 
     if add_total:
         clonotypes_num_df.loc[len(clonotypes_num_df)] = ["TOTAL"] + list(clonotypes_num_df.sum(numeric_only=True, axis=0))
@@ -42,14 +46,20 @@ def pool_metadata(folders, metadata_filename, sample_list=[]):
         all_metadata_dfs.append(metadata)
     all_metadata = pd.concat(all_metadata_dfs).reset_index(drop=True)
     
+    multichain = False
+    if "old.sample.id" in all_metadata.columns:
+        multichain = True
+        all_metadata["old.sample.id"] = all_metadata["old.sample.id"].fillna(all_metadata["sample.id"])
+
     # filter samples according to sample_list if needed
     if sample_list != []:
-        all_metadata = all_metadata.loc[all_metadata["sample.id"].isin(sample_list)]
+        if multichain:
+            all_metadata = all_metadata.loc[all_metadata["sample.id"].isin(sample_list) | all_metadata["old.sample.id"].isin(sample_list)]
+        else:
+            all_metadata = all_metadata.loc[all_metadata["sample.id"].isin(sample_list)]
     return all_metadata
 
 def processing_stats(folders):
-#     all_metadata = pool_metadata(folders, "metadata.txt").rename(columns={"#sample.id":"sample_id"})
-#     all_vdjtools_metadata = pool_metadata(folders, "vdjtools_metadata.txt").rename(columns={"sample.id":"sample_id"})
     all_assemble_results = pool_metadata(folders, "assemble.log.txt")
     all_assemble_results = all_assemble_results[["#SAMPLE_ID", "MIG_COUNT_THRESHOLD", "READS_TOTAL","READS_GOOD_TOTAL","MIGS_TOTAL","MIGS_GOOD_TOTAL"]]
     all_assemble_results = all_assemble_results.rename(columns={"#SAMPLE_ID":"sample_id",
@@ -58,43 +68,30 @@ def processing_stats(folders):
                                                                 "READS_GOOD_TOTAL":"reads_good",
                                                                 "MIGS_TOTAL":"migs",
                                                                 "MIGS_GOOD_TOTAL":"migs_good"})
-#     migs_and_clonotypes = []
-#     for index, row in all_vdjtools_metadata.iterrows():
-#         filename = row["#file.name"]
-#         sample_id = row["sample_id"]
-#         clonoset_df = pd.read_csv(filename, sep="\t")
-#         clonotypes = len(clonoset_df)
-#         migs_used = clonoset_df["count"].sum()
-#         clonoset_df = clonoset_df.loc[~clonoset_df["cdr3aa"].str.contains("\*|_")]
-#         clonotypes_functional = len(clonoset_df)
-#         migs_functional = clonoset_df["count"].sum()
-#         migs_and_clonotypes.append((sample_id, migs_used, migs_functional, clonotypes, clonotypes_functional))
-#     migs_and_clonotypes_df = pd.DataFrame(migs_and_clonotypes, columns =['sample_id', "migs_used", "migs_functional", "clonotypes", "clonotypes_functional"])
-    return all_assemble_results
-#     df = SAMPLES_METADATA[["sample_id", "experimental_group", "subset", "chain", "good"]]
-#     print(df["experimental_group"].unique())
-#     df = df.loc[(df["good"] == "yes") | (df["experimental_group"]=="xla")]
-#     df = df.merge(all_assemble_results)
-#     df = df.merge(migs_and_clonotypes_df)
-#     df = df.dropna()
-#     df.experimental_group=pd.Categorical(df.experimental_group,categories=['preterm', 'term', 'late', "kids", "young","old", "xla"])
-#     df.subset = pd.Categorical(df.subset,categories=['nCD4','mnCD4', 'RTE', 'CD8', "nTreg"])
-#     df = df.dropna()
-#     df.sort_values(by=["experimental_group","subset"], inplace=True)
-#     return df
 
-def show_all_stats(folder, suffix=""):
+    return all_assemble_results
+
+def show_all_stats(folder, suffix="", vdjtools_folder=None):
     checkout_folder = os.path.join(folder, "checkout")
     assemble_folder = os.path.join(folder, "assemble")
+    if vdjtools_folder is None:
+        clonotypes_folder = assemble_folder
+    else:
+        clonotypes_folder = vdjtools_folder
+
     if suffix != "":
         checkout_folder += "_" + suffix
         assemble_folder += "_" + suffix
         
     checkout = checkout_stats(checkout_folder)
     processing = processing_stats(assemble_folder)
-    clonotypes = check_number_of_clonotypes(assemble_folder, add_total=False)
+    clonotypes = check_number_of_clonotypes(clonotypes_folder, add_total=False)
     all_stats = checkout.merge(processing)
-    all_stats = all_stats.merge(clonotypes)
+
+    if "old_sample_id" in clonotypes.columns:
+        all_stats = clonotypes.merge(all_stats.rename(columns={"sample_id": "old_sample_id"}))
+    else:
+        all_stats = clonotypes.merge(all_stats)
     all_stats["mean_reads_per_umi"] = all_stats["reads_with_UMI"]/all_stats["migs"]
     return all_stats
 
