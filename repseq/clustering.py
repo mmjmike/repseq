@@ -1,5 +1,5 @@
 import pandas as pd
-from .common_functions import run_parallel_calculation
+from .common_functions import run_parallel_calculation, combine_metadata_from_folders
 import networkx as nx
 
 
@@ -130,7 +130,9 @@ def find_edges_in_nodes_set_mp(args):
                 edges.append((node_1, node_2)) #save unique codes
     return edges
 
-def create_clusters(nodes, edges):
+def create_clusters(clonoset_input, sample_metadata, mismatches=1, overlap_type="aa", alice=False):
+    nodes, edges = find_nodes_and_edges(clonoset_input, sample_metadata, mismatches=mismatches, overlap_type=overlap_type, alice=alice)
+    
     main_graph = nx.Graph()
     main_graph.add_nodes_from(nodes)
 
@@ -144,6 +146,10 @@ def create_clusters(nodes, edges):
                 node2 = node
         main_graph.add_edge(node1, node2)
     clusters = [main_graph.subgraph(c).copy() for c in nx.connected_components(main_graph)]
+    total_clusters = len(clusters)
+    cluster_num = len(filter_one_node_clusters(clusters))
+    singletons = total_clusters - cluster_num
+    print(f"Found {cluster_num} clusters and {singletons} single nodes")
     return clusters
 
 def filter_one_node_clusters(clusters):
@@ -222,3 +228,37 @@ def filter_clusters_with_alice_hits(clusters):
             filtered_clusters.append(cluster)
             continue
     return filtered_clusters
+
+def pool_clonotypes_to_df(folders, samples_list=None, top=0, functional=True, exclude_singletons=False, cdr3aa_len_range=[], metadata_filename="vdjtools_metadata.txt"):
+    all_metadata = combine_metadata_from_folders(folders, metadata_filename=metadata_filename)
+    #pool_metadata(folders, metadata_filename,samples_list)
+    
+    clonotypes_dfs = []
+    for index, row in all_metadata.iterrows():
+        sample_id = row["sample.id"]
+        if samples_list is not None:
+            if sample_id not in samples_list:
+                continue
+        clonoset_data=pd.read_csv(row["#file.name"],sep="\t")
+        if exclude_singletons:
+            clonoset_data=clonoset_data.loc[~clonoset_data["count"]>1]
+        if functional:
+            clonoset_data=clonoset_data.loc[~clonoset_data["cdr3aa"].str.contains("\*|_")]
+            clonoset_data=clonoset_data.sample(frac=1, random_state=1) #shuffle
+            clonoset_data=clonoset_data.sort_values(by="count", ascending=False) #sort by counts "back" 
+        if top > 0:
+            clonoset_data=clonoset_data.iloc[:top]
+        if cdr3aa_len_range:
+            clonoset_data=clonoset_data.loc[(clonoset_data["cdr3aa"].str.len() <= cdr3aa_len_range[-1]) 
+                                            & (clonoset_data["cdr3aa"].str.len() >= cdr3aa_len_range[0])]
+        clonoset_data["freq"]=clonoset_data["count"]/clonoset_data["count"].sum()
+        sample_id = row["sample.id"]
+        clonotypes_num = clonoset_data.shape[0]
+        clonoset_data["sample_id"] = sample_id
+        clonotypes_dfs.append(clonoset_data)
+#         print("Added {} clonotypes from {}".format(clonotypes_num, sample_id))
+    result_df = pd.concat(clonotypes_dfs).reset_index(drop=True)
+    clonotypes_number = len(result_df)
+    samples_number = len(result_df["sample_id"].unique())
+    print("Pooled {} clonotypes from {} samples".format(clonotypes_number, samples_number))
+    return result_df

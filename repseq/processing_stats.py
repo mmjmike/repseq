@@ -95,7 +95,7 @@ def show_all_stats(folder, suffix="", vdjtools_folder=None):
     all_stats["mean_reads_per_umi"] = all_stats["reads_with_UMI"]/all_stats["migs"]
     return all_stats
 
-def show_important_stats(folder, suffix=""):
-    all_stats = show_all_stats(folder, suffix=suffix)
+def show_important_stats(folder, suffix="", vdjtools_folder=None):
+    all_stats = show_all_stats(folder, suffix=suffix, vdjtools_folder=vdjtools_folder)
     return all_stats[["sample_id", "reads_total", "reads_with_UMI", "migs", "migs_good", "total_clonotypes",
                       "functional_clonotypes", "reads_with_umi_percent", "mean_reads_per_umi"]]

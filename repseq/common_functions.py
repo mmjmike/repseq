@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import concurrent.futures
 
 def print_progress_bar(samples_done, samples_total, program_name="", object_name="sample(s)"):
     done = int(samples_done/samples_total*50)
@@ -11,6 +12,8 @@ def print_progress_bar(samples_done, samples_total, program_name="", object_name
     print(progress_bar, end=end)
     
 def combine_metadata_from_folders(folders, metadata_filename="metadata.txt"):
+    if isinstance(folders, str):
+        folders = [folders]
     list_of_metadata_dfs = []
     for folder in folders:
         filenames = []
