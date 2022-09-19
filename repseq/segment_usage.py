@@ -69,6 +69,54 @@ def get_segment_usage_from_metafile(folder, segment="V", functional=True):
     sample_chains = determine_chain_for_samples(all_usage_df)
     all_usage_df = all_usage_df.merge(sample_chains)
     return fill_zero_usage(all_usage_df, segment).reset_index(drop=True)
+
+def get_vj_usage_from_metafile(folder, segment="V", functional=True):
+    list_of_all_samples_usages = []
+    
+    if isinstance(folder, str):
+        folder = [folder]
+    metadata_filename = "metadata.txt"
+    metadata = combine_metadata_from_folders(folder, metadata_filename=metadata_filename)
+            
+    samples_num = len(metadata)
+    samples_finished = 0
+    first = True
+    
+    for index, row in metadata.iterrows():
+        sample_id=row["sample.id"]
+        file_name=row["#file.name"]
+        
+        clonoset_df = pd.read_csv(file_name, sep="\t")
+        if functional:
+            clonoset_df = clonoset_df.loc[~clonoset_df["aaSeqCDR3"].str.contains("\*|_")]
+        else:
+            clonoset_df = clonoset_df.loc[clonoset_df["aaSeqCDR3"].str.contains("\*|_")]
+        
+        clonoset_df = clonoset_df[clonoset_df["allVHitsWithScore"].notnull()]
+        clonoset_df = clonoset_df[clonoset_df["allVHitsWithScore"].notnull()]
+        #sort by counts
+        clonoset_df.sort_values(by="cloneCount", ascending=False, inplace=True) 
+        
+        #adjust frequencies in subset table (make them sum to 1)
+        clonoset_df.loc[:,"cloneFraction"]=clonoset_df["cloneCount"]/clonoset_df["cloneCount"].sum()
+        
+        #take only the first segment
+        clonoset_df["allVHitsWithScore"]=clonoset_df["allVHitsWithScore"].apply(lambda x: x.split("*")[0])
+        clonoset_df["allJHitsWithScore"]=clonoset_df["allJHitsWithScore"].apply(lambda x: x.split("*")[0])
+        
+        sample_usage=clonoset_df.groupby(["allVHitsWithScore", "allJHitsWithScore"]).sum()["cloneFraction"]
+        
+        usage_df = pd.DataFrame({segment.lower():sample_usage.index, 'usage':sample_usage.values})
+        usage_df["sample_id"] = sample_id
+        list_of_all_samples_usages.append(usage_df)      
+
+        samples_finished += 1
+        print_progress_bar(samples_finished, samples_num, program_name="Calculate {}-usage".format(segment.upper())) 
+    
+    all_usage_df = pd.concat(list_of_all_samples_usages)
+    sample_chains = determine_chain_for_samples(all_usage_df)
+    all_usage_df = all_usage_df.merge(sample_chains)
+    return fill_zero_usage(all_usage_df, segment).reset_index(drop=True)
     
 def fill_zero_usage(df, segment):
     fill_zeros_lines = []
