@@ -1,5 +1,5 @@
 import pandas as pd
-from .common_functions import run_parallel_calculation, combine_metadata_from_folders
+from .common_functions import run_parallel_calculation, combine_metadata_from_folders, print_progress_bar
 import networkx as nx
 
 
@@ -12,15 +12,8 @@ class Node:
         self.seq_aa = seq_aa
         self.seq_nt = seq_nt
         self.sample_id = sample_id
-        self.group = None
         self.size = size
         self.additional_properties = {}
-        
-    def get_group_from_metadata_df(self, sample_metadata_df):
-        # obtain experimental group from 
-        sub_df = sample_metadata_df.loc[sample_metadata_df["sample_id"] == self.sample_id]
-        group = sub_df.iloc[0]["experimental_group"]
-        self.group = group
         
     def is_neighbour_of(self, other, mismatches=1, aa=True, check_v=False, check_j=False):
         """function compare two strings and return
@@ -49,8 +42,17 @@ class Node:
     def __str__(self):
         return "{}_{}".format(self.seq_aa, self.id)
 
+    def add_properties(self, metadata):
+        if self.sample_id not in metadata:
+            for property in list(metadata[list(metadata)[0]].keys()):
+                self.additional_properties[property] = None
+        else:
+            self.additional_properties.update(metadata[self.sample_id])
 
-def find_nodes_and_edges(clonoset_input, sample_metadata, mismatches=1, overlap_type="aa", alice=False):
+        
+
+
+def find_nodes_and_edges(clonoset_input, mismatches=1, overlap_type="aaV"):
     if isinstance(clonoset_input, str):
         clonoset=pd.read_csv(clonoset_input,sep="\t")
     else:
@@ -69,32 +71,42 @@ def find_nodes_and_edges(clonoset_input, sample_metadata, mismatches=1, overlap_
     if "J" in overlap_type:
         check_j = True
     
-    v_column = "v"
-    j_column = "j"
-    aa_column = "cdr3aa"
-    nt_column = "cdr3nt"
-    if alice:
-        v_column = "bestVGene"
-        j_column = "bestJGene"
-        aa_column = "CDR3.amino.acid.sequence"
-        nt_column = "CDR3.nucleotide.sequence"
+    clonoset = clonoset.rename(columns={"bestVGene": "v",
+                                        "bestJGene": "j",
+                                        "CDR3.amino.acid.sequence": "cdr3aa",
+                                        "CDR3.nucleotide.sequence": "cdr3nt",
+                                        "allVHitsWithScore": "v",
+                                        "allJHitsWithScore": "j",
+                                        "aaSeqCDR3": "cdr3aa",
+                                        "nSeqCDR3": "cdr3nt",
+                                        "Sample":"sample_id",
+                                        "cloneFraction":"freq",
+                                        "Read.count": "count",
+                                        "cloneCount": "count"})
     
-    clonoset = clonoset.merge(sample_metadata[["sample_id", "experimental_group"]])
+    clonoset["v"] = clonoset["v"].apply(lambda x: x.split("*")[0])
+    clonoset["j"] = clonoset["j"].apply(lambda x: x.split("*")[0])
+
     nodes_by_len={}
     list_of_all_nodes = []
+
+    size_column_name = "freq"
+    if size_column_name not in clonoset.columns:
+        size_column_name = "count"
+        if size_column_name not in clonoset.columns:
+            clonoset["count"] = 1
+
     for index, row in clonoset.iterrows():
-        v = row[v_column]
-        j = row[j_column]
-        cdr3aa = row[aa_column]
-        cdr3nt = row[nt_column]
-        freq = row["freq"]
+        v = row["v"]
+        j = row["j"]
+        cdr3aa = row["cdr3aa"]
+        cdr3nt = row["cdr3nt"]
+        size = row[size_column_name]
         sample_id = row["sample_id"]
-        group = row["experimental_group"]
         len_cdr3aa = len(cdr3aa)
         if len_cdr3aa not in nodes_by_len:
             nodes_by_len[len_cdr3aa] = []
-        node = Node(index, cdr3nt, cdr3aa, v, j, sample_id, size=freq)
-        node.group = group
+        node = Node(index, cdr3nt, cdr3aa, v, j, sample_id, size=size)
         nodes_by_len[len_cdr3aa].append(node)
         list_of_all_nodes.append(node)
     print("Nodes list created: {} nodes".format(len(list_of_all_nodes)))
@@ -130,37 +142,46 @@ def find_edges_in_nodes_set_mp(args):
                 edges.append((node_1, node_2)) #save unique codes
     return edges
 
-def create_clusters(clonoset_input, sample_metadata, mismatches=1, overlap_type="aa", alice=False):
-    nodes, edges = find_nodes_and_edges(clonoset_input, sample_metadata, mismatches=mismatches, overlap_type=overlap_type, alice=alice)
+def create_clusters(clonoset_input, mismatches=1, overlap_type="aaV"):
+    nodes, edges = find_nodes_and_edges(clonoset_input, mismatches=mismatches, overlap_type=overlap_type)
     
     main_graph = nx.Graph()
     main_graph.add_nodes_from(nodes)
+    print("-----------------------------\nNexworkX graph created")
 
+    program_name = "Adding edges"
+    edges_done = 0
+    edges_total = len(edges)
+    print_progress_bar(edges_done, edges_total, program_name=program_name, object_name="edge(s)")
+    node_id_dict = {node.id: node for node in main_graph}
     for edge in edges:
-        node1_id = edge[0].id
-        node2_id = edge[1].id
-        for node in main_graph:
-            if node.id == node1_id:
-                node1 = node
-            if node.id == node2_id:
-                node2 = node
+        node1 = node_id_dict[edge[0].id]
+        node2 = node_id_dict[edge[1].id]
         main_graph.add_edge(node1, node2)
+        edges_done += 1
+        print_progress_bar(edges_done, edges_total, program_name=program_name, object_name="edge(s)")
     clusters = [main_graph.subgraph(c).copy() for c in nx.connected_components(main_graph)]
     total_clusters = len(clusters)
     cluster_num = len(filter_one_node_clusters(clusters))
     singletons = total_clusters - cluster_num
-    print(f"Found {cluster_num} clusters and {singletons} single nodes")
+    print(f"Found {cluster_num} clusters (2 or more nodes) and {singletons} single nodes. Total: {total_clusters}")
     return clusters
 
 def filter_one_node_clusters(clusters):
     return [c for c in clusters if len(c)>1]
 
-def save_clusters_for_cytoscape(clusters, output_prefix):
+def save_clusters_for_cytoscape(clusters, output_prefix, sample_metadata=None):
     sif_filename = output_prefix + ".sif"
     #properties_filename = output_prefix + ".prop.tsv"
     properties_metadata_filename = output_prefix + ".prop.metadata.tsv"
     edges = []
     nodes = []
+
+    additional_properties=[]
+    for node in clusters[0]:
+        additional_properties = list(node.additional_properties.keys())
+        break
+
     for cluster in clusters:
         for u,v in cluster.edges():
             edges.append("\tneighbour\t".join([str(u),str(v)]))
@@ -168,12 +189,17 @@ def save_clusters_for_cytoscape(clusters, output_prefix):
             list(cluster.nodes())[0].id
             edges.append(str(list(cluster.nodes())[0]))
         for node in cluster:
-            nodes.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.group, node.size))
+            add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
+            nodes.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.size, *add_properties_values))
+
     with open(sif_filename, "w") as f:
         f.write("\n".join(edges))
     print("Saved edges to: {}".format(sif_filename))
     
-    properties_df = pd.DataFrame(nodes, columns=["code", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "experimental_group", "size"])
+    properties_names = ["code", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "size"] + additional_properties
+    properties_df = pd.DataFrame(nodes, columns=properties_names)
+    if sample_metadata is not None:
+        properties_df = properties_df.merge(sample_metadata)
     properties_df.to_csv(properties_metadata_filename, index=False, sep="\t")
     print("Saved node properties and metadata to: {}".format(properties_metadata_filename))
 
@@ -240,6 +266,24 @@ def pool_clonotypes_to_df(folders, samples_list=None, top=0, functional=True, ex
             if sample_id not in samples_list:
                 continue
         clonoset_data=pd.read_csv(row["#file.name"],sep="\t")
+
+        clonoset_data = clonoset_data.rename(columns={"bestVGene": "v",
+                                        "bestJGene": "j",
+                                        "CDR3.amino.acid.sequence": "cdr3aa",
+                                        "CDR3.nucleotide.sequence": "cdr3nt",
+                                        "allVHitsWithScore": "v",
+                                        "allJHitsWithScore": "j",
+                                        "aaSeqCDR3": "cdr3aa",
+                                        "nSeqCDR3": "cdr3nt",
+                                        "Sample":"sample_id",
+                                        "cloneFraction":"freq",
+                                        "Read.count": "count",
+                                        "cloneCount": "count"})
+    
+        clonoset_data["v"] = clonoset_data["v"].apply(lambda x: x.split("*")[0])
+        clonoset_data["j"] = clonoset_data["j"].apply(lambda x: x.split("*")[0])
+
+
         if exclude_singletons:
             clonoset_data=clonoset_data.loc[~clonoset_data["count"]>1]
         if functional:
@@ -253,7 +297,42 @@ def pool_clonotypes_to_df(folders, samples_list=None, top=0, functional=True, ex
                                             & (clonoset_data["cdr3aa"].str.len() >= cdr3aa_len_range[0])]
         clonoset_data["freq"]=clonoset_data["count"]/clonoset_data["count"].sum()
         sample_id = row["sample.id"]
-        clonotypes_num = clonoset_data.shape[0]
+        # clonotypes_num = clonoset_data.shape[0]
+        clonoset_data["sample_id"] = sample_id
+        clonotypes_dfs.append(clonoset_data)
+#         print("Added {} clonotypes from {}".format(clonotypes_num, sample_id))
+    result_df = pd.concat(clonotypes_dfs).reset_index(drop=True)
+    clonotypes_number = len(result_df)
+    samples_number = len(result_df["sample_id"].unique())
+    print("Pooled {} clonotypes from {} samples".format(clonotypes_number, samples_number))
+    return result_df
+
+def add_metadata(clusters, metadata):
+    columns = metadata.columns
+    if "sample_id" not in columns:
+        print("Error: 'sample_id' column is compulsory, but is not present in given metadata")
+        return 
+    metadata = metadata.set_index("sample_id")
+    metadata_dict = metadata.to_dict("index")
+    for cluster in clusters:
+        for node in cluster:
+            node.add_properties(metadata_dict)
+    return
+
+def pool_alice_hits_to_df(folders, samples_list=None, metadata_filename="vdjtools_metadata.txt"):
+    all_metadata = combine_metadata_from_folders(folders, metadata_filename=metadata_filename)
+    #pool_metadata(folders, metadata_filename,samples_list)
+    
+    clonotypes_dfs = []
+    for index, row in all_metadata.iterrows():
+        sample_id = row["sample.id"]
+        if samples_list is not None:
+            if sample_id not in samples_list:
+                continue
+        clonoset_data=pd.read_csv(row["#file.name"],sep="\t")
+        clonoset_data["freq"]=clonoset_data["Read.count"]/clonoset_data["Read.count"].sum()
+        sample_id = row["sample.id"]
+        # clonotypes_num = clonoset_data.shape[0]
         clonoset_data["sample_id"] = sample_id
         clonotypes_dfs.append(clonoset_data)
 #         print("Added {} clonotypes from {}".format(clonotypes_num, sample_id))

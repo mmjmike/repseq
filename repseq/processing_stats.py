@@ -15,6 +15,23 @@ def check_number_of_clonotypes(folders, samples_list=[], metadata_filename="vdjt
         clonoset_data=pd.read_csv(row["#file.name"],sep="\t")
         sample_ids.append(row["sample.id"])
         number_of_clonotypes_total.append(clonoset_data.shape[0])
+
+        clonoset_data = clonoset_data.rename(columns={"bestVGene": "v",
+                                        "bestJGene": "j",
+                                        "CDR3.amino.acid.sequence": "cdr3aa",
+                                        "CDR3.nucleotide.sequence": "cdr3nt",
+                                        "allVHitsWithScore": "v",
+                                        "allJHitsWithScore": "j",
+                                        "aaSeqCDR3": "cdr3aa",
+                                        "nSeqCDR3": "cdr3nt",
+                                        "Sample":"sample_id",
+                                        "cloneFraction":"freq",
+                                        "Read.count": "count",
+                                        "cloneCount": "count"})
+    
+        clonoset_data["v"] = clonoset_data["v"].apply(lambda x: x.split("*")[0])
+        clonoset_data["j"] = clonoset_data["j"].apply(lambda x: x.split("*")[0])
+
         clonoset_data=clonoset_data.loc[~clonoset_data["cdr3aa"].str.contains("\*|_", na=False)]
         number_of_functional_clonotypes.append(clonoset_data.shape[0])
         number_of_singletons.append(clonoset_data.loc[clonoset_data["count"]==1].shape[0])
