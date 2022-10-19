@@ -1,6 +1,8 @@
 import pandas as pd
 from .common_functions import run_parallel_calculation, combine_metadata_from_folders, print_progress_bar
+from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_dict
 import networkx as nx
+import numpy as np
 
 
 class Node:
@@ -50,8 +52,6 @@ class Node:
             self.additional_properties.update(metadata[self.sample_id])
 
         
-
-
 def find_nodes_and_edges(clonoset_input, mismatches=1, overlap_type="aaV"):
     if isinstance(clonoset_input, str):
         clonoset=pd.read_csv(clonoset_input,sep="\t")
@@ -283,9 +283,8 @@ def pool_clonotypes_to_df(folders, samples_list=None, top=0, functional=True, ex
         clonoset_data["v"] = clonoset_data["v"].apply(lambda x: x.split("*")[0])
         clonoset_data["j"] = clonoset_data["j"].apply(lambda x: x.split("*")[0])
 
-
         if exclude_singletons:
-            clonoset_data=clonoset_data.loc[~clonoset_data["count"]>1]
+            clonoset_data=clonoset_data.loc[clonoset_data["count"]>1]
         if functional:
             clonoset_data=clonoset_data.loc[~clonoset_data["cdr3aa"].str.contains("\*|_")]
             clonoset_data=clonoset_data.sample(frac=1, random_state=1) #shuffle
@@ -317,7 +316,6 @@ def add_metadata(clusters, metadata):
     for cluster in clusters:
         for node in cluster:
             node.add_properties(metadata_dict)
-    return
 
 def pool_alice_hits_to_df(folders, samples_list=None, metadata_filename="vdjtools_metadata.txt"):
     all_metadata = combine_metadata_from_folders(folders, metadata_filename=metadata_filename)
@@ -341,3 +339,64 @@ def pool_alice_hits_to_df(folders, samples_list=None, metadata_filename="vdjtool
     samples_number = len(result_df["sample_id"].unique())
     print("Pooled {} clonotypes from {} samples".format(clonotypes_number, samples_number))
     return result_df
+
+def cluster_properties(clusters, weighed=False):
+    properties_list = ["nodes", "edges", "diameter", "density", "eccentricity",
+                       "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j"]
+    results = []
+    for cluster in clusters:
+        average_eccentricity = np.mean(list(nx.eccentricity(cluster).values()))
+        aa_consensus = calc_cluster_consensus(cluster, seq_type="prot", weighed=weighed)
+        nt_consensus = calc_cluster_consensus(cluster, seq_type="dna", weighed=weighed)
+        v_consensus = calc_cluster_consensus_segment(cluster, segment_type="v", weighed=weighed)
+        j_consensus = calc_cluster_consensus_segment(cluster, segment_type="j", weighed=weighed)
+        result = (len(cluster), 
+                  nx.number_of_edges(cluster), 
+                  nx.diameter(cluster),
+                  nx.density(cluster), 
+                  average_eccentricity,
+                  aa_consensus,
+                  nt_consensus,
+                  v_consensus,
+                  j_consensus)
+        results.append(result)
+    return pd.DataFrame(results, columns=properties_list)
+        
+def calc_cluster_consensus(cluster, seq_type="dna", weighed=False):
+    motif_dicts = []
+    for node in cluster:
+        weight = 1
+        if weighed:
+            weight = node.size
+        if seq_type == "dna":
+            seq = node.seq_nt
+        else:
+            seq = node.seq_aa
+        node_motif_dict = create_motif_dict(seq, seq_type=seq_type, weight=weight)
+        motif_dicts.append(node_motif_dict)
+    motif_dict = sum_motif_dicts(motif_dicts)
+    consensus_seq = get_consensus_from_motif_dict(motif_dict)
+    return consensus_seq
+
+def calc_cluster_consensus_segment(cluster, segment_type="v", weighed=False):
+    segments = {}
+    for node in cluster:
+        if segment_type == "v":
+            segment = node.v
+        else:
+            segment = node.j
+        weight = 1
+        if weighed:
+            weight = node.size
+        if segment not in segments:
+            segments[segment] = weight
+        else:
+            segments[segment] += weight
+    best_segment = ""
+    best_score = 0
+    for segment in segments:
+        score = segments[segment]
+        if segments[segment] > best_score:
+            best_score = score
+            best_segment = segment
+    return best_segment

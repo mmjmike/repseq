@@ -43,13 +43,18 @@ def check_number_of_clonotypes(folders, samples_list=[], metadata_filename="vdjt
     clonotypes_num_df.reset_index(drop=True, inplace=True)
     clonotypes_num_df["functional_not_singletons"] = clonotypes_num_df["functional_clonotypes"] - clonotypes_num_df["singletons"]
     
+    old_samples = False
     if "old.sample.id" in all_metadata.columns:
+        old_samples = True
         clonotypes_num_df = clonotypes_num_df.merge(all_metadata.rename(columns={"sample.id": "sample_id",
                          "old.sample.id": "old_sample_id"})[["sample_id", "old_sample_id"]])
 
     # add TOTAL 
     if add_total:
-        clonotypes_num_df.loc[len(clonotypes_num_df)] = ["TOTAL"] + list(clonotypes_num_df.sum(numeric_only=True, axis=0))
+        total_row = ["TOTAL"] + list(clonotypes_num_df.sum(numeric_only=True, axis=0))
+        if old_samples:
+            total_row += [""]
+        clonotypes_num_df.loc[len(clonotypes_num_df)] = total_row
     return clonotypes_num_df
 
 def pool_metadata(folders, metadata_filename, sample_list=[]):
@@ -58,9 +63,18 @@ def pool_metadata(folders, metadata_filename, sample_list=[]):
         folders = [folders]
     all_metadata_dfs = []
     for folder in folders:
+
         vdjtools_metadata_filename = os.path.join(folder, metadata_filename)
         metadata = pd.read_csv(vdjtools_metadata_filename, sep="\t")
+
+        full_paths = False
+        if os.path.exists(metadata.iloc[0]["#file.name"]):
+            full_paths = True
+        if not full_paths:
+            metadata["#file.name"] = metadata["#file.name"].apply(lambda x: os.path.join(folder, x))
+
         all_metadata_dfs.append(metadata)
+
     all_metadata = pd.concat(all_metadata_dfs).reset_index(drop=True)
     
     multichain = False
@@ -74,7 +88,11 @@ def pool_metadata(folders, metadata_filename, sample_list=[]):
             all_metadata = all_metadata.loc[all_metadata["sample.id"].isin(sample_list) | all_metadata["old.sample.id"].isin(sample_list)]
         else:
             all_metadata = all_metadata.loc[all_metadata["sample.id"].isin(sample_list)]
-    return all_metadata
+    columns = ["#file.name", "sample.id"]
+    if multichain:
+        columns += ["old.sample.id"]
+    return all_metadata[columns]
+
 
 def processing_stats(folders):
     all_assemble_results = pool_metadata(folders, "assemble.log.txt")
