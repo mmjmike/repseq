@@ -183,8 +183,19 @@ def save_clusters_for_cytoscape(clusters, output_prefix, sample_metadata=None):
         break
 
     for cluster in clusters:
+        attributes = nx.get_edge_attributes(cluster,'length')
         for u,v in cluster.edges():
-            edges.append("\tneighbour\t".join([str(u),str(v)]))
+            node1_id = str(u)
+            node2_id = str(v)
+            try:
+                length = attributes[(u,v)]
+                edges.append(f"{node1_id}\t{length}\t{node2_id}")
+            except KeyError:
+                try:
+                    length = attributes[(v,u)]
+                    edges.append(f"{node1_id}\t{length}\t{node2_id}")
+                except KeyError:
+                    edges.append(f"{node1_id}\ttneighbour\t{node2_id}")
         if len(cluster) == 1:
             list(cluster.nodes())[0].id
             edges.append(str(list(cluster.nodes())[0]))

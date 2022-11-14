@@ -62,16 +62,22 @@ def pool_metadata(folders, metadata_filename, sample_list=[]):
     if isinstance(folders, str):
         folders = [folders]
     all_metadata_dfs = []
+
+    vdjtools_format = True
+    if metadata_filename == "assemble.log.txt":
+        vdjtools_format = False
+
     for folder in folders:
 
         vdjtools_metadata_filename = os.path.join(folder, metadata_filename)
         metadata = pd.read_csv(vdjtools_metadata_filename, sep="\t")
 
         full_paths = False
-        if os.path.exists(metadata.iloc[0]["#file.name"]):
-            full_paths = True
-        if not full_paths:
-            metadata["#file.name"] = metadata["#file.name"].apply(lambda x: os.path.join(folder, x))
+        if vdjtools_format:
+            if os.path.exists(metadata.iloc[0]["#file.name"]):
+                full_paths = True
+            if not full_paths:
+                metadata["#file.name"] = metadata["#file.name"].apply(lambda x: os.path.join(folder, x))
 
         all_metadata_dfs.append(metadata)
 
@@ -88,11 +94,13 @@ def pool_metadata(folders, metadata_filename, sample_list=[]):
             all_metadata = all_metadata.loc[all_metadata["sample.id"].isin(sample_list) | all_metadata["old.sample.id"].isin(sample_list)]
         else:
             all_metadata = all_metadata.loc[all_metadata["sample.id"].isin(sample_list)]
-    columns = ["#file.name", "sample.id"]
-    if multichain:
-        columns += ["old.sample.id"]
-    return all_metadata[columns]
-
+    if vdjtools_format:
+        columns = ["#file.name", "sample.id"]
+        if multichain:
+            columns += ["old.sample.id"]
+        return all_metadata[columns]
+    else:
+        return all_metadata
 
 def processing_stats(folders):
     all_assemble_results = pool_metadata(folders, "assemble.log.txt")
