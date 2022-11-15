@@ -104,6 +104,8 @@ def save_pooled_mixcr_clonoset_for_tcr_dist(clonoset, output_filename, chain="be
     else:
         clonoset["count"] = clonoset["readCount"]
     
+    clonoset = clonoset[['count', 'sample_id', cdr3_aa_colname, cdr3_nt_colname, v_colname, j_colname]]
+
     clonoset.to_csv(output_filename, sep="\t", index=False)
     print(f"Saved pooled clonoset to {output_filename}")
 
