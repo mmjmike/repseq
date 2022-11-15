@@ -16,13 +16,13 @@ def parse_args():
                     help='tcrdist radius')
     parser.add_argument('output_prefix', type=str,
                     help='prefix for output files')
-    parser.add_argument('--chain', type=str, choices=['alpha', 'beta'], const="beta",
+    parser.add_argument('--chain', type=str, choices=['alpha', 'beta'], default="beta",
                     help='chain of TCR: "alpha" or "beta"')
-    parser.add_argument('--species', type=str, choices=['human', 'mouse'], const="human",
+    parser.add_argument('--species', type=str, choices=['human', 'mouse'], default="human",
                     help='species: "human" or "mouse"')
-    parser.add_argument('--cpus', type=int, choices=range(1,101), const=1,
+    parser.add_argument('--cpus', type=int, choices=range(1,101), default=1,
                     help='number of cpu cores for parralel calculation')
-    parser.add_argument('--group_colname', type=str, const="group",
+    parser.add_argument('--group_colname', type=str, default="group",
                     help='number of cpu cores for parralel calculation')
 
     args = parser.parse_args()
