@@ -1,5 +1,11 @@
 import argparse
+
+import sys
+import os
+REPSEQ_PATH = os.path.join(os.path.expanduser("~"), "soft", "repseq")
+sys.path.append(REPSEQ_PATH)
 from repseq import tcrdist_clustering as tc
+
 
 
 def parse_args():
