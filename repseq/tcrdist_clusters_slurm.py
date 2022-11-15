@@ -36,7 +36,7 @@ def main():
                             args.radius,
                             args.output_prefix,
                             chain=args.chain,
-                            species=args.spesies,
+                            species=args.species,
                             cpus=args.cpus,
                             group_colname=args.group_colname)
 
