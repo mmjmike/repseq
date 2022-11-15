@@ -1,6 +1,7 @@
 import yaml
 import os
 import pandas as pd
+import dill
 
 def read_yaml_metadata(folder, filename="metadata.yaml"):
     yaml_filename = os.path.join(folder, filename)
@@ -19,3 +20,11 @@ def read_yaml_metadata(folder, filename="metadata.yaml"):
 
     yaml_metadata = pd.DataFrame(all_data).rename(columns={"name": "sample_id"})
     return yaml_metadata
+
+def save_dill_dump(obj, filename):
+    with open(filename, 'wb') as f: 
+        dill.dump(obj, f)
+
+def read_dill_dump(filename):
+    with open(filename, 'rb') as f:
+        return dill.load(f)
