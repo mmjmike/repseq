@@ -26,7 +26,7 @@ def run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory
     datetime = strftime("%Y_%m_%d__%H_%M_%S", gmtime())
     slurm_script_filename = os.path.join(ALDAN_TEMP_SLURM_DIR, f"{datetime}_{jobname}.sh")
     if isinstance(log_filename, str):
-        log_dirname = os.dirname(log_filename)
+        log_dirname = os.path.dirname(log_filename)
         if os.path.isdir(log_dirname):
             slurm_script_log_filename = log_filename
         else:
