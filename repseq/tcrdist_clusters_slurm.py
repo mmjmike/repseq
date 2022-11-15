@@ -1,5 +1,5 @@
 import argparse
-from .tcrdist_clustering import build_tcr_dist_clusters
+from repseq import tcrdist_clustering as tc
 
 
 def parse_args():
@@ -26,7 +26,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    build_tcr_dist_clusters(args.clonoset_filename,
+    tc.build_tcr_dist_clusters(args.clonoset_filename,
                             args.radius,
                             args.output_prefix,
                             chain=args.chain,
