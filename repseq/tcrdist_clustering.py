@@ -13,7 +13,9 @@ from .io import save_dill_dump
 REPSEQ_PATH = os.path.join(os.path.expanduser("~"), "soft", "repseq")
 
 
-def build_tcr_dist_clusters_slurm(clonoset_filename, radius, output_prefix, chain="beta", species="human", cpus=1, group_colname="group", time_estimate=4, memory=20):
+def build_tcr_dist_clusters_slurm(clonoset_filename, radius, output_prefix,
+                                 chain="beta", species="human", group_colname="group",
+                                  cpus=1, time_estimate=4, memory=20, append_command=None):
     # print(os.path.abspath(a_module.__file__))
     
     script_path = os.path.join(REPSEQ_PATH, "repseq", "tcrdist_clusters_slurm.py")
@@ -21,7 +23,7 @@ def build_tcr_dist_clusters_slurm(clonoset_filename, radius, output_prefix, chai
     command = f"python {script_path} {clonoset_filename} {radius} {output_prefix} --chain {chain} --species {species} --cpus {cpus} --group_colname {group_colname}"
     jn = os.path.basename(output_prefix)
     jobname = f"TCRdist_clusters_{jn}"
-    run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory, log_filename=log_filename)
+    run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory, log_filename=log_filename, append_command=append_command)
 
 
 def build_tcr_dist_clusters(clonoset_filename, radius, output_prefix, chain="beta", species="human", cpus=1, group_colname="group"):
