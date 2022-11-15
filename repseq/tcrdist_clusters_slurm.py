@@ -1,5 +1,5 @@
 import argparse
-from .tcrdist_clusters import build_tcr_dist_clusters
+from .tcrdist_clustering import build_tcr_dist_clusters
 
 
 def parse_args():
