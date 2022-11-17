@@ -131,7 +131,8 @@ def create_tcr_dist_clusters(clone_df, dist_matrix, nhood_df):
     print("Nodes total: {}".format(len(nodes)))
     main_graph = nx.Graph()
     main_graph.add_nodes_from(nodes)
-    main_graph = add_edges_from_tcrdist_neighbor_df(main_graph, dist_matrix, nhood_df)
+    # main_graph = add_edges_from_tcrdist_neighbor_df(main_graph, dist_matrix, nhood_df)
+    add_edges_from_tcrdist_neighbor_df(main_graph, dist_matrix, nhood_df)
     clusters = [main_graph.subgraph(c).copy() for c in nx.connected_components(main_graph)]
     non_single_clusters = len([c for c in clusters if len(c) > 1])
     print("Clusters: {}; single nodes: {}".format(non_single_clusters, len(clusters)-non_single_clusters))
@@ -168,4 +169,4 @@ def add_edges_from_tcrdist_neighbor_df(graph, matrix, df):
                 if length == -1:
                     length = 0
                 graph.add_edge(node1, node2, length=length)
-    return graph
+    # return graph
