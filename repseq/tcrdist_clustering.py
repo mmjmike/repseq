@@ -7,7 +7,7 @@ from tcrdist.rep_funcs import compute_pw_sparse_out_of_memory, compute_n_tally_o
 from tcrdist.repertoire import TCRrep
 from .slurm import run_slurm_command_from_jupyter
 from .clustering import Node, save_clusters_for_cytoscape
-from .io import save_dill_dump
+from .io import save_dill_dump, read_dill_dump
 
 
 REPSEQ_PATH = os.path.join(os.path.expanduser("~"), "soft", "repseq")
@@ -79,10 +79,14 @@ def build_tcr_dist_clusters(clonoset_filename, radius, output_prefix, chain="bet
     # create list of NetworkX clusters
     clusters = create_tcr_dist_clusters(rep.clone_df, sparse_matrix, nhood_df)
     clusters_filename = f"{output_prefix}.clusters"
+    save_clusters_for_cytoscape([c for c in clusters if len(c) > 1], output_prefix)
+
     save_dill_dump(clusters, clusters_filename)
     print(f"Clusters list written to: {clusters_filename}")
     
-    save_clusters_for_cytoscape([c for c in clusters if len(c) > 1], output_prefix)
+    save_clusters_for_cytoscape([c for c in clusters if len(c) > 1], output_prefix+"_2")
+
+    save_clusters_for_cytoscape([c for c in read_dill_dump(clusters_filename) if len(c) > 1], output_prefix+"_3")
     
     return clusters
 
