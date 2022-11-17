@@ -72,7 +72,7 @@ def build_tcr_dist_clusters(clonoset_filename, radius, output_prefix, chain="bet
                     x_cols       = [group_colname],
                     knn_radius   = radius)
     nhood_df_filename = f"{output_prefix}.neighbours_df.tsv"
-    rep.clone_df.to_csv(nhood_df_filename, sep="\t", index=False)
+    rep.nhood_df.to_csv(nhood_df_filename, sep="\t", index=False)
     print(f"Neighbours DataFrame written to: {nhood_df_filename}")
     
     
