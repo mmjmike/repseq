@@ -30,8 +30,11 @@ def parse_args():
 
 
 def main():
+    
     args = parse_args()
-
+    print("Read args: {} {} {} {} {} {} {}".format(args.clonoset_filename,args.radius,
+                                                   args.output_prefix,args.chain,
+                                                   args.species,args.cpus,args.group_colname))
     tc.build_tcr_dist_clusters(args.clonoset_filename,
                             args.radius,
                             args.output_prefix,

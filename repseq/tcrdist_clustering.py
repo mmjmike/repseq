@@ -25,23 +25,28 @@ def build_tcr_dist_clusters_slurm(clonoset_filename, radius, output_prefix,
         command += f"; {append_command}"
     jn = os.path.basename(output_prefix)
     jobname = f"TCRdist_clusters_{jn}"
+
+    print(f"Running slurm command: {command}")
     run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory, log_filename=log_filename)
 
 
 def build_tcr_dist_clusters(clonoset_filename, radius, output_prefix, chain="beta", species="human", cpus=1, group_colname="group"):
     
     # Create TCRdist repertoire object
+    print("Creating tcrdist repertoire object")
     rep = create_tcr_dist_rep_from_file(clonoset_filename, chain, species)
-    
+    print("Tcrdist repertoire object created")
+
+
     clone_df_filename = f"{output_prefix}.clone_df.tsv"
     rep.clone_df.to_csv(clone_df_filename, sep="\t", index=False)
-    print(f"Clonoset DataFrame written to: {clone_df_filename}")
-    
+    clones = len(rep.clone_df)
+    print(f"Clonoset DataFrame ({clones} clones) written to: {clone_df_filename}")
     
     # Calculate TCR distance matrix
     print(f"Computing sparse distances with radius {radius}...")
     sparse_matrix, fragments = compute_pw_sparse_out_of_memory(tr = rep,
-                    row_size      = 500,
+                    row_size      = 670,
                     pm_processes  = cpus,
                     pm_pbar       = True,
                     max_distance  = radius,
