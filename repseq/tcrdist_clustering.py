@@ -77,20 +77,13 @@ def build_tcr_dist_clusters(clonoset_filename, radius, output_prefix, chain="bet
     nhood_df_read = pd.read_csv(nhood_df_filename, sep="\t")
     
     # create list of NetworkX clusters
-    clusters = create_tcr_dist_clusters(rep.clone_df, sparse_matrix, nhood_df)
+    clusters = create_tcr_dist_clusters(rep.clone_df, sparse_matrix, nhood_df_read)
     clusters_filename = f"{output_prefix}.clusters"
-    save_clusters_for_cytoscape([c for c in clusters if len(c) > 1], output_prefix)
-
     save_dill_dump(clusters, clusters_filename)
     print(f"Clusters list written to: {clusters_filename}")
     
-    save_clusters_for_cytoscape([c for c in clusters if len(c) > 1], output_prefix+"_2")
+    save_clusters_for_cytoscape([c for c in clusters if len(c) > 1], output_prefix)
 
-    save_clusters_for_cytoscape([c for c in read_dill_dump(clusters_filename) if len(c) > 1], output_prefix+"_3")
-
-    clusters2 = create_tcr_dist_clusters(rep.clone_df, sparse_matrix, nhood_df_read)
-    save_clusters_for_cytoscape([c for c in clusters2 if len(c) > 1], output_prefix+"_4")
-    
     return clusters
 
 
