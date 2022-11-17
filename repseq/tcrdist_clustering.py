@@ -88,7 +88,7 @@ def build_tcr_dist_clusters(clonoset_filename, radius, output_prefix, chain="bet
 
     save_clusters_for_cytoscape([c for c in read_dill_dump(clusters_filename) if len(c) > 1], output_prefix+"_3")
 
-    clusters2 = (rep.clone_df, sparse_matrix, nhood_df_read)
+    clusters2 = create_tcr_dist_clusters(rep.clone_df, sparse_matrix, nhood_df_read)
     save_clusters_for_cytoscape([c for c in clusters2 if len(c) > 1], output_prefix+"_4")
     
     return clusters
