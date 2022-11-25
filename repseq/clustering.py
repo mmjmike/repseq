@@ -52,7 +52,7 @@ class Node:
             self.additional_properties.update(metadata[self.sample_id])
 
         
-def find_nodes_and_edges(clonoset_input, mismatches=1, overlap_type="aaV"):
+def find_nodes_and_edges(clonoset_input, mismatches=1, overlap_type="aaV", igh=False):
     if isinstance(clonoset_input, str):
         clonoset=pd.read_csv(clonoset_input,sep="\t")
     else:
@@ -77,6 +77,7 @@ def find_nodes_and_edges(clonoset_input, mismatches=1, overlap_type="aaV"):
                                         "CDR3.nucleotide.sequence": "cdr3nt",
                                         "allVHitsWithScore": "v",
                                         "allJHitsWithScore": "j",
+                                        "allCHitsWithScore": "c",
                                         "aaSeqCDR3": "cdr3aa",
                                         "nSeqCDR3": "cdr3nt",
                                         "Sample":"sample_id",
@@ -86,6 +87,8 @@ def find_nodes_and_edges(clonoset_input, mismatches=1, overlap_type="aaV"):
     
     clonoset["v"] = clonoset["v"].apply(lambda x: x.split("*")[0])
     clonoset["j"] = clonoset["j"].apply(lambda x: x.split("*")[0])
+    if igh:
+        clonoset["c"] = clonoset["c"].apply(lambda x: x.split("*")[0])
 
     nodes_by_len={}
     list_of_all_nodes = []
@@ -107,6 +110,8 @@ def find_nodes_and_edges(clonoset_input, mismatches=1, overlap_type="aaV"):
         if len_cdr3aa not in nodes_by_len:
             nodes_by_len[len_cdr3aa] = []
         node = Node(index, cdr3nt, cdr3aa, v, j, sample_id, size=size)
+        if igh:
+            node.additional_properties["c"] = row["c"]
         nodes_by_len[len_cdr3aa].append(node)
         list_of_all_nodes.append(node)
     print("Nodes list created: {} nodes".format(len(list_of_all_nodes)))
