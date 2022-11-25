@@ -88,7 +88,14 @@ def find_nodes_and_edges(clonoset_input, mismatches=1, overlap_type="aaV", igh=F
     clonoset["v"] = clonoset["v"].apply(lambda x: x.split("*")[0])
     clonoset["j"] = clonoset["j"].apply(lambda x: x.split("*")[0])
     if igh:
-        clonoset["c"] = clonoset["c"].apply(lambda x: x.split("*")[0])
+        def _split_c(c_segm):
+            try:
+                return c_segm("*")[0]
+            except AttributeError:
+                return "None"
+        clonoset["c"] = clonoset["c"].apply(lambda x: _split_c(x))
+
+    
 
     nodes_by_len={}
     list_of_all_nodes = []
