@@ -147,8 +147,8 @@ def find_edges_in_nodes_set_mp(args):
                 edges.append((node_1, node_2)) #save unique codes
     return edges
 
-def create_clusters(clonoset_input, mismatches=1, overlap_type="aaV"):
-    nodes, edges = find_nodes_and_edges(clonoset_input, mismatches=mismatches, overlap_type=overlap_type)
+def create_clusters(clonoset_input, mismatches=1, overlap_type="aaV", igh=False):
+    nodes, edges = find_nodes_and_edges(clonoset_input, mismatches=mismatches, overlap_type=overlap_type, igh=igh)
     
     main_graph = nx.Graph()
     main_graph.add_nodes_from(nodes)
