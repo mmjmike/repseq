@@ -15,7 +15,7 @@ REPSEQ_PATH = os.path.join(os.path.expanduser("~"), "soft", "repseq")
 
 def build_tcr_dist_clusters_slurm(clonoset_filename, radius, output_prefix,
                                   chain="beta", species="human", group_colname="group",
-                                  cpus=1, time_estimate=4, memory=20, append_command=None):
+                                  cpus=1, time_estimate=4, memory=100, append_command=None):
     # print(os.path.abspath(a_module.__file__))
     
     script_path = os.path.join(REPSEQ_PATH, "repseq", "tcrdist_clusters_slurm.py")
