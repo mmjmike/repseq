@@ -90,7 +90,7 @@ def find_nodes_and_edges(clonoset_input, mismatches=1, overlap_type="aaV", igh=F
     if igh:
         def _split_c(c_segm):
             try:
-                return c_segm("*")[0]
+                return c_segm.split("*")[0]
             except AttributeError:
                 return "None"
         clonoset["c"] = clonoset["c"].apply(lambda x: _split_c(x))
