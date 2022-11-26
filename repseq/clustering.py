@@ -177,7 +177,7 @@ def create_clusters(clonoset_input, mismatches=1, overlap_type="aaV", igh=False)
     cluster_num = len(filter_one_node_clusters(clusters))
     singletons = total_clusters - cluster_num
     print(f"Found {cluster_num} clusters (2 or more nodes) and {singletons} single nodes. Total: {total_clusters}")
-    return clusters
+    return clusters.sort(key=lambda x: len(x), reverse=True)
 
 def filter_one_node_clusters(clusters):
     return [c for c in clusters if len(c)>1]
