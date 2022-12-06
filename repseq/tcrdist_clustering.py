@@ -136,7 +136,8 @@ def create_tcr_dist_clusters(clone_df, dist_matrix, nhood_df):
     clusters = [main_graph.subgraph(c).copy() for c in nx.connected_components(main_graph)]
     non_single_clusters = len([c for c in clusters if len(c) > 1])
     print("Clusters: {}; single nodes: {}".format(non_single_clusters, len(clusters)-non_single_clusters))
-    return clusters.sort(key=lambda x: len(x), reverse=True)
+    clusters.sort(key=lambda x: len(x), reverse=True)
+    return clusters
 
 
 def create_cluster_nodes_from_tcrdist_df(df):
