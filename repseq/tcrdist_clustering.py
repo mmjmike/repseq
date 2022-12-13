@@ -126,8 +126,10 @@ def create_tcr_dist_rep_from_file(clonoset_filename, chain, species, cdr3_gap_pe
         db_file = 'alphabeta_gammadelta_db.tsv',
         compute_distances=False)
     if isinstance(cdr3_gap_penalty, int):
-        rep.kargs_a['cdr3_a_aa']['gap_penalty'] = cdr3_gap_penalty 
-        rep.kargs_b['cdr3_b_aa']['gap_penalty'] = cdr3_gap_penalty
+        if chain == "alpha":
+            rep.kargs_a['cdr3_a_aa']['gap_penalty'] = cdr3_gap_penalty 
+        if chain == "beta":
+            rep.kargs_b['cdr3_b_aa']['gap_penalty'] = cdr3_gap_penalty
     return rep
 
 def create_tcr_dist_clusters(clone_df, dist_matrix, nhood_df):
