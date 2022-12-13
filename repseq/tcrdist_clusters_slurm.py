@@ -24,6 +24,8 @@ def parse_args():
                     help='number of cpu cores for parralel calculation')
     parser.add_argument('--group_colname', type=str, default="group",
                     help='number of cpu cores for parralel calculation')
+    parser.add_argument('--cdr3_gap_penalty', type=int, default=4,
+                    help='cdr3 region gap penalty')
 
     args = parser.parse_args()
     return args
@@ -32,16 +34,17 @@ def parse_args():
 def main():
     
     args = parse_args()
-    print("Read args: {} {} {} {} {} {} {}".format(args.clonoset_filename,args.radius,
+    print("Read args: {} {} {} {} {} {} {} {}".format(args.clonoset_filename,args.radius,
                                                    args.output_prefix,args.chain,
-                                                   args.species,args.cpus,args.group_colname))
+                                                   args.species,args.cpus,args.group_colname,args.cdr3_gap_penalty))
     tc.build_tcr_dist_clusters(args.clonoset_filename,
                             args.radius,
                             args.output_prefix,
                             chain=args.chain,
                             species=args.species,
                             cpus=args.cpus,
-                            group_colname=args.group_colname)
+                            group_colname=args.group_colname,
+                            cdr3_gap_penalty=args.cdr3_gap_penalty)
 
 
 if __name__ == "__main__":

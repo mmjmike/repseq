@@ -7,7 +7,7 @@ from tcrdist.rep_funcs import compute_pw_sparse_out_of_memory, compute_n_tally_o
 from tcrdist.repertoire import TCRrep
 from .slurm import run_slurm_command_from_jupyter
 from .clustering import Node, save_clusters_for_cytoscape
-from .io import save_dill_dump, read_dill_dump
+from .io import save_dill_dump
 
 
 REPSEQ_PATH = os.path.join(os.path.expanduser("~"), "soft", "repseq")
@@ -15,7 +15,7 @@ REPSEQ_PATH = os.path.join(os.path.expanduser("~"), "soft", "repseq")
 
 def build_tcr_dist_clusters_slurm(clonoset_filename, radius, output_prefix,
                                   chain="beta", species="human", group_colname="group",
-                                  cpus=1, time_estimate=4, memory=100, append_command=None):
+                                  cpus=1, time_estimate=4, memory=100, append_command=None, cdr3_gap_penalty=None):
     # print(os.path.abspath(a_module.__file__))
     
     script_path = os.path.join(REPSEQ_PATH, "repseq", "tcrdist_clusters_slurm.py")
@@ -23,6 +23,8 @@ def build_tcr_dist_clusters_slurm(clonoset_filename, radius, output_prefix,
     command = f"python {script_path} {clonoset_filename} {radius} {output_prefix} --chain {chain} --species {species} --cpus {cpus} --group_colname {group_colname}"
     if isinstance(append_command, str):
         command += f"; {append_command}"
+    if cdr3_gap_penalty is not None:
+        command += f" --cdr3_gap_penalty {cdr3_gap_penalty}"
     jn = os.path.basename(output_prefix)
     jobname = f"TCRdist_clusters_{jn}"
 
@@ -30,11 +32,11 @@ def build_tcr_dist_clusters_slurm(clonoset_filename, radius, output_prefix,
     run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory, log_filename=log_filename)
 
 
-def build_tcr_dist_clusters(clonoset_filename, radius, output_prefix, chain="beta", species="human", cpus=1, group_colname="group"):
+def build_tcr_dist_clusters(clonoset_filename, radius, output_prefix, chain="beta", species="human", cpus=1, group_colname="group", cdr3_gap_penalty=None):
     
     # Create TCRdist repertoire object
     print("Creating tcrdist repertoire object")
-    rep = create_tcr_dist_rep_from_file(clonoset_filename, chain, species)
+    rep = create_tcr_dist_rep_from_file(clonoset_filename, chain, species, cdr3_gap_penalty=cdr3_gap_penalty)
     print("Tcrdist repertoire object created")
 
 
@@ -115,7 +117,7 @@ def save_pooled_mixcr_clonoset_for_tcr_dist(clonoset, output_filename, chain="be
     print(f"Saved pooled clonoset to {output_filename}")
 
 
-def create_tcr_dist_rep_from_file(clonoset_filename, chain, species):
+def create_tcr_dist_rep_from_file(clonoset_filename, chain, species, cdr3_gap_penalty=None):
     clonoset = pd.read_csv(clonoset_filename, sep="\t")
     rep = TCRrep(
         cell_df = clonoset, 
@@ -123,8 +125,10 @@ def create_tcr_dist_rep_from_file(clonoset_filename, chain, species):
         organism = species,
         db_file = 'alphabeta_gammadelta_db.tsv',
         compute_distances=False)
+    if isinstance(cdr3_gap_penalty, int):
+        rep.kargs_a['cdr3_a_aa']['gap_penalty'] = cdr3_gap_penalty 
+        rep.kargs_b['cdr3_b_aa']['gap_penalty'] = cdr3_gap_penalty
     return rep
-
 
 def create_tcr_dist_clusters(clone_df, dist_matrix, nhood_df):
     nodes = create_cluster_nodes_from_tcrdist_df(clone_df)
