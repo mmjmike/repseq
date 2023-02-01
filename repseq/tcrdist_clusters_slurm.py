@@ -46,6 +46,5 @@ def main():
                             group_colname=args.group_colname,
                             cdr3_gap_penalty=args.cdr3_gap_penalty)
 
-
 if __name__ == "__main__":
     main()
