@@ -580,6 +580,9 @@ def export_clusters_to_gae(clusters):
             # clone_list.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.size, *add_properties_values))
             clone_list.append((node_id, node.v, node.j, node.seq_aa, node.seq_nt, node.sample_id, node.size))
             clone_id_dict[node.id] = node_id
+            weights.append(1)
+            rows.append(node_id)
+            columns.append(node_id)
             node_id += 1
 
         attributes = nx.get_edge_attributes(cluster,'length')
