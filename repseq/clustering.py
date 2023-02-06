@@ -604,4 +604,4 @@ def export_clusters_to_gae(clusters):
     adjacency_matrix = csr_matrix((np.array(weights), (np.array(rows), np.array(columns))),
                           shape = (clone_count, clone_count), 
                           dtype = float).toarray()
-    return adjacency_matrix, clonoset
+    return (adjacency_matrix, clonoset, weights, rows, columns)
