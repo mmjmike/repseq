@@ -38,3 +38,6 @@ def run_parallel_calculation(function, tasks, program_name):
             tasks_done+=1
             print_progress_bar(tasks_done, tasks_total, program_name)
     return result_list
+
+def _new_function_():
+    pass
