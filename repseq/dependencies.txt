@@ -1,0 +1,10 @@
+pandas
+numpy
+json
+pyyaml
+networkx
+scipy
+dill
+logomaker
+matplotlib
+subprocess
