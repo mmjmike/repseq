@@ -3,8 +3,148 @@ from .constants import MIXCR
 import pandas as pd
 import numpy as np
 import os
+from .slurm import create_slurm_batch_file, run_slurm_command_from_jupyter
+from .io import read_json_report, read_mixcr_clonoset
+from .clonosets import find_all_exported_clonosets_in_folder
 from subprocess import Popen, PIPE
+from IPython.display import Image, display
 
+
+
+def mixcr4_analyze_batch(sample_df, output_folder, command_template=None):
+    
+    program_name="MIXCR4.3 Analyze Batch"
+    samples_num = sample_df.shape[0]
+    
+    # by default use the most popular preset for MiLaboratory Human TCR UMI MULTIPLEX Kit
+    default_command_template = "mixcr analyze milab-human-tcr-rna-multiplex-cdr3 r1 r2 output_prefix"
+    if command_template is None:
+        command_template = default_command_template
+        
+    # cut placeholders from command template
+    remove_list = ["mixcr", "r1", "r2", "output_prefix"]
+    command_template = ' '.join([w for w in command_template.split() if w not in remove_list])
+    
+    # Create output dir if does not exist
+    os.makedirs(output_folder, exist_ok=True)
+
+    # default mixcr analyze slurm parameters. They are quite excessive, works fine.
+    time_estimate=1.5
+    cpus=40
+    memory=32
+    
+    # create slurm batch file for progress tracking
+    slurm_batch_filename = os.path.join(output_folder, "mixcr_analyze_slurm_batch.log")
+    create_slurm_batch_file(slurm_batch_filename, program_name, samples_num)
+    
+    # main cycle by samples
+    for i,r in sample_df.iterrows():
+        sample_id = r["sample_id"]
+        r1 = r["R1"]
+        r2 = r["R2"]
+        output_prefix = os.path.join(output_folder, sample_id)
+        command = f'{MIXCR} -Xmx{memory}g {command_template} {r1} {r2} {output_prefix}'
+        jobname = f"mixcr_analyze_{sample_id}"
+        
+        # for batch task finish tracking:
+        command += f'; echo "{jobname} finished" >> {slurm_batch_filename}'
+        
+        # create slurm script and add job to queue, print stdout of sbatch
+        stdout, stderr = run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory)
+        print(stdout, stderr)
+    
+    print(f"{samples_num} tasks added to slurm queue\n")
+    print(f'To see running progress bar run this function in the next jupyter cell:\nslurm.check_slurm_progress("{slurm_batch_filename}", loop=True)')
+    print(f'To see current progress:\nslurm.check_slurm_progress("{slurm_batch_filename}")')
+
+
+def mixcr4_reports(folder):
+    
+    program_name="MIXCR4.3 Reports"
+    time_estimate=1
+    cpus=40
+    memory=32
+    
+    clns_filenames = os.path.join(folder, "*.clns")
+    align_filename = os.path.join(folder, "alignQc.png")
+    chains_filename = os.path.join(folder, "chainsQc.png")
+    tags_filename = os.path.join(folder, "tagsQc.pdf")
+    #tables_filename = os.path.join(folder, "tables.tsv")
+    #preproc_filename = os.path.join(folder, "preproc_tables.tsv")
+    #postanalysis_filename = os.path.join(folder, "postanalysis.json")
+    
+    commands = {"alignQc": f"{MIXCR} -Xmx32g exportQc align -f {clns_filenames} {align_filename}",
+                "chainUsage": f"{MIXCR} -Xmx32g exportQc chainUsage -f {clns_filenames} {chains_filename}",
+                "tagsQc": f"{MIXCR} -Xmx32g exportQc tags -f {clns_filenames} {tags_filename}"#,
+                #"postanalysis": f"{MIXCR} -Xmx32g postanalysis individual -f --default-downsampling none --default-weight-function umi --only-productive --tables {tables_filename} --preproc-tables {preproc_filename} {clns_filenames} {postanalysis_filename}"
+               }
+    
+
+    commands_num = len(commands)
+    
+    slurm_batch_filename = os.path.join(folder, "mixcr_reports_slurm_batch.log")
+    create_slurm_batch_file(slurm_batch_filename, program_name, commands_num)
+    
+    for jobname, command in commands.items():
+        command += f'; echo "{jobname} finished" >> {slurm_batch_filename}'
+        stdout, stderr = run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory)
+        print(stdout, stderr)
+
+
+def get_processing_table(folder):
+    results = []
+    clonosets = find_all_exported_clonosets_in_folder(folder, chain=None)
+
+    for i, r in clonosets.iterrows():
+        sample_id = r["sample_id"]
+        chain = r["chain"]
+        align_report = read_json_report(sample_id, folder, "align")
+        refine_report = read_json_report(sample_id, folder, "refine")
+        assemble_report = read_json_report(sample_id, folder, "assemble")
+
+        # print(sample_id, chain)
+        clonoset = read_mixcr_clonoset(r.filename)
+        clonoset_f = clonoset.loc[~clonoset["aaSeqCDR3"].str.contains("\*|_")]
+
+        Rt=align_report["totalReadsProcessed"]
+        Ru=align_report["totalReadsProcessed"]-align_report["notAlignedReasons"]["NoBarcode"]
+        Ru_pc = round(Ru/Rt*100, 2)
+        Ra=align_report["aligned"]
+        #Ra2=refine_report["correctionReport"]["inputRecords"] ##### differs from Ra, but D.Bolotin did not explain why
+        Ra_pc = round(Ra/Rt*100, 2)
+        UMIa=refine_report["correctionReport"]["steps"][0]["inputDiversity"]
+        UMIc=refine_report["correctionReport"]["steps"][0]["outputDiversity"]
+        try:
+            UMIf=refine_report["correctionReport"]["filterReport"]["numberOfGroupsAccepted"]
+        except TypeError:
+            UMIf=UMIc
+        Rf=refine_report["correctionReport"]["outputRecords"]
+        overseq_threshold = int(refine_report["correctionReport"]["filterReport"]["operatorReports"][0]["operatorReport"]["threshold"])
+        reads_per_umi = round(Rf/UMIf, 2)
+
+
+        Ct=assemble_report["clones"]
+        Rcl=assemble_report["readsInClones"]
+        UMIcl=clonoset.uniqueMoleculeCount.sum()
+        Cfunc=len(clonoset_f)
+        Rfunc=int(clonoset_f.readCount.sum())
+        UMIfunc=clonoset_f.uniqueMoleculeCount.sum()
+
+        results.append([sample_id, chain, Rt, Ru_pc, Ra_pc, UMIa, UMIc, overseq_threshold, Rf, UMIf, reads_per_umi, Ct, Cfunc, Rcl, Rfunc, UMIcl, UMIfunc])
+    result_df = pd.DataFrame(results, columns=["sample_id", "extracted_chain", "reads_total", "reads_with_umi_pc", "reads_aligned_pc",
+                                               "total_umi", "umi_after_correction", "overseq_threshold", "reads_after_filter", "umi_after_filter",
+                                               "reads_per_umi", "clones", "clones_func", "reads_in_clones", "reads_in_func_clones", "umi_in_clones", "umi_in_func_clones"])
+    return result_df
+
+def show_report_images(folder):
+    images = [os.path.join(folder, "alignQc.png"),
+          os.path.join(folder, "chainsQc.png")]
+    for imageName in images:
+        print(imageName)
+        display(Image(filename=imageName))
+
+
+################ Old functions
 def mixcr_check_input(input_folder, output_folder, protocol, samples_metadata_df, chain, species):
     os.makedirs(output_folder, exist_ok=True)
     

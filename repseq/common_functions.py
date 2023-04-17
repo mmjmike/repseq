@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import concurrent.futures
+import numpy as np
 
 def print_progress_bar(samples_done, samples_total, program_name="", object_name="sample(s)"):
     done = int(samples_done/samples_total*50)
@@ -38,3 +39,29 @@ def run_parallel_calculation(function, tasks, program_name):
             tasks_done+=1
             print_progress_bar(tasks_done, tasks_total, program_name)
     return result_list
+
+def shannon_wiener(list_of_numbers):
+    list_of_numbers = list(list_of_numbers)
+    total_size = sum(list_of_numbers)
+    freqs = [s/total_size for s in list_of_numbers]
+    diversity = len(list_of_numbers)
+    sw = -sum([f*np.log(f) for f in freqs])
+    sw_norm = sw/np.log(diversity)
+    return sw, sw_norm, diversity
+
+def extract_segment(s):
+    segm = str(s).split("*")[0]
+    segm = str(s).split("(")[0]
+    if segm == "nan":
+        return "."
+    else:
+        return segm
+
+def extract_refpoint_position(p, n, minus=False):
+    pos = p.split(":")[n]
+    if pos == "":
+        return -1
+    elif minus:
+        return int(pos)-1
+    else:
+        return int(pos)
