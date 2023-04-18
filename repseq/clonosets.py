@@ -122,7 +122,6 @@ def get_clonoset_stats(folders, samples_list=None, chain=None):
     stats = get_clonoset_stats_from_df(clonosets_df)
     return stats
 
-
 def get_column_names_from_clonoset(clonoset):
 
     colnames = {"count_column": None,
@@ -156,21 +155,30 @@ def get_column_names_from_clonoset(clonoset):
     if "readCount" in clonoset.columns:
         colnames["count_column"] = "readCount"
         colnames["fraction_column"] = "readFraction"
+    if "Read.count" in clonoset.columns:
+        colnames["count_column"] = "Read.count"
 
     if "aaSeqCDR3" in clonoset.columns:
         colnames["cdr3aa_column"] = "aaSeqCDR3"
     if "cdr3aa" in clonoset.columns:
         colnames["cdr3aa_column"] = "cdr3aa"
+    if "CDR3.amino.acid.sequence" in clonoset.columns:
+        colnames["cdr3aa_column"] = "cdr3aCDR3.amino.acid.sequencea"
 
     if "nSeqCDR3" in clonoset.columns:
         colnames["cdr3nt_column"] = "nSeqCDR3"
     if "cdr3nt" in clonoset.columns:
         colnames["cdr3nt_column"] = "cdr3nt"
+    if "CDR3.nucleotide.sequence" in clonoset.columns:
+        colnames["cdr3nt_column"] = "CDR3.nucleotide.sequence"
+    
 
     if "allVHitsWithScore" in clonoset.columns:
         colnames["v_column"] = "allVHitsWithScore"
     if "v" in clonoset.columns:
         colnames["v_column"] = "v"
+    if "bestVGene" in clonoset.columns:
+        colnames["v_column"] = "bestVGene"
 
     if "allDHitsWithScore" in clonoset.columns:
         colnames["d_column"] = "allDHitsWithScore"
@@ -181,6 +189,8 @@ def get_column_names_from_clonoset(clonoset):
         colnames["j_column"] = "allJHitsWithScore"
     if "j" in clonoset.columns:
         colnames["j_column"] = "j"
+    if "bestJGene" in clonoset.columns:
+        colnames["j_column"] = "bestJGene"
 
     if "allCHitsWithScore" in clonoset.columns:
         colnames["c_column"] = "allCHitsWithScore"
@@ -247,6 +257,50 @@ def recount_fractions_for_clonoset(clonoset, colnames=None):
     if colnames["umi"]:
         clonoset[umi_fraction_column] = clonoset[umi_column]/clonoset[umi_column].sum()
     return clonoset
+
+
+def pool_clonotypes_from_clonosets_df(clonosets_df, samples_list=None, top=None, downsample=None, only_functional=True, by_umi=False, exclude_singletons=False, seed=None):
+    
+    clonosets_df = filter_clonosets_by_sample_list(clonosets_df, samples_list)
+    
+    clonotypes_dfs = []
+    
+    for index, row in clonosets_df.iterrows():
+        sample_id = row["sample_id"]
+        filename = row["filename"]
+        clonoset=read_mixcr_clonoset(filename)
+        colnames = get_column_names_from_clonoset(clonoset)
+        if only_functional:
+            clonoset = filter_nonfunctional_clones(clonoset, colnames=colnames)
+        
+        count_column = colnames["count_column"]
+        if by_umi:
+            if colnames["umi"] is not None:
+                count_column = colnames["umi_column"]
+            else:
+                print("WARNING! This clonoset does not contain UMI column. Using reads for count instead.")
+        clonoset_size = clonoset[count_column].sum()
+        if downsample is not None:
+            if downsample > clonoset_size:
+                raise(ValueError, f"Downsample size ({downsample}) exceeds the clonoset size ({clonoset_size})")
+            clonoset = downsample_clonoset(clonoset, downsample, seed=seed, by_umi=by_umi)
+        clonoset = recount_fractions_for_clonoset(clonoset, colnames=colnames)
+
+        clonoset = clonoset.rename(columns={colnames["v_column"]: "v",
+                                colnames["j_column"]: "j",
+                                colnames["cdr3aa_column"]: "cdr3aa",
+                                colnames["cdr3nt_column"]: "cdr3nt",
+                                colnames["fraction_column"]:"freq",
+                                colnames["count_column"]: "count"})
+
+        clonoset["sample_id"] = sample_id
+        clonotypes_dfs.append(clonoset_data)
+    result_df = pd.concat(clonotypes_dfs).reset_index(drop=True)
+    clonotypes_number = len(result_df)
+    samples_number = len(result_df["sample_id"].unique())
+    print(f"Pooled {clonotypes_number} clonotypes from {samples_number} samples")
+    return result_df
+
 
 
 ##################### unchecked functions ########################
