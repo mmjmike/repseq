@@ -294,7 +294,7 @@ def pool_clonotypes_from_clonosets_df(clonosets_df, samples_list=None, top=None,
                                 colnames["count_column"]: "count"})
 
         clonoset["sample_id"] = sample_id
-        clonotypes_dfs.append(clonoset_data)
+        clonotypes_dfs.append(clonoset)
     result_df = pd.concat(clonotypes_dfs).reset_index(drop=True)
     clonotypes_number = len(result_df)
     samples_number = len(result_df["sample_id"].unique())
