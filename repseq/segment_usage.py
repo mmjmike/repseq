@@ -15,8 +15,11 @@ def calculate_segment_usage_batch(folders, segment="V", only_functional=True, by
         raise ValueError("ERROR: unsupported segment variant '{}'. Possible values: {}".format(segment, ", ".join(segment_variants)))
     segment_column = f"all{segment}HitsWithScore"
     
-    clonosets_df = find_all_exported_clonosets(folders)
-    clonosets_df = filter_clonosets_by_sample_list(clonosets_df, samples_list)
+    if isinstance(folders, pd.DataFrame):
+        clonosets_df = folders
+    else:
+        clonosets_df = find_all_exported_clonosets(folders)
+        clonosets_df = filter_clonosets_by_sample_list(clonosets_df, samples_list)
     
     print(f"\nCalculating {segment}-usage for {len(clonosets_df)} sample(s)\n"+"-"*50)
     
