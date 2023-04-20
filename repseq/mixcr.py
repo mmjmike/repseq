@@ -11,7 +11,7 @@ from IPython.display import Image, display
 
 
 
-def mixcr4_analyze_batch(sample_df, output_folder, command_template=None):
+def mixcr4_analyze_batch(sample_df, output_folder, command_template=None, mixcr_path="mixcr"):
     
     program_name="MIXCR4.3 Analyze Batch"
     samples_num = sample_df.shape[0]
@@ -43,7 +43,7 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None):
         r1 = r["R1"]
         r2 = r["R2"]
         output_prefix = os.path.join(output_folder, sample_id)
-        command = f'{MIXCR} -Xmx{memory}g {command_template} {r1} {r2} {output_prefix}'
+        command = f'{mixcr_path} -Xmx{memory}g {command_template} {r1} {r2} {output_prefix}'
         jobname = f"mixcr_analyze_{sample_id}"
         
         # for batch task finish tracking:
