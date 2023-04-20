@@ -185,7 +185,7 @@ def get_column_names_from_clonoset(clonoset):
     if "d" in clonoset.columns:
         colnames["d_column"] = "d"
 
-    if "alljHitsWithScore" in clonoset.columns:
+    if "allJHitsWithScore" in clonoset.columns:
         colnames["j_column"] = "allJHitsWithScore"
     if "j" in clonoset.columns:
         colnames["j_column"] = "j"
