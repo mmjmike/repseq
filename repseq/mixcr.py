@@ -58,7 +58,7 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None, mixcr_
     print(f'To see current progress:\nslurm.check_slurm_progress("{slurm_batch_filename}")')
 
 
-def mixcr4_reports(folder):
+def mixcr4_reports(folder, mixcr_path="mixcr"):
     
     program_name="MIXCR4.3 Reports"
     time_estimate=1
@@ -73,9 +73,9 @@ def mixcr4_reports(folder):
     #preproc_filename = os.path.join(folder, "preproc_tables.tsv")
     #postanalysis_filename = os.path.join(folder, "postanalysis.json")
     
-    commands = {"alignQc": f"{MIXCR} -Xmx32g exportQc align -f {clns_filenames} {align_filename}",
-                "chainUsage": f"{MIXCR} -Xmx32g exportQc chainUsage -f {clns_filenames} {chains_filename}",
-                "tagsQc": f"{MIXCR} -Xmx32g exportQc tags -f {clns_filenames} {tags_filename}"#,
+    commands = {"alignQc": f"{mixcr_path} -Xmx32g exportQc align -f {clns_filenames} {align_filename}",
+                "chainUsage": f"{mixcr_path} -Xmx32g exportQc chainUsage -f {clns_filenames} {chains_filename}",
+                "tagsQc": f"{mixcr_path} -Xmx32g exportQc tags -f {clns_filenames} {tags_filename}"#,
                 #"postanalysis": f"{MIXCR} -Xmx32g postanalysis individual -f --default-downsampling none --default-weight-function umi --only-productive --tables {tables_filename} --preproc-tables {preproc_filename} {clns_filenames} {postanalysis_filename}"
                }
     
