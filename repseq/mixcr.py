@@ -101,26 +101,26 @@ def get_processing_table(folder, show_offtarget=False):
         return pd.concat(tables).sort_values(by="sample_id").reset_index(drop=True)
     
     results = []
-    clonosets = cl.find_all_exported_clonosets_in_folder(folder, chain=None)
+    clonosets = find_all_exported_clonosets_in_folder(folder, chain=None)
     
     off_target_chain_threshold = 0.01
 
     for i, r in clonosets.iterrows():
         sample_id = r["sample_id"]
         chain = r["chain"]
-        align_report = io.read_json_report(sample_id, folder, "align")
+        align_report = read_json_report(sample_id, folder, "align")
         
         try:
-            refine_report = io.read_json_report(sample_id, folder, "refine")
+            refine_report = read_json_report(sample_id, folder, "refine")
             umi = True
         except FileNotFoundError:
             umi = False
             
-        assemble_report = io.read_json_report(sample_id, folder, "assemble")
+        assemble_report = read_json_report(sample_id, folder, "assemble")
 
         # print(sample_id, chain)
-        clonoset = io.read_mixcr_clonoset(r.filename)
-        clonoset_f = cl.filter_nonfunctional_clones(clonoset)
+        clonoset = read_mixcr_clonoset(r.filename)
+        clonoset_f = filter_nonfunctional_clones(clonoset)
 
         # align report
         Rt=align_report["totalReadsProcessed"]
