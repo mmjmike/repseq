@@ -1,10 +1,15 @@
-pandas
-numpy
-json
-pyyaml
-networkx
-scipy
-dill
-logomaker
-matplotlib
-subprocess
+conda create -n main python=3.9
+conda activate main
+conda install rpy2
+conda install r-ggplot2
+conda install r-tidyverse
+conda install notebook ipykernel
+ipython kernel install --user
+conda install pandas
+conda install -c jmcmurray json
+conda install pyyaml
+conda install networkx
+conda install scipy
+conda install dill
+conda install matplotlib
+conda install -c bioconda logomaker

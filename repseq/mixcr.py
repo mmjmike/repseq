@@ -5,7 +5,7 @@ import numpy as np
 import os
 from .slurm import create_slurm_batch_file, run_slurm_command_from_jupyter
 from .io import read_json_report, read_mixcr_clonoset
-from .clonosets import find_all_exported_clonosets_in_folder
+from .clonosets import find_all_exported_clonosets_in_folder, filter_nonfunctional_clones
 from subprocess import Popen, PIPE
 from IPython.display import Image, display
 
@@ -91,49 +91,85 @@ def mixcr4_reports(folder, mixcr_path="mixcr"):
         print(stdout, stderr)
 
 
-def get_processing_table(folder):
+def get_processing_table(folder, show_offtarget=False):
+    
+    if isinstance(folder, list):
+        tables = []
+        for f in folder:
+            table = get_processing_table(f, show_offtarget=show_offtarget)
+            tables.append(table)
+        return pd.concat(tables).sort_values(by="sample_id").reset_index(drop=True)
+    
     results = []
     clonosets = find_all_exported_clonosets_in_folder(folder, chain=None)
+    
+    off_target_chain_threshold = 0.01
 
     for i, r in clonosets.iterrows():
         sample_id = r["sample_id"]
         chain = r["chain"]
         align_report = read_json_report(sample_id, folder, "align")
-        refine_report = read_json_report(sample_id, folder, "refine")
+        
+        try:
+            refine_report = read_json_report(sample_id, folder, "refine")
+            umi = True
+        except FileNotFoundError:
+            umi = False
+            
         assemble_report = read_json_report(sample_id, folder, "assemble")
 
         # print(sample_id, chain)
         clonoset = read_mixcr_clonoset(r.filename)
-        clonoset_f = clonoset.loc[~clonoset["aaSeqCDR3"].str.contains("\*|_")]
+        clonoset_f = filter_nonfunctional_clones(clonoset)
 
+        # align report
         Rt=align_report["totalReadsProcessed"]
         Ru=align_report["totalReadsProcessed"]-align_report["notAlignedReasons"]["NoBarcode"]
         Ru_pc = round(Ru/Rt*100, 2)
         Ra=align_report["aligned"]
-        #Ra2=refine_report["correctionReport"]["inputRecords"] ##### differs from Ra, but D.Bolotin did not explain why
         Ra_pc = round(Ra/Rt*100, 2)
-        UMIa=refine_report["correctionReport"]["steps"][0]["inputDiversity"]
-        UMIc=refine_report["correctionReport"]["steps"][0]["outputDiversity"]
-        try:
-            UMIf=refine_report["correctionReport"]["filterReport"]["numberOfGroupsAccepted"]
-        except TypeError:
-            UMIf=UMIc
-        Rf=refine_report["correctionReport"]["outputRecords"]
-        overseq_threshold = int(refine_report["correctionReport"]["filterReport"]["operatorReports"][0]["operatorReport"]["threshold"])
-        reads_per_umi = round(Rf/UMIf, 2)
-
-
+        
+        if umi:
+        #Ra2=refine_report["correctionReport"]["inputRecords"] ##### differs from Ra, but D.Bolotin did not explain why
+        
+            UMIa=refine_report["correctionReport"]["steps"][0]["inputDiversity"]
+            UMIc=refine_report["correctionReport"]["steps"][0]["outputDiversity"]
+            try:
+                UMIf=refine_report["correctionReport"]["filterReport"]["numberOfGroupsAccepted"]
+            except TypeError:
+                UMIf=UMIc
+            Rf=refine_report["correctionReport"]["outputRecords"]
+            overseq_threshold = int(refine_report["correctionReport"]["filterReport"]["operatorReports"][0]["operatorReport"]["threshold"])
+            reads_per_umi = round(Rf/UMIf, 2)
+        else:
+            UMIa = np.nan
+            UMIc = np.nan
+            UMIf = np.nan
+            Rf = np.nan
+            overseq_threshold = np.nan
+            reads_per_umi = np.nan
+            
         Ct=assemble_report["clones"]
         Rcl=assemble_report["readsInClones"]
-        UMIcl=clonoset.uniqueMoleculeCount.sum()
+        
+        Ctc=len(clonoset)
+        Rclc=int(clonoset.readCount.sum())
+        
         Cfunc=len(clonoset_f)
         Rfunc=int(clonoset_f.readCount.sum())
-        UMIfunc=clonoset_f.uniqueMoleculeCount.sum()
+        if umi:
+            UMIcl=clonoset.uniqueMoleculeCount.sum()
+            UMIfunc=clonoset_f.uniqueMoleculeCount.sum()
+        else:
+            UMIcl=np.nan
+            UMIfunc=np.nan
 
-        results.append([sample_id, chain, Rt, Ru_pc, Ra_pc, UMIa, UMIc, overseq_threshold, Rf, UMIf, reads_per_umi, Ct, Cfunc, Rcl, Rfunc, UMIcl, UMIfunc])
+        results.append([sample_id, chain, Rt, Ru_pc, Ra_pc, UMIa, UMIc, overseq_threshold, Rf, UMIf, reads_per_umi, Ct, Rcl, Ctc, Rclc, Cfunc, Rfunc, UMIcl, UMIfunc])
     result_df = pd.DataFrame(results, columns=["sample_id", "extracted_chain", "reads_total", "reads_with_umi_pc", "reads_aligned_pc",
                                                "total_umi", "umi_after_correction", "overseq_threshold", "reads_after_filter", "umi_after_filter",
-                                               "reads_per_umi", "clones", "clones_func", "reads_in_clones", "reads_in_func_clones", "umi_in_clones", "umi_in_func_clones"])
+                                               "reads_per_umi", "clones_total", "reads_in_clones_total", "clones", "reads_in_clones", "clones_func", "reads_in_func_clones", "umi_in_clones", "umi_in_func_clones"])
+    if not show_offtarget:
+        result_df = result_df.loc[result_df.reads_in_clones/result_df.reads_in_clones_total > off_target_chain_threshold]
     return result_df
 
 def show_report_images(folder):
