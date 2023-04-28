@@ -26,8 +26,8 @@ def find_all_exported_clonosets(folders, chain=None):
         clonosets_dfs.append(find_all_exported_clonosets_in_folder(folder, chain=chain))
     return pd.concat(clonosets_dfs)
     
-def find_all_exported_clonosets_in_folder(folder, chain=None):
-
+def find_all_exported_clonosets_in_folder(folder, chain=None, remove_non_target=False, non_target_threshold=0.01):
+    result_columns = ["sample_id", "chain", "filename"]
     if chain is not None:
         if chain.upper() not in CHAIN_VARIANTS:
             chains = ",".join(list(CHAIN_VARIANTS.keys()))
@@ -61,8 +61,29 @@ def find_all_exported_clonosets_in_folder(folder, chain=None):
                 continue
             files.append([sample_id, sample_chain, os.path.join(folder, f)])
         
-    files_df = pd.DataFrame(files, columns=["sample_id", "chain", "filename"])
+    files_df = pd.DataFrame(files, columns=result_columns)
+    if remove_non_target:
+        files_df = remove_non_target_clonosets_from_files_df(files_df, threshold=non_target_threshold)
+
     return files_df
+
+def remove_non_target_clonosets_from_files_df(files_df, threshold=0.01):
+    columns = files_df.columns
+    sample_counts = files_df.sample_id.value_counts()
+    files_df["read_count"] = 1
+    files_df["total_read_count"] = 1
+    for sample,count in sample_counts.items():
+        if count > 1:
+            sample_reads = 0
+            for i, r in files_df.loc[files_df.sample_id == sample].iterrows():
+                clonoset = read_mixcr_clonoset(r["filename"])
+                colnames = get_column_names_from_clonoset(clonoset)
+                clonoset_reads = clonoset[colnames["count_column"]].sum()
+                files_df.loc[i,"read_count"] = clonoset_reads
+                sample_reads += clonoset_reads
+            files_df.loc[files_df.sample_id == sample, "total_read_count"] = sample_reads
+    files_df = files_df.loc[files_df.read_count/files_df.total_read_count > threshold]
+    return files_df[columns].reset_index(drop=True)
 
 def get_clonoset_stats_from_df(clonosets_df):
     results = []
@@ -103,11 +124,13 @@ def get_clonoset_stats_from_df(clonosets_df):
         print_progress_bar(samples_done, samples_total, program_name=program_name)
         
     return pd.DataFrame(results, columns=columns)
-        
+
+
 def filter_clonosets_by_sample_list(clonosets_df, samples_list):
     if samples_list is not None:
         clonosets_df = clonosets_df.loc[clonosets_df["sample_id"].isin(samples_list)]
     return clonosets_df
+
 
 def filter_nonfunctional_clones(clonoset, colnames=None):
     if colnames is None:
@@ -121,6 +144,7 @@ def get_clonoset_stats(folders, samples_list=None, chain=None):
     # print(clonosets_df)
     stats = get_clonoset_stats_from_df(clonosets_df)
     return stats
+
 
 def get_column_names_from_clonoset(clonoset):
 
@@ -259,7 +283,7 @@ def recount_fractions_for_clonoset(clonoset, colnames=None):
     return clonoset
 
 
-def pool_clonotypes_from_clonosets_df(clonosets_df, samples_list=None, top=None, downsample=None, only_functional=True, by_umi=False, exclude_singletons=False, seed=None):
+def pool_clonotypes_from_clonosets_df(clonosets_df, samples_list=None, top=None, downsample=None, only_functional=True, by_umi=False, exclude_singletons=False, seed=None, rename_columns_for_clustering=False):
     
     clonosets_df = filter_clonosets_by_sample_list(clonosets_df, samples_list)
     
@@ -286,12 +310,13 @@ def pool_clonotypes_from_clonosets_df(clonosets_df, samples_list=None, top=None,
             clonoset = downsample_clonoset(clonoset, downsample, seed=seed, by_umi=by_umi)
         clonoset = recount_fractions_for_clonoset(clonoset, colnames=colnames)
 
-        clonoset = clonoset.rename(columns={colnames["v_column"]: "v",
-                                colnames["j_column"]: "j",
-                                colnames["cdr3aa_column"]: "cdr3aa",
-                                colnames["cdr3nt_column"]: "cdr3nt",
-                                colnames["fraction_column"]:"freq",
-                                colnames["count_column"]: "count"})
+        if rename_columns_for_clustering:
+            clonoset = clonoset.rename(columns={colnames["v_column"]: "v",
+                                    colnames["j_column"]: "j",
+                                    colnames["cdr3aa_column"]: "cdr3aa",
+                                    colnames["cdr3nt_column"]: "cdr3nt",
+                                    colnames["fraction_column"]:"freq",
+                                    colnames["count_column"]: "count"})
 
         clonoset["sample_id"] = sample_id
         clonotypes_dfs.append(clonoset)
@@ -486,7 +511,6 @@ def convert_mixcr_clonoset(filename, output_filename, filter_nonfunctional=False
             freq_column = "uniqueUMIFraction"
     if count_column is None:
         raise KeyError(f"No count column in file {filename}")
-    
     
     
     m_clonoset = m_clonoset.rename(columns={count_column:"count",

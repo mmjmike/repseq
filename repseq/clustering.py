@@ -1,6 +1,7 @@
 import pandas as pd
 from .common_functions import run_parallel_calculation, combine_metadata_from_folders, print_progress_bar
-from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_dict
+from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_dict, get_logo_for_clonoset
+
 import networkx as nx
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -532,6 +533,14 @@ def calc_cluster_consensus(cluster, seq_type="dna", weighed=False):
     motif_dict = sum_motif_dicts(motif_dicts)
     consensus_seq = get_consensus_from_motif_dict(motif_dict)
     return consensus_seq
+
+def plot_cluster_logo(cluster, seq_type="prot", weighed=False):
+    result = []
+    for node in cluster:
+        result.append([node.seq_aa, node.seq_nt, node.size])
+    clonoset_df = pd.DataFrame(result, columns=["aaSeqCDR3","nSeqCDR3", "cloneFraction"])
+    get_logo_for_clonoset(clonoset_df, weight_freq=weighed, seq_type=seq_type, plot=True)
+
 
 def calc_cluster_consensus_segment(cluster, segment_type="v", weighed=False):
     segments = {}
