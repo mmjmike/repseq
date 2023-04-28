@@ -18,12 +18,12 @@ CHAIN_VARIANTS = {"TRA": {"TRAD", "TRA"},
                   "IGL": {"IGL"},
                   "BCR": {"IGH", "IGK", "IGL"}}
 
-def find_all_exported_clonosets(folders, chain=None):
+def find_all_exported_clonosets(folders, chain=None, remove_non_target=False, non_target_threshold=0.01):
     if isinstance(folders, str):
         folders = [folders]
     clonosets_dfs = []
     for folder in folders:
-        clonosets_dfs.append(find_all_exported_clonosets_in_folder(folder, chain=chain))
+        clonosets_dfs.append(find_all_exported_clonosets_in_folder(folder, chain=chain, remove_non_target=remove_non_target, non_target_threshold=non_target_threshold))
     return pd.concat(clonosets_dfs)
     
 def find_all_exported_clonosets_in_folder(folder, chain=None, remove_non_target=False, non_target_threshold=0.01):
