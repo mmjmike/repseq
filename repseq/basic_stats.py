@@ -51,6 +51,7 @@ def calc_downsample_size(clonosets_df, only_functional=True, by_umi=True):
                 raise ValueError(error_message_template.format(column))
     if only_functional:
         column = "reads_func"
+    print(column, "col used")
     downsample_size = round_down_to_2_significant(min(stats[column]))
     return downsample_size
 
