@@ -25,7 +25,7 @@ def calculate_basic_stats(clonosets_df, samples_list=None, by_umi=True, add_5_ce
         downsample_size = calc_downsample_size(clonosets_df, only_functional=only_functional, by_umi=by_umi)
         print(f"Automatic downsample size calculated: {downsample_size}")
 
-    diversity_stats = diversity_estimation(clonosets_df, downsample=downsample_size, chain=None, seed=seed, only_functional=only_functional, iterations=iterations, by_umi=by_umi)
+    diversity_stats = diversity_estimation(clonosets_df, downsample_size, chain=None, seed=seed, only_functional=only_functional, iterations=iterations, by_umi=by_umi)
     diversity_stats["downsample_size"] = downsample_size
     
     clonosets_df = clonosets_df.merge(stats)
