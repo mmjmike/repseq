@@ -223,19 +223,25 @@ def get_column_names_from_clonoset(clonoset):
 
     return colnames
 
-
-def downsample_clonoset(clonoset, downsample_size, seed=None, by_umi=False):
-    clonoset= clonoset.copy()
-    if seed is not None:
-        random.seed(seed)
-    
-    colnames = get_column_names_from_clonoset(clonoset)
+def decide_count_and_frac_columns(colnames, by_umi):
     count_column = colnames["count_column"]
+    fraction_column = colnames["fraction_column"]
     if by_umi:
         if colnames["umi"] is not None:
             count_column = colnames["umi_column"]
+            fraction_column = colnames["umi_fraction_column"]
         else:
-            print("WARNING! This clonoset does not contain UMI column. Using reads for downsample instead.")
+            print("WARNING! Clonoset does not contain UMI column. Using reads for downsample instead.\nTo avoid this warning set parameter 'by_umi=False'")
+    return count_column, fraction_column
+
+
+def downsample_clonoset(clonoset, downsample_size, seed=None, by_umi=False, colnames=None):
+    clonoset= clonoset.copy()
+    if seed is not None:
+        random.seed(seed)
+    if colnames is None:
+        colnames = get_column_names_from_clonoset(clonoset)
+    count_column, fraction_column = decide_count_and_frac_columns(colnames, by_umi)
             
     total_count = int(clonoset[count_column].sum())
     
@@ -297,12 +303,8 @@ def pool_clonotypes_from_clonosets_df(clonosets_df, samples_list=None, top=None,
         if only_functional:
             clonoset = filter_nonfunctional_clones(clonoset, colnames=colnames)
         
-        count_column = colnames["count_column"]
-        if by_umi:
-            if colnames["umi"] is not None:
-                count_column = colnames["umi_column"]
-            else:
-                print("WARNING! This clonoset does not contain UMI column. Using reads for count instead.")
+        count_column, fraction_column = decide_count_and_frac_columns(colnames, by_umi)
+        
         clonoset_size = clonoset[count_column].sum()
         if downsample is not None:
             if downsample > clonoset_size:
@@ -331,99 +333,6 @@ def pool_clonotypes_from_clonosets_df(clonosets_df, samples_list=None, top=None,
 ##################### unchecked functions ########################
 
 # dirty
-def diversity_estimation(folders, downsample_size, chain=None, seed=None, only_functional=True, samples_list=None, iterations=3, by_umi=False):
-    
-    clonosets_df = find_all_exported_clonosets(folders, chain=chain)
-    clonosets_df = filter_clonosets_by_sample_list(clonosets_df, samples_list)
-    
-    samples_total = len(clonosets_df)
-    samples_done = 0
-    
-    program_name = "Diversity estimate"
-    
-    cf.print_progress_bar(samples_done, samples_total, program_name=program_name)
-    results = []
-    for i, r in clonosets_df.iterrows():
-        sample_id = r["sample_id"]
-        filename = r["filename"]
-        clonoset = read_mixcr_clonoset(filename).rename(columns={'uniqueUMICount': 'uniqueMoleculeCount',
-                                                                 'uniqueUMIFraction': 'uniqueMoleculeFraction'})
-        if only_functional:
-            clonoset = filter_nonfunctional_clones(clonoset)
-        
-        diversity_values = []
-        sw_values = []
-        n_sw_values = []
-
-        for i in range(iterations):
-            downsampled = downsample_clonoset(clonoset, downsample_size)
-            if isinstance(clonoset, str):
-                print(f"Error in clonoset '{filename}': {clonoset}")
-                return
-            if 'cloneCount' in downsampled.columns:
-                column = 'cloneCount'
-            elif by_umi and 'uniqueMoleculeCount' in downsampled.columns:
-                column = "uniqueMoleculeCount"
-            else:
-                column = "readCount"
-            sw, sw_norm, diversity = shannon_wiener(downsampled[column])
-            diversity_values.append(diversity)
-            sw_values.append(sw)
-            n_sw_values.append(sw_norm)
-        results.append([sample_id, np.mean(diversity_values), np.mean(sw_values), np.mean(n_sw_values)])
-        samples_done += 1
-        cf.print_progress_bar(samples_done, samples_total, program_name=program_name)
-    return pd.DataFrame(results, columns = ["sample_id", "observed_diversity", "shannon_wiener", "norm_shannon_wiener"])
-
-
-# dirty
-def diversity_estimation_parallel(folders, downsample_size, chain=None, seed=None, only_functional=True, samples_list=None, iterations=3, by_umi=False):
-    
-    clonosets_df = find_all_exported_clonosets(folders, chain=chain)
-    clonosets_df = filter_clonosets_by_sample_list(clonosets_df, samples_list)
-    
-    program_name = "Diversity estimate"
-    
-    tasks=[]
-    for i, r in clonosets_df.iterrows():
-        sample_id = r["sample_id"]
-        filename = r["filename"]
-        task=(sample_id, filename, iterations, only_functional, downsample_size, by_umi)
-        tasks.append(task)
-        
-    result_list = run_parallel_calculation(diversity_estimation_mp, tasks, program_name)
-    df = pd.DataFrame(results, columns = ["sample_id", "observed_diversity", "shannon_wiener", "norm_shannon_wiener"])
-    return df
-
-# dirty
-def diversity_estimation_mp(args):
-    (sample_id, filename, iterations, only_functional, downsample_size, by_umi) = args
-    clonoset = read_mixcr_clonoset(filename).rename(columns={'uniqueUMICount': 'uniqueMoleculeCount',
-                                                                 'uniqueUMIFraction': 'uniqueMoleculeFraction'})
-    
-    if only_functional:
-        clonoset = filter_nonfunctional_clones(clonoset)
-        
-    diversity_values = []
-    sw_values = []
-    n_sw_values = []
-
-    for i in range(iterations):
-        downsampled = downsample_clonoset(clonoset, downsample_size)
-        if isinstance(clonoset, str):
-            print(f"Error in clonoset '{filename}': {clonoset}")
-            return
-        if 'cloneCount' in downsampled.columns:
-            column = 'cloneCount'
-        elif by_umi and 'uniqueMoleculeCount' in downsampled.columns:
-            column = "uniqueMoleculeCount"
-        else:
-            column = "readCount"
-        sw, sw_norm, diversity = shannon_wiener(downsampled[column])
-        diversity_values.append(diversity)
-        sw_values.append(sw)
-        n_sw_values.append(sw_norm)
-    return (sample_id, np.mean(diversity_values), np.mean(sw_values), np.mean(n_sw_values))
 
 
 # dirty

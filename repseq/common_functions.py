@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import concurrent.futures
 import numpy as np
+import math
 
 def print_progress_bar(samples_done, samples_total, program_name="", object_name="sample(s)"):
     done = int(samples_done/samples_total*50)
@@ -65,3 +66,10 @@ def extract_refpoint_position(p, n, minus=False):
         return int(pos)-1
     else:
         return int(pos)
+    
+def round_down_to_2_significant(x):
+    divisions = 0
+    while x > 100:
+        x = x/10
+        divisions += 1
+    return math.floor(x) * 10 ** divisions
