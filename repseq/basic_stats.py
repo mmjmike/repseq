@@ -155,7 +155,7 @@ def diversity_estimation_mp(args):
 
     for i in range(iterations):
 
-        downsampled = downsample_clonoset(clonoset, downsample_size, colnames=colnames)
+        downsampled = downsample_clonoset(clonoset, downsample_size, colnames=colnames,by_umi=by_umi)
         if isinstance(clonoset, str):
             print(f"Error in clonoset '{filename}': {clonoset}")
             return
