@@ -37,7 +37,6 @@ def calculate_basic_stats(clonosets_df, samples_list=None, by_umi=True, add_5_ce
 def calc_downsample_size(clonosets_df, only_functional=True, by_umi=True):
     
     stats = get_clonoset_stats_from_df(clonosets_df)
-    column = "reads"
 
     error_message_template = "There is a 'null' value in {} column. Not all samples can be downsampled equally"
     if by_umi:
@@ -49,8 +48,11 @@ def calc_downsample_size(clonosets_df, only_functional=True, by_umi=True):
             column = "umi"
             if stats[column].isnull().any():
                 raise ValueError(error_message_template.format(column))
-    if only_functional:
-        column = "reads_func"
+    else:
+        if only_functional:
+            column = "reads_func"
+        else:
+            column = "reads"
     print(column, "col used")
     downsample_size = round_down_to_2_significant(min(stats[column]))
     return downsample_size
