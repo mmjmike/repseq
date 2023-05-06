@@ -17,7 +17,7 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None, mixcr_
     samples_num = sample_df.shape[0]
     
     # by default use the most popular preset for MiLaboratory Human TCR UMI MULTIPLEX Kit
-    default_command_template = "mixcr analyze milab-human-tcr-rna-multiplex-cdr3 r1 r2 output_prefix"
+    default_command_template = "mixcr analyze milab-human-tcr-rna-multiplex-cdr3 -f r1 r2 output_prefix"
     if command_template is None:
         command_template = default_command_template
         
