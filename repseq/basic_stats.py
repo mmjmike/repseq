@@ -91,15 +91,23 @@ def calc_nt_len_insert_size_and_convergence_for_df(clonosets_df, by_umi=True, on
         
         nt_len_mean = np.average(clonoset["nt_len"], weights=clonoset[fraction_column])
         insert_size_mean = np.average(clonoset["insert_size"], weights=clonoset[fraction_column])
-        clones = len(clonoset)
-        unique_aa_cdr3 = len(clonoset[cdr3aa_column].unique())
-        convergence = round(clones/unique_aa_cdr3, 8)
+        convergence = calc_convergence_for_clonoset(clonoset, colnames=colnames)
         
         results.append([sample_id, nt_len_mean, insert_size_mean, convergence])
         samples_done += 1
         print_progress_bar(samples_done, samples_total, program_name=program_name)
         
     return pd.DataFrame(results, columns=columns)
+
+def calc_convergence_for_clonoset(clonoset, colnames=None):
+    if colnames is None:
+        colnames = get_column_names_from_clonoset(clonoset)
+    cdr3nt_column = colnames["cdr3nt_column"]
+    cdr3aa_column = colnames["cdr3aa_column"]
+    unique_aa_cdr3 = len(clonoset[cdr3aa_column].unique())
+    unique_nt_cdr3 = len(clonoset[cdr3nt_column].unique())
+    convergence = round(unique_nt_cdr3/unique_aa_cdr3, 8)
+    return convergence
 
 def calc_insert_size(vend,dstart,dend,jstart):
     if dstart == -1:

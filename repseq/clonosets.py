@@ -247,7 +247,10 @@ def downsample_clonoset(clonoset, downsample_size, seed=None, by_umi=False, coln
     
     if total_count < downsample_size:
         return f"total count {total_count} is less than downsample size {downsample_size}"
-    
+    elif total_count == downsample_size:
+        clonoset = recount_fractions_for_clonoset(clonoset, colnames=colnames)
+        return clonoset
+
     sample = sorted(random.sample(range(total_count), downsample_size))
     curr_sum = 0
     i = 0
@@ -304,6 +307,8 @@ def pool_clonotypes_from_clonosets_df(clonosets_df, samples_list=None, top=None,
             clonoset = filter_nonfunctional_clones(clonoset, colnames=colnames)
         
         count_column, fraction_column = decide_count_and_frac_columns(colnames, by_umi)
+        if exclude_singletons:
+            clonoset = clonoset.loc[clonoset[count_column] > 1]
         
         clonoset_size = clonoset[count_column].sum()
         if downsample is not None:
