@@ -3,6 +3,7 @@ from .common_functions import run_parallel_calculation, combine_metadata_from_fo
 from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_dict, get_logo_for_clonoset
 
 import networkx as nx
+from networkx.algorithms import community
 import numpy as np
 from scipy.sparse import csr_matrix
 import os
@@ -311,6 +312,27 @@ def create_clusters(clonoset_input, mismatches=1, overlap_type="aaV", igh=False,
     print(f"Found {cluster_num} clusters (2 or more nodes) and {singletons} single nodes. Total: {total_clusters}")
     clusters.sort(key=lambda x: len(x), reverse=True)
     return clusters
+
+def find_cluster_communities_louvain(clusters, resolution=1, threshold=1e-07, seed=1):
+    total_communities = 0
+    new_clusters = []
+    for cluster in clusters:
+        if len(cluster) < 2:
+            for node in cluster:
+                node.additional_properties["community"] = total_communities
+            total_communities += 1 
+            new_clusters.append(cluster)
+        else:
+            cluster_communities = community.louvain_communities(cluster, resolution=resolution, threshold=threshold, seed=seed)
+            for com in cluster_communities:
+                com_nodes = []
+                for node in com:
+                    node.additional_properties["community"] = total_communities
+                    com_nodes.append(node)
+                total_communities += 1  
+                new_clusters.append(cluster.subgraph(com_nodes))
+    new_clusters.sort(key=lambda x: len(x), reverse=True)
+    return new_clusters
 
 def filter_one_node_clusters(clusters):
     return [c for c in clusters if len(c)>1]
