@@ -290,7 +290,7 @@ def take_top_clonotypes_in_clonoset(clonoset, top, only_functional=True, mix_tai
 
     clonoset=clonoset.sort_values(by=count_column, ascending=False)
     
-    if top < len(clonoset):
+    if top > len(clonoset):
         print(f"Warning! Clonoset size - {len(clonoset)} - is less than required top - {top}")
     if top > 0:
         clonoset=clonoset.iloc[:top]
