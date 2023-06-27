@@ -275,6 +275,28 @@ def downsample_clonoset(clonoset, downsample_size, seed=None, by_umi=False, coln
     
     return clonoset.reset_index(drop=True)
 
+def take_top_clonotypes_in_clonoset(clonoset, top, only_functional=True, mix_tails=True, seed=None, by_umi=False, colnames=None):
+    clonoset= clonoset.copy()
+    if only_functional:
+        clonoset=filter_nonfunctional_clones(clonoset)
+        
+    if mix_tails:
+        clonoset=clonoset.sample(frac=1, random_state=seed) #shuffle
+    
+    if colnames is None:
+        colnames = get_column_names_from_clonoset(clonoset)
+    
+    count_column, fraction_column = decide_count_and_frac_columns(colnames, by_umi)
+
+    clonoset=clonoset.sort_values(by=count_column, ascending=False)
+    
+    if top < len(clonoset):
+        print(f"Warning! Clonoset size - {len(clonoset)} - is less than required top - {top}")
+    if top > 0:
+        clonoset=clonoset.iloc[:top]
+    clonoset = recount_fractions_for_clonoset(clonoset)
+    
+    return clonoset
 
 def recount_fractions_for_clonoset(clonoset, colnames=None):
     clonoset = clonoset.copy()
@@ -367,23 +389,7 @@ def take_top_clonotypes(folders, output_folder, top=0, chain=None, samples_list=
     print(f"Saved {samples_total} sample(s) to: {output_folder}")
 
 # dirty
-def take_top_clonotypes_in_clonoset(clonoset, top=0, only_functional=True, mix_tails=True):
-    
-    count_column = "cloneCount"
-    
-    if only_functional:
-        clonoset=filter_nonfunctional_clones(clonoset)
-        
-    if mix_tails:
-        clonoset=clonoset.sample(frac=1, random_state=1) #shuffle
-        
-    clonoset=clonoset.sort_values(by=count_column, ascending=False)
-    
-    if top > 0:
-        clonoset=clonoset.iloc[:top]
-    clonoset = recount_fractions_for_clonoset(clonoset)
-    
-    return clonoset
+
 
     
 # dirty
