@@ -60,7 +60,7 @@ def run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory
         f.write(slurm_text)
         
     # run slurm script
-    run_slurm_command = f'chmod a+x {slurm_script_filename}; sbatch {slurm_script_filename}'
+    run_slurm_command = f'chmod a+x {slurm_script_filename} && sbatch {slurm_script_filename}'
     # print(f"Added slurm command to batch: {run_slurm_command}")
     process = Popen(run_slurm_command, stdout=PIPE, stderr=PIPE, shell=True)
     stdout, stderr = process.communicate()
