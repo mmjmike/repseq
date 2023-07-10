@@ -132,10 +132,13 @@ def filter_clonosets_by_sample_list(clonosets_df, samples_list):
     return clonosets_df
 
 
-def filter_nonfunctional_clones(clonoset, colnames=None):
+def filter_nonfunctional_clones(clonoset_in, colnames=None):
+    clonoset = clonoset_in.copy()
     if colnames is None:
         colnames = get_column_names_from_clonoset(clonoset)
-    return clonoset.loc[~clonoset[colnames["cdr3aa_column"]].str.contains("\*|_")]
+    clonoset = clonoset.loc[~clonoset[colnames["cdr3aa_column"]].str.contains("\*|_")]
+    clonoset = clonoset.loc[~clonoset[colnames["cdr3aa_column"]] == ""]
+    return clonoset
 
 
 def get_clonoset_stats(folders, samples_list=None, chain=None):
