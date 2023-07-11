@@ -137,7 +137,7 @@ def filter_nonfunctional_clones(clonoset_in, colnames=None):
     if colnames is None:
         colnames = get_column_names_from_clonoset(clonoset)
     clonoset = clonoset.loc[~clonoset[colnames["cdr3aa_column"]].str.contains("\*|_")]
-    clonoset = clonoset.loc[clonoset[colnames["cdr3aa_column"]] != ""]
+    # clonoset = clonoset.loc[clonoset[colnames["cdr3aa_column"]] != ""]
     return clonoset
 
 
