@@ -57,7 +57,7 @@ def calc_c_usage_cl(clonoset_in, colnames=None):
 
 def calc_segment_usage_cl(clonoset_in, segment="v", colnames=None):
     colnames = get_column_names_from_clonoset(clonoset_in)
-    freq_column = colnames["frequency_column"]
+    freq_column = colnames["fraction_column"]
     segment_column = colnames[f"{segment}_column"]
     result = clonoset_in[[freq_column, segment_column]].groupby(segment_column).sum().to_dict()[freq_column]
     return result
