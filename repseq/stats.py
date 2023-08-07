@@ -11,6 +11,7 @@ from .common_functions import (calc_insert_size,
                                shannon_wiener,
                                run_parallel_calculation)
 from .io import read_clonoset
+from filter import Filter
 
 REPSEQ_PATH = os.path.join(os.path.expanduser("~"), "soft", "repseq")
 AA_PROPS_PATH = os.path.join(REPSEQ_PATH, "repseq", "resourses", "aa_property_table.txt")
@@ -285,7 +286,7 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
         if clonoset_filter is not None:
             task = (sample_id, filename, calc_function, clonoset_filter.spawn(), iterations, seed, program_name, random_filter)
         else:
-            task = (sample_id, filename, calc_function, clonoset_filter, iterations, seed, program_name, random_filter)
+            task = (sample_id, filename, calc_function, Filter(), iterations, seed, program_name, random_filter)
         tasks.append(task)
     
     results = run_parallel_calculation(perform_generic_calculation_mp, tasks, program_name, object_name="calcultaion(s)")

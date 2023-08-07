@@ -36,7 +36,6 @@ class Filter:
         clonoset = self._downsample(clonoset, colnames)
         clonoset = self._get_top(clonoset, colnames)
         clonoset = self._recount_fractions_for_clonoset(clonoset, colnames)
-        
         return clonoset
     
     def _convert_clonoset(self, clonoset, colnames):
@@ -79,6 +78,8 @@ class Filter:
         
     
     def _recount_fractions_for_clonoset(self, clonoset_in, colnames):
+        if self.is_empty():
+            return clonoset_in
         clonoset = clonoset_in.copy()
 
         count_column = colnames["count_column"]
