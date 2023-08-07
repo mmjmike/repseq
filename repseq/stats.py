@@ -11,7 +11,7 @@ from .common_functions import (calc_insert_size,
                                shannon_wiener,
                                run_parallel_calculation)
 from .io import read_clonoset
-from filter import Filter
+from repseq.clone_filter import Filter
 
 REPSEQ_PATH = os.path.join(os.path.expanduser("~"), "soft", "repseq")
 AA_PROPS_PATH = os.path.join(REPSEQ_PATH, "repseq", "resourses", "aa_property_table.txt")
