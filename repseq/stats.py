@@ -35,6 +35,32 @@ def calc_clonoset_stats(clonosets_df, cl_filter=None):
     df = df.astype(convert_dict)
     return df
 
+def calc_segment_usage(clonosets_df, segment="v", cl_filter=None):
+    segment_to_function_dict = {"v": calc_v_usage_cl,
+                                "j": calc_j_usage_cl,
+                                "c": calc_c_usage_cl}
+    segment = segment.lower()
+    if segment not in segment_to_function_dict.keys():
+        raise ValueError(f"Wrong segment value. Possible values: {', '.join(segment_to_function_dict.keys())}")
+    df = generic_calculation(clonosets_df, segment_to_function_dict[segment], clonoset_filter=cl_filter, program_name="CalcSegmentUsage")
+
+    return df.fillna(0)
+
+def calc_v_usage_cl(clonoset_in, colnames=None):
+    return calc_segment_usage_cl(clonoset_in, segment="v", colnames=colnames)
+
+def calc_j_usage_cl(clonoset_in, colnames=None):
+    return calc_segment_usage_cl(clonoset_in, segment="j", colnames=colnames)
+
+def calc_c_usage_cl(clonoset_in, colnames=None):
+    return calc_segment_usage_cl(clonoset_in, segment="c", colnames=colnames)
+
+def calc_segment_usage_cl(clonoset_in, segment="v", colnames=None):
+    colnames = get_column_names_from_clonoset(clonoset_in)
+    freq_column = colnames["frequency_column"]
+    segment_column = colnames[f"{segment}_column"]
+    result = clonoset_in[[freq_column, segment_column]].groupby(segment_column).sum().to_dict()[freq_column]
+    return result
 
 def calc_diversity_stats(clonosets_df, cl_filter=None, iterations=3, seed=None, drop_small_samples=True):
     df = generic_calculation(clonosets_df, calculate_diversity_stats_cl, clonoset_filter=cl_filter,
