@@ -49,6 +49,8 @@ def calc_convergence(clonosets_df, cl_filter=None, iterations=1, seed=None, drop
 
 
 def calc_cdr3_properties(clonosets_df, cl_filter=None, iterations=1, seed=None, drop_small_samples=True):
+    if cl_filter is None:
+        cl_filter = Filter(functionality="f")
     df = generic_calculation(clonosets_df, calculate_cdr3_properties_cl, clonoset_filter=cl_filter,
                              program_name="CalcCDR3aaProperties", iterations=iterations, seed=seed, drop_small_samples=drop_small_samples)
     return df
