@@ -42,8 +42,10 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None, mixcr_
         sample_id = r["sample_id"]
         r1 = r["R1"]
         r2 = r["R2"]
-        output_prefix = os.path.join(output_folder, sample_id)
+    #   output_prefix = os.path.join(output_folder, sample_id)
+        output_prefix = sample_id
         command = f'{mixcr_path} -Xmx{memory}g {command_template} {r1} {r2} {output_prefix}'
+        command = f"cd {output_folder}; " + command
         jobname = f"mixcr_analyze_{sample_id}"
         
         # for batch task finish tracking:
@@ -65,10 +67,14 @@ def mixcr4_reports(folder, mixcr_path="mixcr"):
     cpus=40
     memory=32
     
-    clns_filenames = os.path.join(folder, "*.clns")
-    align_filename = os.path.join(folder, "alignQc.png")
-    chains_filename = os.path.join(folder, "chainsQc.png")
-    tags_filename = os.path.join(folder, "tagsQc.pdf")
+    # clns_filenames = os.path.join(folder, "*.clns")
+    # align_filename = os.path.join(folder, "alignQc.png")
+    # chains_filename = os.path.join(folder, "chainsQc.png")
+    # tags_filename = os.path.join(folder, "tagsQc.pdf")
+    clns_filenames = "*.clns"
+    align_filename = "alignQc.png"
+    chains_filename = "chainsQc.png"
+    tags_filename = "tagsQc.pdf"
     #tables_filename = os.path.join(folder, "tables.tsv")
     #preproc_filename = os.path.join(folder, "preproc_tables.tsv")
     #postanalysis_filename = os.path.join(folder, "postanalysis.json")
@@ -76,6 +82,12 @@ def mixcr4_reports(folder, mixcr_path="mixcr"):
     commands = {"alignQc": f"{mixcr_path} -Xmx32g exportQc align -f {clns_filenames} {align_filename}",
                 "chainUsage": f"{mixcr_path} -Xmx32g exportQc chainUsage -f {clns_filenames} {chains_filename}",
                 "tagsQc": f"{mixcr_path} -Xmx32g exportQc tags -f {clns_filenames} {tags_filename}"#,
+                #"postanalysis": f"{MIXCR} -Xmx32g postanalysis individual -f --default-downsampling none --default-weight-function umi --only-productive --tables {tables_filename} --preproc-tables {preproc_filename} {clns_filenames} {postanalysis_filename}"
+               }
+    
+    commands = {"alignQc": f"cd {folder}; {mixcr_path} -Xmx32g exportQc align -f {clns_filenames} {align_filename}",
+                "chainUsage": f"cd {folder}; {mixcr_path} -Xmx32g exportQc chainUsage -f {clns_filenames} {chains_filename}",
+                "tagsQc": f"cd {folder}; {mixcr_path} -Xmx32g exportQc tags -f {clns_filenames} {tags_filename}"#,
                 #"postanalysis": f"{MIXCR} -Xmx32g postanalysis individual -f --default-downsampling none --default-weight-function umi --only-productive --tables {tables_filename} --preproc-tables {preproc_filename} {clns_filenames} {postanalysis_filename}"
                }
     
