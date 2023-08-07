@@ -52,7 +52,7 @@ def shannon_wiener(list_of_numbers):
 
 def extract_segment(s):
     segm = str(s).split("*")[0]
-    segm = str(s).split("(")[0]
+    segm = str(segm).split("(")[0]
     if segm == "nan":
         return "."
     else:
@@ -73,3 +73,21 @@ def round_down_to_2_significant(x):
         x = x/10
         divisions += 1
     return math.floor(x) * 10 ** divisions
+
+def center_5(string):
+    return string[math.ceil(len(string)/2)-3:math.ceil(len(string)/2)+2]
+
+def calc_insert_size(vend,dstart,dend,jstart):
+    if dstart == -1:
+        insert = jstart-vend-1
+        if insert < 0:
+            insert = 0
+    else:
+        vd = dstart-vend-1
+        dj = jstart-dend-1
+        if vd<0:
+            vd = 0
+        if dj<0:
+            dj = 0
+        insert = vd+dj
+    return insert

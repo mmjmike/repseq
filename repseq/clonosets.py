@@ -25,7 +25,7 @@ def find_all_exported_clonosets(folders, chain=None, remove_non_target=False, no
     for folder in folders:
         clonosets_dfs.append(find_all_exported_clonosets_in_folder(folder, chain=chain, remove_non_target=remove_non_target, non_target_threshold=non_target_threshold))
     return pd.concat(clonosets_dfs)
-    
+   
 def find_all_exported_clonosets_in_folder(folder, chain=None, remove_non_target=False, non_target_threshold=0.01):
     result_columns = ["sample_id", "chain", "filename"]
     if chain is not None:
@@ -132,13 +132,28 @@ def filter_clonosets_by_sample_list(clonosets_df, samples_list):
     return clonosets_df
 
 
-def filter_nonfunctional_clones(clonoset_in, colnames=None):
+def filter_nonfunctional_clones(clonoset_in, colnames=None,):
     clonoset = clonoset_in.copy()
     if colnames is None:
         colnames = get_column_names_from_clonoset(clonoset)
     clonoset = clonoset.loc[~clonoset[colnames["cdr3aa_column"]].str.contains("\*|_")]
     # clonoset = clonoset.loc[clonoset[colnames["cdr3aa_column"]] != ""]
     return clonoset
+
+def filter_by_functionality(clonoset_in, colnames=None, functional=True):
+    clonoset = clonoset_in.copy()
+    if colnames is None:
+        colnames = get_column_names_from_clonoset(clonoset)
+    cdr3aa_column = colnames["cdr3aa_column"]
+    if functional:
+        clonoset = clonoset.loc[~clonoset[cdr3aa_column].str.contains("\*|_")]
+        clonoset = clonoset.loc[clonoset[cdr3aa_column] != ""]
+    else:
+        clonoset = clonoset.loc[clonoset[cdr3aa_column].str.contains("\*|_")]
+        clonoset = clonoset.loc[clonoset[cdr3aa_column] == ""]
+
+    return clonoset
+
 
 
 def get_clonoset_stats(folders, samples_list=None, chain=None):
@@ -362,36 +377,6 @@ def pool_clonotypes_from_clonosets_df(clonosets_df, samples_list=None, top=None,
 
 ##################### unchecked functions ########################
 
-# dirty
-
-
-# dirty
-def take_top_clonotypes(folders, output_folder, top=0, chain=None, samples_list=None, only_functional=True, mix_tails=True, count_by_umi=False):
-    # create output_folder if it doesnot exist
-    os.makedirs(output_folder, exist_ok=True)
-    
-    clonosets_df = find_all_exported_clonosets(folders, chain=chain)
-    if samples_list is not None:
-        clonosets_df = clonosets_df.loc[clonosets_df["sample_id"].isin(samples_list)].reset_index(drop=True)
-    
-    samples_total = len(clonosets_df)
-    samples_done = 0
-    program_name = "Take top clonotypes"
-    cf.print_progress_bar(samples_done, samples_total, program_name=program_name)
-    
-    for i, r in clonosets_df.iterrows():
-        sample_id = r["sample_id"]
-        filename = r["filename"]
-        new_filename = os.path.join(output_folder, os.path.basename(filename))
-        clonoset = pd.read_csv(filename, sep="\t")
-        clonoset = take_top_clonotypes_in_clonoset(clonoset, top=top, only_functional=only_functional, mix_tails=mix_tails, count_by_umi=count_by_umi)
-        clonoset.to_csv(new_filename, index=False, sep="\t")
-        samples_done += 1
-        cf.print_progress_bar(samples_done, samples_total, program_name=program_name)
-    
-    print(f"Saved {samples_total} sample(s) to: {output_folder}")
-
-# dirty
 
 
     
@@ -416,51 +401,51 @@ def pool_clonosets(folders, samples_list=None, only_functional=False):
     return pooled_clonoset
 
 # dirty
-def convert_mixcr_clonoset(filename, output_filename, filter_nonfunctional=False, by_umi=True):
-    m_clonoset = read_mixcr_clonoset(filename)
-    count_column, freq_column = None, None
-    if "cloneCount" in m_clonoset.columns and "cloneFraction" in m_clonoset.columns:
-        count_column = "cloneCount"
-        freq_column = "cloneFraction"
-    elif "readCount" in m_clonoset.columns and "readFraction" in m_clonoset.columns:
-        count_column = "readCount"
-        freq_column = "readFraction"
-    if by_umi:
-        if "uniqueMoleculeCount" in m_clonoset.columns and "uniqueMoleculeFraction" in m_clonoset.columns:
-            count_column = "uniqueMoleculeCount"
-            freq_column = "uniqueMoleculeFraction"
-        elif "uniqueUMICount" in m_clonoset.columns and "uniqueUMIFraction" in m_clonoset.columns:
-            count_column = "uniqueUMICount"
-            freq_column = "uniqueUMIFraction"
-    if count_column is None:
-        raise KeyError(f"No count column in file {filename}")
+# def convert_mixcr_clonoset(filename, output_filename, filter_nonfunctional=False, by_umi=True):
+#     m_clonoset = read_mixcr_clonoset(filename)
+#     count_column, freq_column = None, None
+#     if "cloneCount" in m_clonoset.columns and "cloneFraction" in m_clonoset.columns:
+#         count_column = "cloneCount"
+#         freq_column = "cloneFraction"
+#     elif "readCount" in m_clonoset.columns and "readFraction" in m_clonoset.columns:
+#         count_column = "readCount"
+#         freq_column = "readFraction"
+#     if by_umi:
+#         if "uniqueMoleculeCount" in m_clonoset.columns and "uniqueMoleculeFraction" in m_clonoset.columns:
+#             count_column = "uniqueMoleculeCount"
+#             freq_column = "uniqueMoleculeFraction"
+#         elif "uniqueUMICount" in m_clonoset.columns and "uniqueUMIFraction" in m_clonoset.columns:
+#             count_column = "uniqueUMICount"
+#             freq_column = "uniqueUMIFraction"
+#     if count_column is None:
+#         raise KeyError(f"No count column in file {filename}")
     
     
-    m_clonoset = m_clonoset.rename(columns={count_column:"count",
-                                            freq_column:"freq",
-                                            "nSeqCDR3": "cdr3nt",
-                                            "aaSeqCDR3": "cdr3aa"})
-    m_clonoset["v"] = m_clonoset["allVHitsWithScore"].apply(lambda x: extract_segment(x))
-    m_clonoset["d"] = m_clonoset["allDHitsWithScore"].apply(lambda x: extract_segment(x))
-    m_clonoset["j"] = m_clonoset["allJHitsWithScore"].apply(lambda x: extract_segment(x))
-    m_clonoset["VEnd"] = m_clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 11, minus=True))
-    m_clonoset["DStart"] = m_clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 12, minus=False))
-    m_clonoset["DEnd"] = m_clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 15, minus=True))
-    m_clonoset["JStart"] = m_clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 16, minus=False))
-    v_clonoset = m_clonoset.sort_values(by="count", ascending=False).reset_index(drop=True)[["count", "freq", "cdr3nt", "cdr3aa", "v", "d", "j", "VEnd", "DStart", "DEnd", "JStart"]]
-    v_clonoset.to_csv(output_filename, index=False, sep = "\t")
-    return
+#     m_clonoset = m_clonoset.rename(columns={count_column:"count",
+#                                             freq_column:"freq",
+#                                             "nSeqCDR3": "cdr3nt",
+#                                             "aaSeqCDR3": "cdr3aa"})
+#     m_clonoset["v"] = m_clonoset["allVHitsWithScore"].apply(lambda x: extract_segment(x))
+#     m_clonoset["d"] = m_clonoset["allDHitsWithScore"].apply(lambda x: extract_segment(x))
+#     m_clonoset["j"] = m_clonoset["allJHitsWithScore"].apply(lambda x: extract_segment(x))
+#     m_clonoset["VEnd"] = m_clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 11, minus=True))
+#     m_clonoset["DStart"] = m_clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 12, minus=False))
+#     m_clonoset["DEnd"] = m_clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 15, minus=True))
+#     m_clonoset["JStart"] = m_clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 16, minus=False))
+#     v_clonoset = m_clonoset.sort_values(by="count", ascending=False).reset_index(drop=True)[["count", "freq", "cdr3nt", "cdr3aa", "v", "d", "j", "VEnd", "DStart", "DEnd", "JStart"]]
+#     v_clonoset.to_csv(output_filename, index=False, sep = "\t")
+#     return
 
 # dirty
-def convert_mixcr_to_vdjtools(file_list, output_folder, filter_nonfunctional=False, by_umi=True):
-    metadata_list = []
-    for f in file_list:
-        basename = os.path.splitext(os.path.basename(f))[0]
-        sample_id = basename.split(".")[0]
-        new_filename = f"vdjtools.{sample_id}.txt"
-        new_path = os.path.join(output_folder, new_filename)
-        convert_mixcr_clonoset(f, new_path, filter_nonfunctional=filter_nonfunctional, by_umi=by_umi)
-        metadata_list.append([new_filename, sample_id])
-    metadata_filename = os.path.join(output_folder, "metadata.txt")
-    metadata = pd.DataFrame(metadata_list, columns=["#file.name", "sample.id"])
-    metadata.to_csv(metadata_filename, index=False, sep="\t")
+# def convert_mixcr_to_vdjtools(file_list, output_folder, filter_nonfunctional=False, by_umi=True):
+#     metadata_list = []
+#     for f in file_list:
+#         basename = os.path.splitext(os.path.basename(f))[0]
+#         sample_id = basename.split(".")[0]
+#         new_filename = f"vdjtools.{sample_id}.txt"
+#         new_path = os.path.join(output_folder, new_filename)
+#         convert_mixcr_clonoset(f, new_path, filter_nonfunctional=filter_nonfunctional, by_umi=by_umi)
+#         metadata_list.append([new_filename, sample_id])
+#     metadata_filename = os.path.join(output_folder, "metadata.txt")
+#     metadata = pd.DataFrame(metadata_list, columns=["#file.name", "sample.id"])
+#     metadata.to_csv(metadata_filename, index=False, sep="\t")
