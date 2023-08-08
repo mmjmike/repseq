@@ -7,7 +7,7 @@ from .slurm import create_slurm_batch_file, run_slurm_command_from_jupyter
 from .io import read_json_report, read_mixcr_clonoset
 from .clonosets import find_all_exported_clonosets_in_folder, filter_nonfunctional_clones
 from subprocess import Popen, PIPE
-from IPython.display import Image, display
+from IPython.display import Image, display, SVG
 
 
 
@@ -72,8 +72,8 @@ def mixcr4_reports(folder, mixcr_path="mixcr"):
     # chains_filename = os.path.join(folder, "chainsQc.png")
     # tags_filename = os.path.join(folder, "tagsQc.pdf")
     clns_filenames = "*.clns"
-    align_filename = "alignQc.png"
-    chains_filename = "chainsQc.png"
+    align_filename = "alignQc.svg"
+    chains_filename = "chainsQc.svg"
     align_filename_pdf = "alignQc.pdf"
     chains_filename_pdf = "chainsQc.pdf"
     tags_filename = "tagsQc.pdf"
@@ -187,11 +187,30 @@ def get_processing_table(folder, show_offtarget=False):
     return result_df.sort_values(by="sample_id").reset_index(drop=True)
 
 def show_report_images(folder):
-    images = [os.path.join(folder, "alignQc.png"),
-          os.path.join(folder, "chainsQc.png")]
-    for imageName in images:
-        print(imageName)
-        display(Image(filename=imageName))
+    svg_align_filename = os.path.join(folder, "alignQc.svg")
+    svg_chain_filename = os.path.join(folder, "chainsQc.svg")
+    png_align_filename = os.path.join(folder, "alignQc.png")
+    png_chain_filename = os.path.join(folder, "chainsQc.png")
+    
+    if os.path.exists(svg_align_filename):
+        print(svg_align_filename)
+        display(SVG(filename=svg_align_filename))
+    elif os.path.exists(png_align_filename):
+        print(png_align_filename)
+        display(Image(filename=png_align_filename))
+    else:
+        print("No alignQc image found (svg or png)")
+
+    if os.path.exists(svg_chain_filename):
+        print(svg_chain_filename)
+        display(SVG(filename=svg_chain_filename))
+    elif os.path.exists(png_chain_filename):
+        print(png_chain_filename)
+        display(Image(filename=png_chain_filename))
+    else:
+        print("No chainQc image found (svg or png)")
+        
+
 
 
 ################ Old functions
