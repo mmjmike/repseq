@@ -74,19 +74,19 @@ def mixcr4_reports(folder, mixcr_path="mixcr"):
     clns_filenames = "*.clns"
     align_filename = "alignQc.png"
     chains_filename = "chainsQc.png"
+    align_filename_pdf = "alignQc.pdf"
+    chains_filename_pdf = "chainsQc.pdf"
     tags_filename = "tagsQc.pdf"
     #tables_filename = os.path.join(folder, "tables.tsv")
     #preproc_filename = os.path.join(folder, "preproc_tables.tsv")
     #postanalysis_filename = os.path.join(folder, "postanalysis.json")
     
-    commands = {"alignQc": f"{mixcr_path} -Xmx32g exportQc align -f {clns_filenames} {align_filename}",
-                "chainUsage": f"{mixcr_path} -Xmx32g exportQc chainUsage -f {clns_filenames} {chains_filename}",
-                "tagsQc": f"{mixcr_path} -Xmx32g exportQc tags -f {clns_filenames} {tags_filename}"#,
-                #"postanalysis": f"{MIXCR} -Xmx32g postanalysis individual -f --default-downsampling none --default-weight-function umi --only-productive --tables {tables_filename} --preproc-tables {preproc_filename} {clns_filenames} {postanalysis_filename}"
-               }
+
     
     commands = {"alignQc": f"cd {folder}; {mixcr_path} -Xmx32g exportQc align -f {clns_filenames} {align_filename}",
                 "chainUsage": f"cd {folder}; {mixcr_path} -Xmx32g exportQc chainUsage -f {clns_filenames} {chains_filename}",
+                "alignQcPDF": f"cd {folder}; {mixcr_path} -Xmx32g exportQc align -f {clns_filenames} {align_filename_pdf}",
+                "chainUsagePDF": f"cd {folder}; {mixcr_path} -Xmx32g exportQc chainUsage -f {clns_filenames} {chains_filename_pdf}",
                 "tagsQc": f"cd {folder}; {mixcr_path} -Xmx32g exportQc tags -f {clns_filenames} {tags_filename}"#,
                 #"postanalysis": f"{MIXCR} -Xmx32g postanalysis individual -f --default-downsampling none --default-weight-function umi --only-productive --tables {tables_filename} --preproc-tables {preproc_filename} {clns_filenames} {postanalysis_filename}"
                }
