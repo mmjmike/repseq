@@ -171,7 +171,7 @@ def calculate_cdr3_properties_cl(clonoset_in, colnames=None):
         clonoset["insert_size"] = clonoset.apply(lambda x: calc_insert_size(x.VEnd, x.DStart, x.DEnd, x.JStart), axis=1)
 
         insert_size_mean = np.average(clonoset["insert_size"], weights=clonoset[fraction_column])
-        zero_insert_freq = clonoset.loc["insert_size" == 0][fraction_column].sum()
+        zero_insert_freq = clonoset.loc[clonoset["insert_size"] == 0][fraction_column].sum()
     else:
         insert_size_mean = None
         zero_insert_freq = None
