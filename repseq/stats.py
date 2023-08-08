@@ -51,9 +51,7 @@ def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long"):
     if table == "wide":
         return df
     else:
-        df.melt(id_vars=["sample_id", "chain"]).rename(columns={"value":"usage", "variable":segment})
-
-    return 
+        return df.melt(id_vars=["sample_id", "chain"]).rename(columns={"value":"usage", "variable":segment})
 
 def calc_v_usage_cl(clonoset_in, colnames=None):
     return calc_segment_usage_cl(clonoset_in, segment="v", colnames=colnames)
