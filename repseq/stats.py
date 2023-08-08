@@ -35,7 +35,11 @@ def calc_clonoset_stats(clonosets_df, cl_filter=None):
     df = df.astype(convert_dict)
     return df
 
-def calc_segment_usage(clonosets_df, segment="v", cl_filter=None):
+def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long"):
+    table_options = ["long", "wide"]
+    if table not in table_options:
+        raise ValueError(f"Unknown value for 'table' parameter. Possible options: {', '.join(table_options)}")
+
     segment_to_function_dict = {"v": calc_v_usage_cl,
                                 "j": calc_j_usage_cl,
                                 "c": calc_c_usage_cl}
@@ -43,8 +47,13 @@ def calc_segment_usage(clonosets_df, segment="v", cl_filter=None):
     if segment not in segment_to_function_dict.keys():
         raise ValueError(f"Wrong segment value. Possible values: {', '.join(segment_to_function_dict.keys())}")
     df = generic_calculation(clonosets_df, segment_to_function_dict[segment], clonoset_filter=cl_filter, program_name="CalcSegmentUsage")
+    df = df.fillna(0)
+    if table == "wide":
+        return df
+    else:
+        df.melt(id_vars=["sample_id", "chain"]).rename(columns={"value":"usage", "variable":segment})
 
-    return df.fillna(0)
+    return 
 
 def calc_v_usage_cl(clonoset_in, colnames=None):
     return calc_segment_usage_cl(clonoset_in, segment="v", colnames=colnames)
