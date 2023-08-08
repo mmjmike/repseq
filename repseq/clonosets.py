@@ -149,8 +149,7 @@ def filter_by_functionality(clonoset_in, colnames=None, functional=True):
         clonoset = clonoset.loc[~clonoset[cdr3aa_column].str.contains("\*|_")]
         clonoset = clonoset.loc[clonoset[cdr3aa_column] != ""]
     else:
-        clonoset = clonoset.loc[clonoset[cdr3aa_column].str.contains("\*|_")]
-        clonoset = clonoset.loc[clonoset[cdr3aa_column] == ""]
+        clonoset = clonoset.loc[(clonoset[cdr3aa_column].str.contains("\*|_")) | (clonoset[cdr3aa_column] == "")]
 
     return clonoset
 
