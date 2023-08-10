@@ -28,9 +28,9 @@ def calc_clonoset_stats(clonosets_df, cl_filter=None):
                     "reads_func": int,
                     "reads_nonfunc": int}
     if not df["umi"].isnull().values.any():
-        convert_dict.update({"umi": "umi_count",
-                        "umi_func": "func_umi_count",
-                        "umi_nonfunc": "umi_nonfunc"})
+        convert_dict.update({"umi": int,
+                        "umi_func": int,
+                        "umi_nonfunc": int})
  
     df = df.astype(convert_dict)
     return df
