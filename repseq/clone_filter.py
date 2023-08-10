@@ -43,7 +43,7 @@ class Filter:
         result_columns = ["count", "freq", "cdr3nt", "cdr3aa", "v", "d", "j"]
         segment_borders_columns = ["VEnd", "DStart", "DEnd", "JStart"]
         
-        count_column, fraction_column = decide_count_and_frac_columns(colnames, self.by_umi)
+        count_column, fraction_column = decide_count_and_frac_columns(colnames, self.by_umi, suppress_warnings=True)
         
         rename_dict = {count_column: "count",
                        fraction_column: "freq",

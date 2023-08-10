@@ -281,14 +281,22 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
             print("Calcultating stats for original clonosets\n" + "_"*41)
             stats = calc_clonoset_stats(clonosets_df)
             downsample_column = count_column_by_umi_and_functionality[clonoset_filter.by_umi][clonoset_filter.functionality]
+            read_column = count_column_by_umi_and_functionality[False][clonoset_filter.functionality]
             top_column = clone_column_by_functionality[clonoset_filter.functionality]
+
         if need_downsample:
+            count_by_reads_samples = set()
             if stats[downsample_column].isnull().any().any():
                 nan_downsample_samples = list(stats[stats[downsample_column].isna()].sample_id)
                 print(f"WARNING! Following samples have NaN downsample counts ('{downsample_column}'): {', '.join(nan_downsample_samples)}")
-                print("These samples will be excluded from further calculations.")
-                exclude_samples.update(nan_downsample_samples)
-            not_enough_count_df = stats[stats[downsample_column] < clonoset_filter.downsample_size]
+                if clonoset_filter.by_umi:
+                    print("These samples will be counted by reads instead")
+                    count_by_reads_samples = set(nan_downsample_samples)
+                else:
+                    print("These samples will be excluded from further calculations.")
+                    exclude_samples.update(nan_downsample_samples)
+            not_enough_count_df = stats[(stats[downsample_column] < clonoset_filter.downsample_size) & (~stats.sample_id.isin(count_by_reads_samples)) |
+                                        (stats[read_column] < clonoset_filter.downsample_size) & (stats.sample_id.isin(count_by_reads_samples))]
             if len(not_enough_count_df) > 0:
                 not_enough_count_samples = list(not_enough_count_df.sample_id)
                 if not drop_small_samples:
@@ -300,8 +308,11 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
             if stats[downsample_column].isnull().any().any():
                 nan_downsample_samples = list(stats[stats[downsample_column].isna()].sample_id)
                 print(f"WARNING! Following samples have NaN counts ('{downsample_column}'): {', '.join(nan_downsample_samples)}")
-                print("These samples will be excluded from further calculations.")
-                exclude_samples.update(nan_downsample_samples)
+                if clonoset_filter.by_umi:
+                    print("These samples will be counted by reads instead")
+                else:
+                    print("These samples will be excluded from further calculations.")
+                    exclude_samples.update(nan_downsample_samples)
             not_enough_clones_df = stats[stats[top_column] < clonoset_filter.top]
             if len(not_enough_clones_df) > 0:
                 not_enough_clones_samples = list(not_enough_clones_df.sample_id)

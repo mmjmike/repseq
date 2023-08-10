@@ -240,15 +240,15 @@ def get_column_names_from_clonoset(clonoset):
 
     return colnames
 
-def decide_count_and_frac_columns(colnames, by_umi):
+def decide_count_and_frac_columns(colnames, by_umi, suppress_warnings=False):
     count_column = colnames["count_column"]
     fraction_column = colnames["fraction_column"]
     if by_umi:
         if colnames["umi"] is not None:
             count_column = colnames["umi_column"]
             fraction_column = colnames["umi_fraction_column"]
-        else:
-            print("WARNING! Clonoset does not contain UMI column. Using reads for downsample instead.\nTo avoid this warning set parameter 'by_umi=False'")
+        elif not suppress_warnings:
+            print("WARNING! Clonoset does not contain UMI column. Using reads for clone count instead.\nTo avoid this warning set parameter 'by_umi=False'")
     return count_column, fraction_column
 
 
