@@ -36,6 +36,9 @@ def calc_clonoset_stats(clonosets_df, cl_filter=None):
     return df
 
 def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long"):
+    if cl_filter is None:
+        cl_filter = Filter()
+    
     table_options = ["long", "wide"]
     if table not in table_options:
         raise ValueError(f"Unknown value for 'table' parameter. Possible options: {', '.join(table_options)}")
@@ -326,7 +329,7 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
         if clonoset_filter is not None:
             task = (sample_id, filename, calc_function, clonoset_filter.spawn(), iterations, seed, program_name, random_filter)
         else:
-            task = (sample_id, filename, calc_function, Filter(), iterations, seed, program_name, random_filter)
+            task = (sample_id, filename, calc_function, None, iterations, seed, program_name, random_filter)
         tasks.append(task)
     
     results = run_parallel_calculation(perform_generic_calculation_mp, tasks, program_name, object_name="calcultaion(s)")
