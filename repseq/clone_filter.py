@@ -11,6 +11,34 @@ import random
 
 class Filter:
     
+    """
+    Clonoset filter.
+    May be used to filter clonosets:
+        - by clone functionality
+        - randomly downsample them to particular number of reads of UMIs
+        - take top clonotypes by size (number of reads of UMIs) with or without random mixing
+
+    Properties:
+        - :name: string with the name of the filter. Will be displayed in print
+        - :functionality: Possible values:
+            - "a" - any (default). No clones are filtered out
+            - "f" - only functional. Those, not having stop codons and 
+                frame shifts in CDR3 regions, or having non-empty values in CDR3 amino-acid
+                sequence
+            - "n" - only-nonfunctional - opposite to "f" - functional
+        - :downsample: int - the number of reads/UMIs to randomly downsample the clonoset to.
+            default value 'None' - means not to apply downsampling
+        - :top:  int - the number of top biggest by reads/UMIs clonotypes to take from the clonoset.
+            default value 'None' - means not to apply top
+        - :by_umi: bool - default=False. Which column to take for clonotype count - reads or UMIs 
+            (if UMI count column exists).
+        - :mix_tails: bool - default=False. Defines whether to randomly mix-up the order of clonotypes
+            before sorting by size and taking the top clonotypes. Basically mix_tails=True mixes up 
+            clonotypes with the same size in read or UMIs.
+        - :seed: any hashable type, better to use int - seed for reproducibility of random events 
+            (downsampling or top with mix-tails). Default=None.
+    """
+
     def __init__(self, name="default_filter", functionality="a", downsample=None, top=None, by_umi=False, mix_tails=False, seed=None):
         self.name = name
         self.functionality = functionality
@@ -22,24 +50,52 @@ class Filter:
         self._check_input()
         
     def spawn(self):
+        """
+        Returns: the copy of the filter. Necessary for parallel computing
+        """
         return Filter(name=self.name, functionality=self.functionality, downsample=self.downsample_size, top=self.top,
                      by_umi=self.by_umi,mix_tails=self.mix_tails, seed=self.seed)
         
     def apply(self, input_clonoset, colnames=None):
+        """
+        Main method of the Filter object - application of it to a clonoset
+
+        Args:
+            input_clonoset (pd.DataFrame): clonoset in the form of Pandas DataFrame in
+                MiXCR(3 or 4+ version), VDJtools or Bioadaptive formats.
+            colnames (dict, optional): Dictionary of available specific column names.
+                Defaults to None - colnames imputed automatically.
+
+        Returns:
+            clonoset (pd.DataFrame): clonoset after converting to common (VDJtools-like)
+                format and applying functionality filtration and downsampling or taking top
+        """
+        
+        # copy clonoset for not changing the original one
         clonoset = input_clonoset.copy()
         if colnames is None:
             colnames = get_column_names_from_clonoset(clonoset)
+
+        # converting to common VDJtools-like format and obtaining new colnames
         clonoset = self._convert_clonoset(clonoset, colnames)
         colnames = get_column_names_from_clonoset(clonoset)
+
+        # application of main filters
         if self.functionality != "a":
             clonoset = self._filter_by_functionality(clonoset, colnames)
         clonoset = self._downsample(clonoset, colnames)
         clonoset = self._get_top(clonoset, colnames)
+
+        # the fraction columns need to be recounted after filtering, as they
+        # remain the same as in the original clonoset before filtration
         clonoset = self._recount_fractions_for_clonoset(clonoset, colnames)
         return clonoset
     
     def _convert_clonoset(self, clonoset, colnames):
+        # copy clonoset for not changing the original one
         c_clonoset = clonoset.copy()
+
+        # basic column name in clonoset DF
         result_columns = ["count", "freq", "cdr3nt", "cdr3aa", "v", "d", "j"]
         segment_borders_columns = ["VEnd", "DStart", "DEnd", "JStart"]
         
@@ -54,15 +110,21 @@ class Filter:
                        colnames["j_column"]: "j"}
         c_clonoset = c_clonoset.rename(columns=rename_dict)
         
+        # In the case of MiXCR and Bioadaptive format the segment type columns
+        # usually show several segment variants with particular allele and score.
+        # Here we extract only the name of the best hit without allele ane score
         c_clonoset["v"] = c_clonoset["v"].apply(lambda x: extract_segment(x))
         c_clonoset["d"] = c_clonoset["d"].apply(lambda x: extract_segment(x))
         c_clonoset["j"] = c_clonoset["j"].apply(lambda x: extract_segment(x))
         
+        # add the column for Constant segment if it exists in the original clonoset
         if colnames["c_column"] is not None:
             c_clonoset = c_clonoset.rename(columns={colnames["c_column"]: "c"})
             c_clonoset["c"] = c_clonoset["c"].apply(lambda x: extract_segment(x))
             result_columns += ["c"]
         
+        # obtain the borders of the segments within CDR3 region, if possible and add them to
+        # resulting clonoset
         if "refPoints" in c_clonoset.columns:
             c_clonoset["VEnd"] = c_clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 11, minus=True))
             c_clonoset["DStart"] = c_clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 12, minus=False))
@@ -71,6 +133,7 @@ class Filter:
         
         result_columns += [col for col in segment_borders_columns if col in c_clonoset.columns]    
         
+        # save "sample_id" column if it is present in clonoset
         if "sample_id" in c_clonoset.columns:
             result_columns.append("sample_id")
         
@@ -93,6 +156,13 @@ class Filter:
         return clonoset
     
     def _check_input(self):
+
+        """
+        Check if the object was created properly
+
+        Raises:
+            ValueError: in case of incorrect parameter values
+        """
         functionality_options = ["a", "f", "n"]
         if self.functionality not in functionality_options:
             raise ValueError(f"Incorrect value '{self.functionality}' for functionality. Possible values: {', '.join(functionality_options)}")
@@ -109,23 +179,36 @@ class Filter:
         if not isinstance(self.seed, Hashable):
             raise ValueError(f"Incorrect value '{self.seed}' for seed. Must be hashable")
 
-
     
     def _downsample(self, clonoset_in, colnames):
+        """
+        Downsample clonoset.
+        
+        This function takes the total number of reads or UMIs of the clonoset.
+        Then randomly samples the downsample_size from 0 to this total number of reads/UMIs. 
+        This random sample is mapped to the clonotype sizes and 
+        the new downsampled clonoset is created
+        """
+        
         if self.downsample_size is None:
             return clonoset_in
         
         clonoset = clonoset_in.copy()
         count_column = colnames["count_column"]
         total_count = int(clonoset[count_column].sum())
+
+        # raise ValueError if UMI/read count is less then downsample_size
         if total_count < self.downsample_size:
             raise ValueError(f"total count {total_count} is less than downsample size {self.downsample_size}")
         elif total_count == self.downsample_size:
             return clonoset
         
+        # set seed if given and take the sample of total_count
         if self.seed is not None:
             random.seed(self.seed)
         sample = sorted(random.sample(range(total_count), self.downsample_size))
+        
+        # map the sample to the clone counts in the clonoset
         curr_sum = 0
         i = 0
         new_counts_dict = {}
@@ -141,19 +224,35 @@ class Filter:
                     break
             if new_count > 0:
                 new_counts_dict[index]=new_count
+        
+        # filter clonoset for missed clones and set new clone counts
         (indices,counts) = zip(*new_counts_dict.items())
         clonoset = clonoset.loc[clonoset.index.isin(indices)]
         clonoset[count_column] = counts    
         return clonoset.reset_index(drop=True)
     
     def _get_top(self, clonoset_in, colnames):
+        """
+        Takes top N biggest clones from the clonoset.
+        
+        Mix-tails is recommended for use, because the order of the clonotypes
+        with equal count may not be independent from their other properties.
+        This option mixes up the order of all clonotypes in clonoset and then
+        sorts them by count in decreasing order, so that clonotypes with the same
+        count not have completely random order. Also use seed option for reproducibility
+        of the results.
+
+        Raises:
+            ValueError: if clone count is less then required top
+        """
+
         if self.top is None:
             return clonoset_in
         
         clonoset = clonoset_in.copy()
         count_column = colnames["count_column"]
         
-        #shuffle
+        #shuffle the order of clonotypes if required
         if self.seed is not None:
             random.seed(self.seed)
         if self.mix_tails:
@@ -163,6 +262,8 @@ class Filter:
 
         if self.top > len(clonoset):
             raise ValueError(f"Warning! Clonoset size - {len(clonoset)} - is less than required top - {self.top}")
+        
+        # take top
         if self.top > 0:
             clonoset=clonoset.iloc[:self.top]
 
@@ -218,6 +319,10 @@ class Filter:
         return self.functionality == "a" and self.downsample_size is None and self.top is None
 
     def _repr_html_(self):
+        """
+        function for printing the Filter properties to Jupyter output
+        """
+
         functionality = {"a": "any",
                          "f": "only functional clones (no frameshifts and Stops)",
                          "n": "only non-functional"}
