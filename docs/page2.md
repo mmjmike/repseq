@@ -86,3 +86,4 @@ def shannon_wiener(list_of_numbers):
 :fontawesome-brands-twitter:{ .twitter }
 
 :octicons-heart-fill-24:{ .heart }
+
