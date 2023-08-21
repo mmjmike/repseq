@@ -77,29 +77,31 @@ def overlap_distances(clonosets_df, overlap_type="aaV", mismatches=0, metric="F2
     Calculating overlap distances between multiple repseq samples using F2 of F metrics
     The result of this function may be used for heatmap+clusterization of samples or for MDS plots
     
-    :clonosets_df: pandas DataFrame, containing three columns - 'sample_id' and 'filename' columns,
-    filename - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
-    sample_id's should be all unique in this DF
-    :overlap_type: possible values are aa, aaV, aaVJ, nt, ntV, ntVJ. aa/nt define which CDR3 sequence
-    to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
-    to decide if clonotypes are equal.
-    :mismatches: default 0. The permissible number of single-letter mismatches in clonotypes sequences 
-    for them to be treated similar, i.e. hamming distance.
-    :metric: F or F2. Default F2. F2 - sum of sqrt of product of similar clonotype frequencies in 
-    two clonosets. F - sqrt of the sum of frequency products.
-    :by_umi: (default False), set =True for MiXCR4 clonosets to select count/frequency of clonotypes 
-    in UMI's if they exist in implemented protocol
-    :only_functional: (default True) use only functional clonotypes (do not contain stop codons or
-    frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
-    1 after filtering of non-functional clonotypes
+    Args:
+        clonosets_df (pd.DataFrame): contains three columns - 'sample_id' and 'filename' columns,
+            filename - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
+            sample_id's should be all unique in this DF
+        overlap_type (str): possible values are aa, aaV, aaVJ, nt, ntV, ntVJ. aa/nt define which CDR3 sequence
+            to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
+            to decide if clonotypes are equal
+        mismatches (int): The permissible number of single-letter mismatches in clonotypes sequences 
+            for them to be treated similar, i.e. hamming distance.
+        by_umi (bool): set =True for MiXCR4 clonosets to select count/frequency of clonotypes 
+            in UMI's if they exist in implemented protocol
+        metric (str): possible values - `F` or `F2`. Default F2. F2 - sum of sqrt of product of 
+            similar clonotype frequencies in two clonosets. F - sqrt of the sum of frequency products.
+        only_functional (bool): use only functional clonotypes (do not contain stop codons or
+            frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
+            1 after filtering of non-functional clonotypes
     
-    Important: similar clonotypes by overlap_type in one particular clonoset are NOT combined into one
+    Important: similar clonotypes by `overlap_type` in one particular clonoset are NOT combined into one
     and are treated as different clonotypes.
 
-    Output: pandas DF with following columns: "clone", "sample1_count", "sample2_count", "sample1", "sample2", "pair"
-    clone - is tuple, containing sequence (aa or nt), plus V or J if they are required by the metric
-    count columns contain freq/count of the clone in sample
-    pair column is made for easy separation of possibly huge DataFrame into overlapping pairs
+    Returns:
+        df (pd.DataFrame): dataframe with following columns: "clone", "sample1_count", "sample2_count", "sample1", "sample2", "pair"
+            clone - is tuple, containing sequence (aa or nt), plus V or J if they are required by the metric
+            count columns contain freq/count of the clone in sample
+            pair column is made for easy separation of possibly huge DataFrame into overlapping pairs
     """
     
     
