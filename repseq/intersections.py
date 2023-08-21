@@ -78,10 +78,10 @@ def overlap_distances(clonosets_df, overlap_type="aaV", mismatches=0, metric="F2
     The result of this function may be used for heatmap+clusterization of samples or for MDS plots
     
     Args:
-        clonosets_df (pd.DataFrame): contains three columns - 'sample_id' and 'filename' columns,
+        clonosets_df (pd.DataFrame): contains three columns - `sample_id` and `filename` columns,
             filename - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
             sample_id's should be all unique in this DF
-        overlap_type (str): possible values are aa, aaV, aaVJ, nt, ntV, ntVJ. aa/nt define which CDR3 sequence
+        overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence
             to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
             to decide if clonotypes are equal
         mismatches (int): The permissible number of single-letter mismatches in clonotypes sequences 
