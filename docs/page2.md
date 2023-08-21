@@ -87,3 +87,6 @@ def shannon_wiener(list_of_numbers):
 
 :octicons-heart-fill-24:{ .heart }
 
+## Try to show all the functions of a module
+
+::: intersections

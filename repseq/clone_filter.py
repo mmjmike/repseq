@@ -19,23 +19,23 @@ class Filter:
         - take top clonotypes by size (number of reads of UMIs) with or without random mixing
 
     Properties:
-        - :name: string with the name of the filter. Will be displayed in print
-        - :functionality: Possible values:
+        - name string with the name of the filter. Will be displayed in print
+        - functionality Possible values:
             - "a" - any (default). No clones are filtered out
             - "f" - only functional. Those, not having stop codons and 
                 frame shifts in CDR3 regions, or having non-empty values in CDR3 amino-acid
                 sequence
             - "n" - only-nonfunctional - opposite to "f" - functional
-        - :downsample: int - the number of reads/UMIs to randomly downsample the clonoset to.
+        - downsample int - the number of reads/UMIs to randomly downsample the clonoset to.
             default value 'None' - means not to apply downsampling
-        - :top:  int - the number of top biggest by reads/UMIs clonotypes to take from the clonoset.
+        - top  int - the number of top biggest by reads/UMIs clonotypes to take from the clonoset.
             default value 'None' - means not to apply top
-        - :by_umi: bool - default=False. Which column to take for clonotype count - reads or UMIs 
+        - by_umi bool - default=False. Which column to take for clonotype count - reads or UMIs 
             (if UMI count column exists).
-        - :mix_tails: bool - default=False. Defines whether to randomly mix-up the order of clonotypes
+        - mix_tails bool - default=False. Defines whether to randomly mix-up the order of clonotypes
             before sorting by size and taking the top clonotypes. Basically mix_tails=True mixes up 
             clonotypes with the same size in read or UMIs.
-        - :seed: any hashable type, better to use int - seed for reproducibility of random events 
+        - seed any hashable type, better to use int - seed for reproducibility of random events 
             (downsampling or top with mix-tails). Default=None.
     """
 
@@ -51,7 +51,10 @@ class Filter:
         
     def spawn(self):
         """
-        Returns: the copy of the filter. Necessary for parallel computing
+        
+        Returns:
+            the copy of the filter. Necessary for parallel computing
+
         """
         return Filter(name=self.name, functionality=self.functionality, downsample=self.downsample_size, top=self.top,
                      by_umi=self.by_umi,mix_tails=self.mix_tails, seed=self.seed)

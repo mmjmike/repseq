@@ -11,27 +11,29 @@ def intersect_clones_in_samples_batch(clonosets_df, overlap_type="aaV", by_umi=F
     The result of this function may be used for scatterplots of frequencies/counts of 
     overlapping clonotypes
     
-    :clonosets_df: pandas DataFrame, containing three columns - 'sample_id' and 'filename' columns,
-    filename - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
-    sample_id's should be all unique in this DF
-    :overlap_type: possible values are aa, aaV, aaVJ, nt, ntV, ntVJ. aa/nt define which CDR3 sequence
-    to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
-    to decide if clonotypes are equal.
-    :by_umi: (default False), set =True for MiXCR4 clonosets to select count/frequency of clonotypes 
-    in UMI's if they exist in implemented protocol
-    :by_freq: default is True - this means that the intersect metric is frequency of clonotype, 
-    but not its count
-    :only_functional: (default True) use only functional clonotypes (do not contain stop codons or
-    frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
-    1 after filtering of non-functional clonotypes
+    Args:
+        clonosets_df (pd.DataFrame): contains three columns - 'sample_id' and 'filename' columns,
+            filename - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
+            sample_id's should be all unique in this DF
+        overlap_type (str): possible values are aa, aaV, aaVJ, nt, ntV, ntVJ. aa/nt define which CDR3 sequence
+            to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
+            to decide if clonotypes are equal
+        by_umi (bool): set =True for MiXCR4 clonosets to select count/frequency of clonotypes 
+            in UMI's if they exist in implemented protocol
+        by_freq (bool): default is True - this means that the intersect metric is frequency of clonotype, 
+            but not its count
+        only_functional (bool): use only functional clonotypes (do not contain stop codons or
+            frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
+            1 after filtering of non-functional clonotypes
     
     Important: when using particular overlap type, similar clonotypes in one particular clonoset are
     combined into one with summation of counts/frequencies.
 
-    Output: pandas DF with following columns: "clone", "sample1_count", "sample2_count", "sample1", "sample2", "pair"
-    clone - is tuple, containing sequence (aa or nt), plus V or J if they are required by the metric
-    count columns contain freq/count of the clone in sample
-    pair column is made for easy separation of possibly huge DataFrame into overlapping pairs
+    Returns:
+        df (pd.DataFrame): dataframe with following columns: "clone", "sample1_count", "sample2_count", "sample1", "sample2", "pair"
+            clone - is tuple, containing sequence (aa or nt), plus V or J if they are required by the metric
+            count columns contain freq/count of the clone in sample
+            pair column is made for easy separation of possibly huge DataFrame into overlapping pairs
     """
 
 
