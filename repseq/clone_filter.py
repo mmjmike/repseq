@@ -18,28 +18,31 @@ class Filter:
         - randomly downsample them to particular number of reads of UMIs
         - take top clonotypes by size (number of reads of UMIs) with or without random mixing
 
-    Properties:
-        - name string with the name of the filter. Will be displayed in print
-        - functionality Possible values:
+    Args:
+        - name (str): the name of the filter. Will be displayed in print
+        - functionality (str): Possible values:
             - "a" - any (default). No clones are filtered out
             - "f" - only functional. Those, not having stop codons and 
                 frame shifts in CDR3 regions, or having non-empty values in CDR3 amino-acid
                 sequence
             - "n" - only-nonfunctional - opposite to "f" - functional
-        - downsample int - the number of reads/UMIs to randomly downsample the clonoset to.
+        - downsample (int): the number of reads/UMIs to randomly downsample the clonoset to.
             default value 'None' - means not to apply downsampling
-        - top  int - the number of top biggest by reads/UMIs clonotypes to take from the clonoset.
+        - top (int): the number of top biggest by reads/UMIs clonotypes to take from the clonoset.
             default value 'None' - means not to apply top
-        - by_umi bool - default=False. Which column to take for clonotype count - reads or UMIs 
+        - by_umi (bool): default=False. Which column to take for clonotype count - reads or UMIs 
             (if UMI count column exists).
-        - mix_tails bool - default=False. Defines whether to randomly mix-up the order of clonotypes
+        - mix_tails (bool): default=False. Defines whether to randomly mix-up the order of clonotypes
             before sorting by size and taking the top clonotypes. Basically mix_tails=True mixes up 
             clonotypes with the same size in read or UMIs.
-        - seed any hashable type, better to use int - seed for reproducibility of random events 
+        - count_threshold (int): limits [0:100000], all clonotypes with count less than this value will
+            be filtered out
+        - seed (any hashable type): better to use int - seed for reproducibility of random events 
             (downsampling or top with mix-tails). Default=None.
     """
 
-    def __init__(self, name="default_filter", functionality="a", downsample=None, top=None, by_umi=False, mix_tails=False, seed=None):
+    def __init__(self, name="default_filter", functionality="a", downsample=None,
+                 top=None, by_umi=False, mix_tails=False, count_threshold=None, seed=None):
         self.name = name
         self.functionality = functionality
         self.downsample_size = downsample
@@ -47,6 +50,7 @@ class Filter:
         self.by_umi = by_umi
         self.mix_tails = mix_tails
         self.seed = seed
+        self.count_threshold = count_threshold
         self._check_input()
         
     def spawn(self):
@@ -56,8 +60,10 @@ class Filter:
             the copy of the filter. Necessary for parallel computing
 
         """
-        return Filter(name=self.name, functionality=self.functionality, downsample=self.downsample_size, top=self.top,
-                     by_umi=self.by_umi,mix_tails=self.mix_tails, seed=self.seed)
+        return Filter(name=self.name, functionality=self.functionality,
+                      downsample=self.downsample_size, top=self.top,
+                      by_umi=self.by_umi, mix_tails=self.mix_tails,
+                      count_threshold=self.count_threshold, seed=self.seed)
         
     def apply(self, input_clonoset, colnames=None):
         """
@@ -86,6 +92,9 @@ class Filter:
         # application of main filters
         if self.functionality != "a":
             clonoset = self._filter_by_functionality(clonoset, colnames)
+        
+        clonoset = self._filter_by_count(clonoset,colnames)
+        
         clonoset = self._downsample(clonoset, colnames)
         clonoset = self._get_top(clonoset, colnames)
 
@@ -158,6 +167,13 @@ class Filter:
             clonoset[umi_fraction_column] = clonoset[umi_column]/clonoset[umi_column].sum()
         return clonoset
     
+    def _filter_by_count(self, clonoset_in, colnames):
+        if self.count_threshold is None:
+            return clonoset_in
+        clonoset = clonoset_in.copy()
+
+
+
     def _check_input(self):
 
         """
@@ -167,8 +183,15 @@ class Filter:
             ValueError: in case of incorrect parameter values
         """
         functionality_options = ["a", "f", "n"]
+        count_threshold_limits = [0, 100000]
         if self.functionality not in functionality_options:
             raise ValueError(f"Incorrect value '{self.functionality}' for functionality. Possible values: {', '.join(functionality_options)}")
+        if self.count_threshold is not None:
+            if not isinstance(self.count_threshold, int):
+                raise TypeError("Count threshold must be an 'int' or 'None'")
+            if (self.count_threshold < count_threshold_limits[0]
+                  or self.count_threshold > count_threshold_limits[1]):
+                raise ValueError(f"Incorrect value '{self.functionality}' for count_threshold. Possible values: {count_threshold_limits}")                
         if self.downsample_size is not None:
             if not isinstance(self.downsample_size, int):
                 raise ValueError(f"Incorrect value '{self.downsample_size}' for downsample_size. Only int or None possible")
@@ -294,6 +317,9 @@ class Filter:
         change_size = False
         if functionality != "a":
             change_size = True
+        if isinstance(self.count_threshold, int):
+            output += f"Count threshold:\t{self.count_threshold}\n"
+            change_size = True
         if isinstance(self.downsample_size, int):
             output += f"Downsample size:\t{self.downsample_size}\n"
             random = True
@@ -334,6 +360,9 @@ class Filter:
         random = False
         change_size = False
         if functionality != "a":
+            change_size = True
+        if isinstance(self.count_threshold, int):
+            output += f"<p>Count threshold: {self.count_threshold}</p>"
             change_size = True
         if isinstance(self.downsample_size, int):
             output += f"<p>Downsample size: {self.downsample_size}</p>"
