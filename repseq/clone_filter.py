@@ -93,7 +93,7 @@ class Filter:
         if self.functionality != "a":
             clonoset = self._filter_by_functionality(clonoset, colnames)
         
-        clonoset = self._filter_by_count(clonoset,colnames)
+        clonoset = self._filter_by_count(clonoset, colnames)
         
         clonoset = self._downsample(clonoset, colnames)
         clonoset = self._get_top(clonoset, colnames)
@@ -171,6 +171,10 @@ class Filter:
         if self.count_threshold is None:
             return clonoset_in
         clonoset = clonoset_in.copy()
+        count_column = colnames["count_column"]
+        clonoset = clonoset.loc[clonoset[count_column] >= self.count_threshold]
+
+        return clonoset
 
 
 
@@ -284,7 +288,7 @@ class Filter:
         if self.mix_tails:
             index_order = random.sample(list(clonoset.index), len(clonoset))
             clonoset = clonoset.iloc[index_order] 
-            clonoset=clonoset.sort_values(by=count_column, ascending=False)
+            clonoset = clonoset.sort_values(by=count_column, ascending=False)
 
         if self.top > len(clonoset):
             raise ValueError(f"Warning! Clonoset size - {len(clonoset)} - is less than required top - {self.top}")
@@ -345,7 +349,7 @@ class Filter:
         return output
     
     def is_empty(self):
-        return self.functionality == "a" and self.downsample_size is None and self.top is None
+        return self.functionality == "a" and self.downsample_size is None and self.top is None and self.count_threshold is None
 
     def _repr_html_(self):
         """
