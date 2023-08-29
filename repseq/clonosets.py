@@ -19,6 +19,20 @@ CHAIN_VARIANTS = {"TRA": {"TRAD", "TRA"},
                   "BCR": {"IGH", "IGK", "IGL"}}
 
 def find_all_exported_clonosets(folders, chain=None, remove_non_target=False, non_target_threshold=0.01):
+    """
+    Main method of the Filter object - application of it to a clonoset
+
+    Args:
+        folders (path or list of paths): clonoset in the form of Pandas DataFrame in
+            MiXCR(3 or 4+ version), VDJtools or Bioadaptive formats.
+        colnames (dict, optional): Dictionary of available specific column names.
+            Defaults to None - colnames imputed automatically.
+
+    Returns:
+        clonoset (pd.DataFrame): clonoset after converting to common (VDJtools-like)
+            format and applying functionality filtration and downsampling or taking top
+
+    """
     if isinstance(folders, str):
         folders = [folders]
     clonosets_dfs = []
