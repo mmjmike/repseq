@@ -13,6 +13,16 @@ from IPython.display import Image, display, SVG
 
 def mixcr4_analyze_batch(sample_df, output_folder, command_template=None, mixcr_path="mixcr"):
     
+    """
+    Function for batch runs of MiXCR software using SLURM.
+
+    Args:
+        - sample_df (pd.DataFrame): 
+        - output_folder (str): path to output
+        - command_template (str): 
+    """
+
+
     program_name="MIXCR4.3 Analyze Batch"
     samples_num = sample_df.shape[0]
     
