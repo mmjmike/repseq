@@ -72,6 +72,14 @@ def calc_segment_usage_cl(clonoset_in, segment="v", colnames=None):
     result = clonoset_in[[freq_column, segment_column]].groupby(segment_column).sum().to_dict()[freq_column]
     return result
 
+def calc_vj_usage_cl(clonoset_in, colnames=None):
+    colnames = get_column_names_from_clonoset(clonoset_in)
+    freq_column = colnames["fraction_column"]
+    v_column = colnames["v_column"]
+    j_column = colnames["j_column"]
+    result = clonoset_in[[freq_column, v_column, j_column]].groupby([v_column, j_column]).sum().to_dict()[freq_column]
+    return result
+
 def calc_diversity_stats(clonosets_df, cl_filter=None, iterations=3, seed=None, drop_small_samples=True):
     df = generic_calculation(clonosets_df, calculate_diversity_stats_cl, clonoset_filter=cl_filter,
                              program_name="CalcDiversityStats", iterations=iterations, seed=seed, drop_small_samples=drop_small_samples)
