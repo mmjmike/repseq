@@ -11,17 +11,26 @@ from IPython.display import Image, display, SVG
 
 
 
-def mixcr4_analyze_batch(sample_df, output_folder, command_template=None, mixcr_path="mixcr"):
+def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
+                         mixcr_path="mixcr", memory=32, time_estimate=1.5):
     
     """
     Function for batch runs of MiXCR software using SLURM.
 
     Args:
-        - sample_df (pd.DataFrame): 
-        - output_folder (str): path to output
-        - command_template (str): 
+        - sample_df (pd.DataFrame): DataFrame, containing 'sample_id' column and 
+        'R1' and 'R2' columns, containing paths (recommended full paths) to raw read files
+        - output_folder (str): path to output folder
+        - command_template (str): MiXCR command template 
+        (default: 'mixcr analyze milab-human-tcr-rna-multiplex-cdr3 -f r1 r2 output_prefix').
+        May be used as an example
+        - mixcr_path (str): path to MiXCR binary
+        - memory (int): required OOM in GB
+        - time_estimate (numeric): time estimate in hours for the calculation. It
+        is the limit for SLURM task
     """
-
+    max_memory = 1500
+    min_memory = 16
 
     program_name="MIXCR4.3 Analyze Batch"
     samples_num = sample_df.shape[0]
@@ -39,9 +48,17 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None, mixcr_
     os.makedirs(output_folder, exist_ok=True)
 
     # default mixcr analyze slurm parameters. They are quite excessive, works fine.
-    time_estimate=1.5
+    # time_estimate=1.5
     cpus=40
-    memory=32
+    if not isinstance(memory, int):
+        raise TypeError("memory parameter must be an integer")
+    if memory < min_memory:
+        print(f"{memory} < than limit ({min_memory}), using {min_memory} GB")
+        memory = min_memory
+    if memory > max_memory:
+        print(f"{memory} > than limit ({max_memory}), using {max_memory} GB")
+        memory = max_memory
+        
     
     # create slurm batch file for progress tracking
     slurm_batch_filename = os.path.join(output_folder, "mixcr_analyze_slurm_batch.log")
