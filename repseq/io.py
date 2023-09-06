@@ -199,6 +199,18 @@ def recode_vdj_names_bioadaptive(vdj_name):
 
 def read_json_report(sample_id, folder, report_type):
     filename = os.path.join(folder, f"{sample_id}.{report_type}.report.json")
+    if "." in sample_id:
+        sample_id2 = ".".join(sample_id.split(".")[:-1])
+        filename2 = os.path.join(folder, f"{sample_id2}.{report_type}.report.json")
+        try:
+            report = open_json_report(filename)
+        except FileNotFoundError:
+            report = open_json_report(filename2)
+    else:
+        report = open_json_report(filename)
+    return report
+
+def open_json_report(filename):
     with open(filename) as data_file:    
         for jsonObj in data_file:
             report = json.loads(jsonObj)
