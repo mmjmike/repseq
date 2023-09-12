@@ -1,8 +1,9 @@
 import math
 import pandas as pd
 from .common_functions import print_progress_bar, run_parallel_calculation
-from .io import read_mixcr_clonoset
+from .io import read_clonoset
 from .clonosets import filter_nonfunctional_clones, recount_fractions_for_clonoset, get_column_names_from_clonoset
+from repseq.clone_filter import Filter
 
 
 def intersect_clones_in_samples_batch(clonosets_df, overlap_type="aaV", by_umi=False, by_freq=True, only_functional=True):
@@ -72,6 +73,58 @@ def intersect_clones_in_samples_batch(clonosets_df, overlap_type="aaV", by_umi=F
     return pd.concat(results).reset_index(drop=True)
 
 
+def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0):
+    print("Creating clonotypes count table\n"+"-"*50)
+    print(f"Overlap type: {overlap_type}")
+    aa, check_v, check_j = overlap_type_to_flags(overlap_type)
+    clonoset_dicts = convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=cl_filter,
+                                                        overlap_type=overlap_type, by_freq=False)
+    unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts, check_v, check_j)
+    
+    tasks = []
+    for sample_id in clonoset_dicts:
+        task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], check_v, check_j, mismatches]
+        tasks.append(task)
+    
+    results = run_parallel_calculation(count_table_mp, tasks, "Counting features", object_name="pairs")
+    result_dict = dict()
+    for result in results:
+        result_dict.update(result)
+    count_table = pd.DataFrame(result_dict)
+    count_table.index = unique_clonotypes
+    return count_table
+
+def count_table_mp(args):
+    (features, sample_id, clonoset_dict, check_v, check_j, mismatches) = args
+    result = []
+    for feature in features:
+        count = 0
+        len_feature = len(feature[0])
+        if len_feature in clonoset_dict:
+            clonotypes = clonoset_dict[len_feature]
+            for clonotype in clonotypes:
+                if clonotypes_equal(feature, clonotype, check_v, check_j, mismatches=mismatches):
+                    count += clonotype[-1]
+        result.append(count)
+    return {sample_id: result}
+        
+        
+
+
+def find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts, check_v, check_j):
+    unique_clonotypes = set()
+    for sample_id in clonoset_dicts:
+        for cdr3len in clonoset_dicts[sample_id]:
+            for clonotype in clonoset_dicts[sample_id][cdr3len]:
+                clone_len = 1
+                if check_v:
+                    clone_len += 1
+                if check_j:
+                    clone_len += 1
+                unique_clonotypes.add(tuple(clonotype[:clone_len]))
+    return unique_clonotypes
+    
+
 def overlap_distances(clonosets_df, overlap_type="aaV", mismatches=0, metric="F2", by_umi=False, only_functional=True):
     """
     Calculating overlap distances between multiple repseq samples using F2 of F metrics
@@ -126,7 +179,7 @@ def overlap_distances(clonosets_df, overlap_type="aaV", mismatches=0, metric="F2
     for i, r in clonosets_df.sort_values(by="sample_id").iterrows():
         filename = r["filename"]
         sample_id = r["sample_id"]
-        cl_list = prepare_clonoset_for_intersection(filename, overlap_type=overlap_type, by_umi=by_umi, by_freq=True, for_f_metric=True, only_functional=only_functional)
+        cl_list = prepare_clonoset_for_intersection(filename, overlap_type=overlap_type, by_umi=by_umi, by_freq=True, retain_counts=True, only_functional=only_functional)
         samples_read += 1
         print_progress_bar(samples_read, samples_total, "Reading clonosets")
         clonoset_lists[sample_id] = cl_list
@@ -151,6 +204,28 @@ def overlap_distances(clonosets_df, overlap_type="aaV", mismatches=0, metric="F2
 
 
 ### Supporting functions
+
+def convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True):
+    clonoset_dicts = {}
+    
+    if cl_filter is None:
+        cl_filter = Filter()
+
+    samples_total = len(clonosets_df)
+    samples_read = 0
+    print_progress_bar(samples_read, samples_total, "Reading clonosets")
+    for i, r in clonosets_df.sort_values(by="sample_id").iterrows():
+        filename = r["filename"]
+        sample_id = r["sample_id"]
+        clonoset = read_clonoset(filename)
+        clonoset = cl_filter.apply(clonoset)
+        cl_dict = prepare_clonoset_for_intersection(clonoset, overlap_type=overlap_type,
+                                                    by_freq=by_freq, retain_counts=True)
+        samples_read += 1
+        print_progress_bar(samples_read, samples_total, "Reading clonosets")
+        clonoset_dicts[sample_id] = cl_dict
+    return clonoset_dicts
+
 
 def overlap_metric_two_clone_dicts(args):
     (sample_id_1, sample_id_2, clonoset_dicts, check_v, check_j, mismatches, metric) = args
@@ -204,49 +279,39 @@ def overlap_type_to_flags(overlap_type):
         check_j = True
     return aa, check_v, check_j
 
-def prepare_clonoset_for_intersection(clonoset_filename, overlap_type="aaV", only_functional=True, by_umi=False, by_freq=True, for_f_metric=False):
+def prepare_clonoset_for_intersection(clonoset, overlap_type="aaV", by_freq=True, retain_counts=False):
     aa, check_v, check_j = overlap_type_to_flags(overlap_type)
     
-    clonoset = read_mixcr_clonoset(clonoset_filename)
     colnames = get_column_names_from_clonoset(clonoset)
-    if only_functional:
-        clonoset = filter_nonfunctional_clones(clonoset, colnames=colnames)
-        clonoset = recount_fractions_for_clonoset(clonoset, colnames=colnames)
+    # if only_functional:
+    #     clonoset = filter_nonfunctional_clones(clonoset, colnames=colnames)
+    #     clonoset = recount_fractions_for_clonoset(clonoset, colnames=colnames)
     
     cl_seq_col = colnames["cdr3aa_column"]
     if not aa:
         cl_seq_col = colnames["cdr3nt_column"]
     clonoset["seq"] = clonoset[cl_seq_col]
     
+    weight_column = colnames["count_column"]
     if by_freq:
-        cl_freq_col = colnames["fraction_column"]
-        if by_umi and colnames["umi"] is not None:
-            cl_freq_col = colnames["umi_fraction_column"]
-        clonoset["freq"] = clonoset[cl_freq_col]
-    else:
-        cl_freq_col = colnames["count_column"]
-        if by_umi and colnames["umi"] is not None:
-            cl_freq_col = colnames["umi_column"]
-        clonoset["freq"] = clonoset[cl_freq_col]
+        weight_column = colnames["fraction_column"]
     
     result_colnames = ["seq"]
     
     if check_v:
         cl_v_col = colnames["v_column"]
-        clonoset["v"] = clonoset[cl_v_col].apply(lambda x: x.split("*")[0])
-        result_colnames.append("v")
+        result_colnames.append(cl_v_col)
     
     if check_j:
         cl_j_col = colnames["j_column"]
-        clonoset[cl_j_col] = clonoset[cl_j_col].apply(lambda x: x.split("*")[0])
-        result_colnames.append("j")
+        result_colnames.append(cl_j_col)
     
     
-    if not for_f_metric:
+    if not retain_counts:
         clonoset["clone"] = clonoset.apply(lambda x: tuple(x[col] for col in result_colnames), axis=1)
-        return clonoset[["clone", "freq"]].groupby("clone").sum().sort_values(by="freq",ascending=False).to_dict()["freq"]
+        return clonoset[["clone", weight_column]].groupby("clone").sum().sort_values(by=weight_column,ascending=False).to_dict()[weight_column]
     else:
-        result_colnames.append("freq")
+        result_colnames.append(weight_column)
         clonoset_list = list(clonoset.apply(lambda x: tuple(x[col] for col in result_colnames), axis=1))
         clonoset_dict = {}
         for clone in clonoset_list:
