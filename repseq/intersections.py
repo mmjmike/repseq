@@ -6,7 +6,7 @@ from .clonosets import filter_nonfunctional_clones, recount_fractions_for_clonos
 from repseq.clone_filter import Filter
 
 
-def intersect_clones_in_samples_batch(clonosets_df, overlap_type="aaV", by_umi=False, by_freq=True, only_functional=True):
+def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True):
     """
     Calculating frequencies of intersecting clonotypes between multiple repseq samples.
     The result of this function may be used for scatterplots of frequencies/counts of 
@@ -46,18 +46,10 @@ def intersect_clones_in_samples_batch(clonosets_df, overlap_type="aaV", by_umi=F
         raise ValueError("Input clonosets DataFrame contains non-unique sample ID's")
     
     # converting clonosets to compact dicts (clone: freq) based on overlap type and count/freq/umi
-    clonoset_dicts = {}
-    
     samples_total = len(clonosets_df)
-    samples_read = 0
-    print_progress_bar(samples_read, samples_total, "Reading clonosets")
-    for i, r in clonosets_df.sort_values(by="sample_id").iterrows():
-        filename = r["filename"]
-        sample_id = r["sample_id"]
-        cl_dict = prepare_clonoset_for_intersection(filename, overlap_type=overlap_type, by_umi=by_umi, by_freq=by_freq, only_functional=only_functional)
-        samples_read += 1
-        print_progress_bar(samples_read, samples_total, "Reading clonosets")
-        clonoset_dicts[sample_id] = cl_dict
+    clonoset_dicts = convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=cl_filter,
+                                                        overlap_type=overlap_type, by_freq=True,
+                                                        retain_counts=False)
         
     sample_list = list(clonosets_df.sort_values(by="sample_id").sample_id)
     tasks = []
@@ -125,7 +117,7 @@ def find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts, check_v, check_j):
     return unique_clonotypes
     
 
-def overlap_distances(clonosets_df, overlap_type="aaV", mismatches=0, metric="F2", by_umi=False, only_functional=True):
+def overlap_distances(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, metric="F2"):
     """
     Calculating overlap distances between multiple repseq samples using F2 of F metrics
     The result of this function may be used for heatmap+clusterization of samples or for MDS plots
@@ -171,18 +163,9 @@ def overlap_distances(clonosets_df, overlap_type="aaV", mismatches=0, metric="F2
         raise ValueError("Input clonosets DataFrame contains non-unique sample ID's")
     
     # converting clonosets to compact lists of clonotypes separated by CDR3 lengths to dictionary based on overlap type and count/freq/umi
-    clonoset_lists = {}
-    
     samples_total = len(clonosets_df)
-    samples_read = 0
-    print_progress_bar(samples_read, samples_total, "Reading clonosets")
-    for i, r in clonosets_df.sort_values(by="sample_id").iterrows():
-        filename = r["filename"]
-        sample_id = r["sample_id"]
-        cl_list = prepare_clonoset_for_intersection(filename, overlap_type=overlap_type, by_umi=by_umi, by_freq=True, retain_counts=True, only_functional=only_functional)
-        samples_read += 1
-        print_progress_bar(samples_read, samples_total, "Reading clonosets")
-        clonoset_lists[sample_id] = cl_list
+    clonoset_lists = convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=cl_filter,
+                                                        overlap_type=overlap_type, by_freq=True)
     
     # generating a set of tasks
     
@@ -205,7 +188,7 @@ def overlap_distances(clonosets_df, overlap_type="aaV", mismatches=0, metric="F2
 
 ### Supporting functions
 
-def convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True):
+def convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True, retain_counts=True):
     clonoset_dicts = {}
     
     if cl_filter is None:
@@ -220,7 +203,7 @@ def convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=None, overlap_typ
         clonoset = read_clonoset(filename)
         clonoset = cl_filter.apply(clonoset)
         cl_dict = prepare_clonoset_for_intersection(clonoset, overlap_type=overlap_type,
-                                                    by_freq=by_freq, retain_counts=True)
+                                                    by_freq=by_freq, retain_counts=retain_counts)
         samples_read += 1
         print_progress_bar(samples_read, samples_total, "Reading clonosets")
         clonoset_dicts[sample_id] = cl_dict
