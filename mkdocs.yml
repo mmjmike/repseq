@@ -28,9 +28,11 @@ theme:
 
 nav:
   - Home: index.md
-  - Filter: filter.md
-  - Page2: page2.md
-  - Modules: modules.md
+  - MiXCR module: mixcr.md
+  - Postanalysis: postanalysis.md
+  - Clone filter: filter.md
+  - Test page: page2.md
+  - Examples: examples.md
   # - Code Reference: reference/
 
 
