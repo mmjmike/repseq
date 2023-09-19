@@ -18,16 +18,16 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
     Function for batch runs of MiXCR software using SLURM.
 
     Args:
-        - sample_df (pd.DataFrame): DataFrame, containing 'sample_id' column and 
-        'R1' and 'R2' columns, containing paths (recommended full paths) to raw read files
-        - output_folder (str): path to output folder
-        - command_template (str): MiXCR command template 
-        (default: 'mixcr analyze milab-human-tcr-rna-multiplex-cdr3 -f r1 r2 output_prefix').
-        May be used as an example
-        - mixcr_path (str): path to MiXCR binary
-        - memory (int): required OOM in GB
-        - time_estimate (numeric): time estimate in hours for the calculation. It
-        is the limit for SLURM task
+        sample_df (pd.DataFrame): DataFrame, containing 'sample_id' column and 
+            'R1' and 'R2' columns, containing paths (recommended full paths) to raw read files
+        output_folder (str): path to output folder
+        command_template (str): MiXCR command template 
+            (default: 'mixcr analyze milab-human-tcr-rna-multiplex-cdr3 -f r1 r2 output_prefix').
+            May be used as an example
+        mixcr_path (str): path to MiXCR binary
+        memory (int): required OOM in GB
+        time_estimate (numeric): time estimate in hours for the calculation. It
+            is the limit for SLURM task
     """
     max_memory = 1500
     min_memory = 16
@@ -130,7 +130,7 @@ def mixcr4_reports(folder, mixcr_path="mixcr"):
         print(stdout, stderr)
 
 
-def get_processing_table(folder, show_offtarget=False):
+def get_processing_table(folder, show_offtarget=False, off_target_chain_threshold=0.01):
     
     if isinstance(folder, list):
         tables = []
@@ -141,8 +141,6 @@ def get_processing_table(folder, show_offtarget=False):
     
     results = []
     clonosets = find_all_exported_clonosets_in_folder(folder, chain=None)
-    
-    off_target_chain_threshold = 0.01
 
     for i, r in clonosets.iterrows():
         sample_id = r["sample_id"]
