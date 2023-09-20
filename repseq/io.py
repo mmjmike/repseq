@@ -6,6 +6,21 @@ import json
 import zipfile
 
 def read_yaml_metadata(folder, filename="metadata.yaml"):
+    
+    """
+    Reads NGSiK metadata from a given folder and converts to `pd.DataFrame`. By default 
+    it searches for `metadata.yaml` file in this folder and extracts the table.
+    
+    Args:
+        folder (str): path to NGSiK folder
+        filename (str): NGSiK metadata filename
+    
+    Returns:
+        sample_df (pd.DataFrame): extracted DataFrame from metadata
+    
+    """
+    
+    
     yaml_filename = os.path.join(folder, filename)
     with open(yaml_filename, "r") as stream:
         try:
@@ -23,38 +38,23 @@ def read_yaml_metadata(folder, filename="metadata.yaml"):
     yaml_metadata = pd.DataFrame(all_data).rename(columns={"name": "sample_id"})
     return yaml_metadata
 
-def save_dill_dump(obj, filename):
-    with open(filename, 'wb') as f: 
-        dill.dump(obj, f)
-
-def read_dill_dump(filename):
-    with open(filename, 'rb') as f:
-        return dill.load(f)
-
-def read_mixcr_clonoset(filename):
-    clonoset = pd.read_csv(filename, sep="\t", dtype={'cloneId': int, 'readCount': int, 'readFraction': float,
-                                                          'uniqueUMICount': int, 'uniqueUMIFraction': float,
-                                                          'uniqueMoleculeCount': int, 'uniqueMoleculeFraction': float,
-                                                          'cloneCount': int, 'cloneFraction': float,
-                                                          'targetSequences': str, 'targetQualities': str,
-                                                          'allVHitsWithScore': str, 'allDHitsWithScore': str,
-                                                          'allJHitsWithScore': str, 'allCHitsWithScore': str,
-                                                          'allVAlignments': str, 'allDAlignments': str,
-                                                          'allJAlignments': str, 'allCAlignments': str,
-                                                          'nSeqFR1': str, 'minQualFR1': str,
-                                                          'nSeqCDR1': str, 'minQualCDR1': str,
-                                                          'nSeqFR2': str, 'minQualFR2': str,
-                                                          'nSeqCDR2': str, 'minQualCDR2': str,
-                                                          'nSeqFR3': str, 'minQualFR3': str,
-                                                          'nSeqCDR3': str, 'minQualCDR3': str,
-                                                          'nSeqFR4': str, 'minQualFR4': str,
-                                                          'aaSeqFR1': str, 'aaSeqCDR1': str,
-                                                          'aaSeqFR2': str, 'aaSeqCDR2': str,
-                                                          'aaSeqFR3': str, 'aaSeqCDR3': str,
-                                                          'aaSeqFR4': str, 'refPoints': str})
-    return clonoset
 
 def read_clonoset(filename):
+    """
+    Reads generic clonoset files. 
+    Easyly reads `csv`, `tsv`, `txt` or `gz` files.
+    Reads first found file inside `zip` files.
+    Clonosets should be in tab-separated format: MiXCR (v3 or v4), vdjtools, Bioadaptive
+    
+    Args:
+        filename (str): path to clonoset file
+
+    Returns:
+        clonoset (pd.DataFrame): DataFrame representation of clonoset in given file.
+            Bioadaptive clonosets are converted to vdjtools-like format.
+    """
+    
+    
     file_name, file_extension = os.path.splitext(filename)
 
     d_types_mixcr = {'cloneId': int, 'readCount': int, 'readFraction': float,
@@ -102,6 +102,46 @@ def read_clonoset(filename):
     if 'count (templates/reads)' in clonoset.columns:
         clonoset = convert_bioadaptive_clonoset(clonoset)
     return clonoset
+
+def read_json_report(sample_id, folder, report_type):
+    """
+    Reads MiXCR4 json reports into a Python mixed data structure.
+    This function takes the last json record, if for example MiXCR adds up several records 
+    to json file (it happens, when the program is rerun several times on the same data).
+    Program also includes cases when Sample-barcodes are used.
+
+    Args:
+        sample_id (str): sample_id used when running the MiXCR program
+        folder (str): folder in which the MiXCR output is stored
+        report_type (str): align, refine, assemble
+
+    Returns:
+        report (dict): mixed dict/list python structure, representing the json report
+    """
+
+
+    filename = os.path.join(folder, f"{sample_id}.{report_type}.report.json")
+    if "." in sample_id:
+        sample_id2 = ".".join(sample_id.split(".")[:-1])
+        filename2 = os.path.join(folder, f"{sample_id2}.{report_type}.report.json")
+        try:
+            report = open_json_report(filename)
+        except FileNotFoundError:
+            report = open_json_report(filename2)
+    else:
+        report = open_json_report(filename)
+    return report
+
+def open_json_report(filename):
+    """
+    Supporting function for `read_json_report`. Reads the last record from json file.
+    """
+    
+    with open(filename) as data_file:    
+        for jsonObj in data_file:
+            report = json.loads(jsonObj)
+    return report
+
 
 def convert_bioadaptive_clonoset(clonoset):
     # clonoset = clonoset.loc[clonoset.sequenceStatus == "In"]
@@ -197,21 +237,34 @@ def recode_vdj_names_bioadaptive(vdj_name):
         vdj_name = substitution_dict[vdj_name]
     return vdj_name
 
-def read_json_report(sample_id, folder, report_type):
-    filename = os.path.join(folder, f"{sample_id}.{report_type}.report.json")
-    if "." in sample_id:
-        sample_id2 = ".".join(sample_id.split(".")[:-1])
-        filename2 = os.path.join(folder, f"{sample_id2}.{report_type}.report.json")
-        try:
-            report = open_json_report(filename)
-        except FileNotFoundError:
-            report = open_json_report(filename2)
-    else:
-        report = open_json_report(filename)
-    return report
+def save_dill_dump(obj, filename):
+    with open(filename, 'wb') as f: 
+        dill.dump(obj, f)
 
-def open_json_report(filename):
-    with open(filename) as data_file:    
-        for jsonObj in data_file:
-            report = json.loads(jsonObj)
-    return report
+def read_dill_dump(filename):
+    with open(filename, 'rb') as f:
+        return dill.load(f)
+
+def read_mixcr_clonoset(filename):
+    # DEPRECATED
+    clonoset = pd.read_csv(filename, sep="\t", dtype={'cloneId': int, 'readCount': int, 'readFraction': float,
+                                                          'uniqueUMICount': int, 'uniqueUMIFraction': float,
+                                                          'uniqueMoleculeCount': int, 'uniqueMoleculeFraction': float,
+                                                          'cloneCount': int, 'cloneFraction': float,
+                                                          'targetSequences': str, 'targetQualities': str,
+                                                          'allVHitsWithScore': str, 'allDHitsWithScore': str,
+                                                          'allJHitsWithScore': str, 'allCHitsWithScore': str,
+                                                          'allVAlignments': str, 'allDAlignments': str,
+                                                          'allJAlignments': str, 'allCAlignments': str,
+                                                          'nSeqFR1': str, 'minQualFR1': str,
+                                                          'nSeqCDR1': str, 'minQualCDR1': str,
+                                                          'nSeqFR2': str, 'minQualFR2': str,
+                                                          'nSeqCDR2': str, 'minQualCDR2': str,
+                                                          'nSeqFR3': str, 'minQualFR3': str,
+                                                          'nSeqCDR3': str, 'minQualCDR3': str,
+                                                          'nSeqFR4': str, 'minQualFR4': str,
+                                                          'aaSeqFR1': str, 'aaSeqCDR1': str,
+                                                          'aaSeqFR2': str, 'aaSeqCDR2': str,
+                                                          'aaSeqFR3': str, 'aaSeqCDR3': str,
+                                                          'aaSeqFR4': str, 'refPoints': str})
+    return clonoset
