@@ -1,7 +1,7 @@
 import pandas as pd
 from .common_functions import run_parallel_calculation, combine_metadata_from_folders, print_progress_bar
 from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_dict, get_logo_for_clonoset
-from clone_filter import Filter
+from .clone_filter import Filter
 
 import networkx as nx
 from networkx.algorithms import community
