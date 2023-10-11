@@ -18,6 +18,21 @@ AA_PROPS_PATH = os.path.join(REPSEQ_PATH, "repseq", "resourses", "aa_property_ta
 
 
 def calc_clonoset_stats(clonosets_df, cl_filter=None):
+    """
+    Calculates statistics for clonosets regarding clonotype, read and UMI counts.
+    Also gives counts for functional clonotypes and non-singletons: clonotypes, 
+    having only one count (UMI count if present, read count in other cases).
+    Clonosets are given to the function in a form of pd.DataFrame
+
+    Args:
+        clonosets_df (pd.DataFrame): dataframe, containing two required columns: 
+            `sample_id` and `filename`. Also recommended to have `chain` column in this DF.
+        cl_filter (Filter): clonoset filter - object from `clone_filter.py` module.
+
+    Returns:
+        pd.DataFrame: dataframe with clonotype statistics for each sample in clonosets_df
+    """
+
     df = generic_calculation(clonosets_df, calculate_clonoset_stats_cl, clonoset_filter=cl_filter, program_name="CalcClonosetStats")
     convert_dict = {"clones": int,
                     "clones_func": int,
@@ -36,6 +51,30 @@ def calc_clonoset_stats(clonosets_df, cl_filter=None):
     return df
 
 def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long"):
+    """
+    Calculates segment (`V`, `J`, or `C`) usage for several samples. By default outputs
+    'long' table with four columns: segment name, `usage`, `sample_id` and `chain`.
+    It also may take a clone_filter as input: `cl_filter` from `clone_filter` module.
+
+
+    Args:
+        clonosets_df (pd.DataFrame): dataframe, containing two required columns: 
+            `sample_id` and `filename`. Also recommended to have `chain` column in this DF.
+        segment (str, optional): possible values are `v`, `j` or `c`. Defaults to "v".
+        cl_filter (_type_, optional): _description_. Defaults to None.
+        table (str, optional): _description_. Defaults to "long".
+
+    Raises:
+        ValueError: _description_
+        ValueError: _description_
+
+    Returns:
+        pd.DataFrame: 'long' or 'wide'. If 'long' it contains four columns, as stated in
+            the function description. If 'wide' - then it has all possible segments in 
+            column names, sample_id's - in rows and usage in each cell in the table.
+    """
+
+
     if cl_filter is None:
         cl_filter = Filter()
     
