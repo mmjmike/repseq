@@ -1,5 +1,6 @@
 import logomaker
 import pandas as pd
+from .clone_filter import Filter
 
 def create_motif_dict(seq, seq_type="dna", weight=1):
     if seq_type == 'dna':
@@ -35,13 +36,15 @@ def normalize_motif_dict(motif_dict):
             
 def get_logo_for_clonoset(clonoset_df, weight_freq=False, seq_type="dna", plot=True):
     motif_dicts = []
+    clonoset = Filter(by_umi=True).apply(clonoset_df)
+
     for i, r in clonoset_df.iterrows():
         weight = 1
         if weight_freq:
-            weight = r["cloneFraction"]
-        column = "nSeqCDR3"
+            weight = r["freq"]
+        column = "cdr3nt"
         if seq_type == "prot":
-            column = "aaSeqCDR3"
+            column = "cdr3aa"
         seq = r[column]
         motif_dict = create_motif_dict(seq, seq_type=seq_type, weight=weight)
         motif_dicts.append(motif_dict)
