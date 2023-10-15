@@ -61,12 +61,9 @@ def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long"):
         clonosets_df (pd.DataFrame): dataframe, containing two required columns: 
             `sample_id` and `filename`. Also recommended to have `chain` column in this DF.
         segment (str, optional): possible values are `v`, `j` or `c`. Defaults to "v".
-        cl_filter (_type_, optional): _description_. Defaults to None.
-        table (str, optional): _description_. Defaults to "long".
+        cl_filter (Filter, optional): clonoset filter - object from `clone_filter.py` module.
+        table (str, optional): table type - `long` or `wide`. Defaults to "long".
 
-    Raises:
-        ValueError: _description_
-        ValueError: _description_
 
     Returns:
         pd.DataFrame: 'long' or 'wide'. If 'long' it contains four columns, as stated in
@@ -120,6 +117,27 @@ def calc_vj_usage_cl(clonoset_in, colnames=None):
     return result
 
 def calc_diversity_stats(clonosets_df, cl_filter=None, iterations=3, seed=None, drop_small_samples=True):
+    """
+    Calculates `observed diversity`, `Shannon-Wiener` and `normalized Shannon-Wiener` index for
+    each clonoset in `clonosets_df`.
+    `observed diversity` - total number of unique clonotypes in a given clonoset
+    `Shannon-Wiener` - mixed evenness and diversity metric
+    `normalized Shannon-Wiener` - evenness metric.
+    It is highly recommnded to use equal downsampling for all input clonosets for 
+    
+    Args:
+        clonosets_df (pd.DataFrame): dataframe, containing two required columns: 
+            `sample_id` and `filename`. Also recommended to have `chain` column in this DF.
+        segment (str, optional): possible values are `v`, `j` or `c`. Defaults to "v".
+        cl_filter (Filter, optional): clonoset filter - object from `clone_filter.py` module.
+        table (str, optional): table type - `long` or `wide`. Defaults to "long".
+
+
+    Returns:
+        pd.DataFrame: 'long' or 'wide'. If 'long' it contains four columns, as stated in
+            the function description. If 'wide' - then it has all possible segments in 
+            column names, sample_id's - in rows and usage in each cell in the table.
+    """
     df = generic_calculation(clonosets_df, calculate_diversity_stats_cl, clonoset_filter=cl_filter,
                              program_name="CalcDiversityStats", iterations=iterations, seed=seed, drop_small_samples=drop_small_samples)
     return df
