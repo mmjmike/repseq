@@ -91,3 +91,6 @@ def calc_insert_size(vend,dstart,dend,jstart):
             dj = 0
         insert = vd+dj
     return insert
+
+
+

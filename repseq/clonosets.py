@@ -2,9 +2,10 @@ import pandas as pd
 import numpy as np
 import os
 import re
-from .io import read_mixcr_clonoset
+from .io import read_mixcr_clonoset, read_clonoset
 from .common_functions import print_progress_bar
 import random
+
 
 
 CHAIN_VARIANTS = {"TRA": {"TRAD", "TRA"},
@@ -254,16 +255,6 @@ def get_column_names_from_clonoset(clonoset):
 
     return colnames
 
-def decide_count_and_frac_columns(colnames, by_umi, suppress_warnings=False):
-    count_column = colnames["count_column"]
-    fraction_column = colnames["fraction_column"]
-    if by_umi:
-        if colnames["umi"] is not None:
-            count_column = colnames["umi_column"]
-            fraction_column = colnames["umi_fraction_column"]
-        elif not suppress_warnings:
-            print("WARNING! Clonoset does not contain UMI column. Using reads for clone count instead.\nTo avoid this warning set parameter 'by_umi=False'")
-    return count_column, fraction_column
 
 
 def downsample_clonoset(clonoset, downsample_size, seed=None, by_umi=False, colnames=None):
@@ -345,7 +336,9 @@ def recount_fractions_for_clonoset(clonoset, colnames=None):
     return clonoset
 
 
-def pool_clonotypes_from_clonosets_df(clonosets_df, samples_list=None, top=None, downsample=None, only_functional=True, by_umi=False, exclude_singletons=False, seed=None, rename_columns_for_clustering=False):
+
+
+def pool_clonotypes_from_clonosets_df_old(clonosets_df, samples_list=None, top=None, downsample=None, only_functional=True, by_umi=False, exclude_singletons=False, seed=None, rename_columns_for_clustering=False):
     
     clonosets_df = filter_clonosets_by_sample_list(clonosets_df, samples_list)
     
@@ -386,7 +379,16 @@ def pool_clonotypes_from_clonosets_df(clonosets_df, samples_list=None, top=None,
     print(f"Pooled {clonotypes_number} clonotypes from {samples_number} samples")
     return result_df
 
-
+def decide_count_and_frac_columns(colnames, by_umi, suppress_warnings=False):
+    count_column = colnames["count_column"]
+    fraction_column = colnames["fraction_column"]
+    if by_umi:
+        if colnames["umi"] is not None:
+            count_column = colnames["umi_column"]
+            fraction_column = colnames["umi_fraction_column"]
+        elif not suppress_warnings:
+            print("WARNING! Clonoset does not contain UMI column. Using reads for clone count instead.\nTo avoid this warning set parameter 'by_umi=False'")
+    return count_column, fraction_column
 
 ##################### unchecked functions ########################
 

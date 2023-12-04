@@ -2,6 +2,7 @@ import pandas as pd
 from .common_functions import run_parallel_calculation, combine_metadata_from_folders, print_progress_bar
 from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_dict, get_logo_for_clonoset
 from .clone_filter import Filter
+from .io import read_clonoset
 
 import networkx as nx
 from networkx.algorithms import community
@@ -64,6 +65,28 @@ class Node:
                 self.additional_properties[property] = None
         else:
             self.additional_properties.update(metadata[self.sample_id])
+
+
+def pool_clonotypes_from_clonosets_df(clonosets_df, cl_filter=None):
+    
+    if cl_filter is None:
+        cl_filter = Filter()
+    
+    clonotypes_dfs = []
+    
+    for index, row in clonosets_df.iterrows():
+        sample_id = row["sample_id"]
+        filename = row["filename"]
+        clonoset = read_clonoset(filename)
+        clonoset = cl_filter.apply(clonoset)
+        clonoset["sample_id"] = sample_id
+        clonotypes_dfs.append(clonoset)
+
+    result_df = pd.concat(clonotypes_dfs).reset_index(drop=True)
+
+    print(f"Pooled {len(result_df)} clonotypes from {len(clonosets_df)} samples")
+
+    return result_df
 
         
 def find_nodes_and_edges(clonoset_input, mismatches=1, overlap_type="aaV", igh=False, count_by_freq=False):
@@ -270,8 +293,48 @@ def tcr_dist(node_1, node_2, radius):
         return dist
     return -1
 
-def create_clusters(clonoset_input, mismatches=1, overlap_type="aaV", igh=False, tcrdist_radius=None, count_by_freq=True):
+def create_clusters_old(clonoset_input, mismatches=1, overlap_type="aaV", igh=False, tcrdist_radius=None, count_by_freq=True):
     tcr_dist=False
+    if isinstance(tcrdist_radius, int):
+        tcr_dist=True
+        nodes, edges = find_nodes_and_edges_tcrdist_no_gaps(clonoset_input, radius=tcrdist_radius, count_by_freq=count_by_freq, igh=igh)
+    else:
+        nodes, edges = find_nodes_and_edges(clonoset_input, mismatches=mismatches, overlap_type=overlap_type, igh=igh, count_by_freq=count_by_freq)
+    
+    main_graph = nx.Graph()
+    main_graph.add_nodes_from(nodes)
+    print("-----------------------------\nNexworkX graph created")
+
+    program_name = "Adding edges"
+    edges_done = 0
+    edges_total = len(edges)
+    print_progress_bar(edges_done, edges_total, program_name=program_name, object_name="edge(s)")
+    node_id_dict = {node.id: node for node in main_graph}
+    for edge in edges:
+        node1 = node_id_dict[edge[0].id]
+        node2 = node_id_dict[edge[1].id]
+        length = edge[2]
+        main_graph.add_edge(node1, node2, length=length)
+        edges_done += 1
+        print_progress_bar(edges_done, edges_total, program_name=program_name, object_name="edge(s)")
+    clusters = [main_graph.subgraph(c).copy() for c in nx.connected_components(main_graph)]
+    total_clusters = len(clusters)
+    cluster_num = len(filter_one_node_clusters(clusters))
+    singletons = total_clusters - cluster_num
+    print(f"Found {cluster_num} clusters (2 or more nodes) and {singletons} single nodes. Total: {total_clusters}")
+    clusters.sort(key=lambda x: len(x), reverse=True)
+    return clusters
+
+
+def create_clusters(clonoset_df, cl_filter=None, mismatches=1, overlap_type="aaV", igh=False, tcrdist_radius=None, count_by_freq=True):
+    
+    if cl_filter is None:
+        cl_filter = Filter()
+
+    clonoset_input = pool_clonotypes_from_clonosets_df(clonoset_df, cl_filter=cl_filter)
+
+    tcr_dist=False
+
     if isinstance(tcrdist_radius, int):
         tcr_dist=True
         nodes, edges = find_nodes_and_edges_tcrdist_no_gaps(clonoset_input, radius=tcrdist_radius, count_by_freq=count_by_freq, igh=igh)
@@ -371,6 +434,11 @@ def save_clusters_for_cytoscape(clusters, output_prefix, sample_metadata=None):
     print("Saved node properties and metadata to: {}".format(properties_metadata_filename))
 
 def add_alice_hits_to_clusters(clusters, alice_hits_df, check_samples=True):
+    nt_seq_colname = "CDR3.nucleotide.sequence"
+    if nt_seq_colname not in alice_hits_df.columns:
+        nt_seq_colname = "cdr3nt"
+
+
     if check_samples:
         samples = list(alice_hits_df["sample_id"].unique())
         alice_hits_dict = {}
@@ -379,7 +447,7 @@ def add_alice_hits_to_clusters(clusters, alice_hits_df, check_samples=True):
             for index, row in alice_hits_df.loc[alice_hits_df["sample_id"] == sample].iterrows():
                 v = row["bestVGene"]
                 j = row["bestJGene"]
-                cdr3nt = row["CDR3.nucleotide.sequence"]
+                cdr3nt = row[nt_seq_colname]
                 hit = (cdr3nt, v, j)
                 hits.add(hit)
             alice_hits_dict[sample] = hits
@@ -394,7 +462,7 @@ def add_alice_hits_to_clusters(clusters, alice_hits_df, check_samples=True):
         for index, row in alice_hits_df.iterrows():
             v = row["bestVGene"]
             j = row["bestJGene"]
-            cdr3nt = row["CDR3.nucleotide.sequence"]
+            cdr3nt = row[nt_seq_colname]
             hit = (cdr3nt, v, j)
             hits.add(hit)
             for cluster in clusters:
