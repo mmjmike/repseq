@@ -345,10 +345,10 @@ def create_clusters(clonoset_df, cl_filter=None, mismatches=1, overlap_type="aaV
     main_graph.add_nodes_from(nodes)
     print("-----------------------------\nNexworkX graph created")
 
-    program_name = "Adding edges"
+    program_name = "Adding edges..."
     edges_done = 0
     edges_total = len(edges)
-    print_progress_bar(edges_done, edges_total, program_name=program_name, object_name="edge(s)")
+    # print_progress_bar(edges_done, edges_total, program_name=program_name, object_name="edge(s)")
     node_id_dict = {node.id: node for node in main_graph}
     for edge in edges:
         node1 = node_id_dict[edge[0].id]
@@ -356,7 +356,7 @@ def create_clusters(clonoset_df, cl_filter=None, mismatches=1, overlap_type="aaV
         length = edge[2]
         main_graph.add_edge(node1, node2, length=length)
         edges_done += 1
-        print_progress_bar(edges_done, edges_total, program_name=program_name, object_name="edge(s)")
+        # print_progress_bar(edges_done, edges_total, program_name=program_name, object_name="edge(s)")
     clusters = [main_graph.subgraph(c).copy() for c in nx.connected_components(main_graph)]
     total_clusters = len(clusters)
     cluster_num = len(filter_one_node_clusters(clusters))

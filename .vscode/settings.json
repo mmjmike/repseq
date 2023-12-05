@@ -1,4 +1,4 @@
 {
-    "workbench.editor.doubleClickTabToToggleEditorGroupSizes": true,
+    "workbench.editor.doubleClickTabToToggleEditorGroupSizes": "expand",
     "editor.detectIndentation": false
 }
