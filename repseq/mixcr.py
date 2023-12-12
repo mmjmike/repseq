@@ -222,7 +222,10 @@ def get_processing_table(folder, show_offtarget=False, off_target_chain_threshol
             except TypeError:
                 UMIf=UMIc
             Rf=refine_report["correctionReport"]["outputRecords"]
-            overseq_threshold = int(refine_report["correctionReport"]["filterReport"]["operatorReports"][0]["operatorReport"]["threshold"])
+            try:
+                overseq_threshold = int(refine_report["correctionReport"]["filterReport"]["operatorReports"][0]["operatorReport"]["threshold"])
+            except TypeError:
+                overseq_threshold = None
             reads_per_umi = round(Rf/UMIf, 2)
         else:
             UMIa = np.nan
@@ -246,6 +249,8 @@ def get_processing_table(folder, show_offtarget=False, off_target_chain_threshol
         else:
             UMIcl=np.nan
             UMIfunc=np.nan
+        if umi and overseq_threshold is None:
+            reads_per_umi = round(Rclc/UMIcl, 2)
 
         results.append([sample_id, chain, Rt, Ru_pc, Ra_pc, Roa_pc, UMIa, UMIc, overseq_threshold, Rf, UMIf, reads_per_umi, Ct, Rcl, Ctc, Rclc, Cfunc, Rfunc, UMIcl, UMIfunc])
     result_df = pd.DataFrame(results, columns=["sample_id", "extracted_chain", "reads_total", "reads_with_umi_pc", "reads_aligned_pc", "reads_overlapped_aln_pc",
