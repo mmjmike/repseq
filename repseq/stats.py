@@ -79,10 +79,7 @@ def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long"):
     if table not in table_options:
         raise ValueError(f"Unknown value for 'table' parameter. Possible options: {', '.join(table_options)}")
 
-    # segment_to_function_dict = {"v": calc_v_usage_cl,
-    #                             "j": calc_j_usage_cl,
-    #                             "c": calc_c_usage_cl}
-    possible_segments = ["v", "j", "c"]
+    possible_segments = ["v", "j", "c", "vj", "vlen", "vjlen"]
     segment = segment.lower()
     if segment not in possible_segments:
         raise ValueError(f"Wrong segment value. Possible values: {', '.join(possible_segments)}")
@@ -93,28 +90,39 @@ def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long"):
     else:
         return df.melt(id_vars=["sample_id", "chain"]).rename(columns={"value":"usage", "variable":segment})
 
-def calc_v_usage_cl(clonoset_in, colnames=None):
-    return calc_segment_usage_cl(clonoset_in, segment="v", colnames=colnames)
-
-def calc_j_usage_cl(clonoset_in, colnames=None):
-    return calc_segment_usage_cl(clonoset_in, segment="j", colnames=colnames)
-
-def calc_c_usage_cl(clonoset_in, colnames=None):
-    return calc_segment_usage_cl(clonoset_in, segment="c", colnames=colnames)
-
 def calc_segment_usage_cl(clonoset_in, segment="v", colnames=None):
+    if segment == "vj":
+        return calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=False)
+    elif segment == "vlen":
+        return calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=False, include_len=True)
+    elif segment == "vjlen":
+        return calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=True)
     colnames = get_column_names_from_clonoset(clonoset_in)
     freq_column = colnames["fraction_column"]
     segment_column = colnames[f"{segment}_column"]
     result = clonoset_in[[freq_column, segment_column]].groupby(segment_column).sum().to_dict()[freq_column]
     return result
 
-def calc_vj_usage_cl(clonoset_in, colnames=None):
-    colnames = get_column_names_from_clonoset(clonoset_in)
+def calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=False):
+    if not include_j and not include_len:
+        print("WARNING! 'calc_vjlen_usage_cl' must have at least one of the flags 'include_j' or 'include_len' equal to 'True'. Calling 'calc_segment_usage_cl' with segment='v' instead")
+        return calc_segment_usage_cl(clonoset_in)
+    if colnames is None:
+        colnames = get_column_names_from_clonoset(clonoset_in)
     freq_column = colnames["fraction_column"]
+    clonoset = clonoset_in.copy()
     v_column = colnames["v_column"]
-    j_column = colnames["j_column"]
-    result = clonoset_in[[freq_column, v_column, j_column]].groupby([v_column, j_column]).sum().to_dict()[freq_column]
+    columns_to_join = [v_column]
+    if include_j:
+        j_column = colnames["j_column"]
+        columns_to_join.append(j_column)
+    if include_len:
+        cdr3aa_column = colnames["cdr3aa_column"]
+        aalen_column = "cdr3aa_len"
+        columns_to_join.append(aalen_column)
+        clonoset[aalen_column] = clonoset[cdr3aa_column].apply(lambda x: len(x))
+    
+    result = clonoset[[freq_column] + columns_to_join].groupby(columns_to_join).sum().to_dict()[freq_column]
     return result
 
 def calc_diversity_stats(clonosets_df, cl_filter=None, iterations=3, seed=None, drop_small_samples=True):
