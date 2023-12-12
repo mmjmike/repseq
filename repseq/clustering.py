@@ -1,6 +1,6 @@
 import pandas as pd
 from .common_functions import run_parallel_calculation, combine_metadata_from_folders, print_progress_bar
-from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_dict, get_logo_for_clonoset
+from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_dict, get_logo_for_list_of_clonotypes
 from .clone_filter import Filter
 from .io import read_clonoset
 
@@ -614,11 +614,22 @@ def calc_cluster_consensus(cluster, seq_type="dna", weighed=False):
     return consensus_seq
 
 def plot_cluster_logo(cluster, seq_type="prot", weighed=False):
-    result = []
+    list_of_clonotypes = []
+    seq_types = ["prot", "dna"]
+    if seq_type not in seq_types:
+        raise ValueError(f"Wrong 'seq_type'! Possible values: {', '.join(seq_types)}")
     for node in cluster:
-        result.append([node.seq_aa, node.seq_nt, node.size])
-    clonoset_df = pd.DataFrame(result, columns=["aaSeqCDR3","nSeqCDR3", "cloneFraction"])
-    get_logo_for_clonoset(clonoset_df, weight_freq=weighed, seq_type=seq_type, plot=True)
+        if seq_type == "dna":
+            seq = node.seq_nt
+        else:
+            seq = node.seq_aa
+        if weighed:
+            weight = node.size
+            clone = (seq, weight)
+        else:
+            clone = (seq)
+        list_of_clonotypes.append(clone)
+    get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=True)
 
 
 def calc_cluster_consensus_segment(cluster, segment_type="v", weighed=False):

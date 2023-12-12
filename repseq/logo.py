@@ -60,6 +60,48 @@ def get_logo_for_clonoset(clonoset_df, weight_freq=False, seq_type="dna", plot=T
     else:
         return pd.DataFrame(motif_dict_sum)
 
+def get_logo_for_clonoset(clonoset_df, weight_freq=False, seq_type="dna", plot=True):
+    
+    clonoset = Filter(by_umi=True).apply(clonoset_df)
+
+    column = "cdr3nt"
+    if seq_type == "prot":
+        column = "cdr3aa"
+
+    list_of_clonotypes = []
+
+    for i, r in clonoset.iterrows():
+        seq = r[column]
+        if weight_freq:
+            weight = r["freq"]
+            clone = (seq, weight)
+        else:
+            clone = (seq)
+        list_of_clonotypes.append(clone)
+
+    get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=plot)
+
+def get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=True):
+    motif_dicts = []
+    for clone in list_of_clonotypes:
+        weight = 1
+        if len(clone) > 1:
+            weight = clone[1]
+        seq = clone[0]
+        motif_dict = create_motif_dict(seq, seq_type=seq_type, weight=weight)
+        motif_dicts.append(motif_dict)
+    #print(len(motif_dicts))
+    motif_dict_sum = sum_motif_dicts(motif_dicts)
+    motif_dict_sum = normalize_motif_dict(motif_dict_sum)
+    info_matrix = logomaker.transform_matrix(pd.DataFrame(motif_dict_sum), 
+                                  from_type='probability', 
+                                  to_type='information')
+    if plot:
+        logomaker.Logo(info_matrix)
+        #plt.show()
+    else:
+        return pd.DataFrame(motif_dict_sum)
+
 def get_consensus_from_motif_dict(motif_dict):
     seq_len = len(motif_dict[list(motif_dict.keys())[0]])
     seq = ""
