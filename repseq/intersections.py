@@ -13,15 +13,15 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
     overlapping clonotypes
     
     Args:
-        clonosets_df (pd.DataFrame): contains three columns - 'sample_id' and 'filename' columns,
-            filename - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
+        clonosets_df (pd.DataFrame): contains three columns - `sample_id` and `filename` columns,
+            `filename` - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
             sample_id's should be all unique in this DF
-        overlap_type (str): possible values are aa, aaV, aaVJ, nt, ntV, ntVJ. aa/nt define which CDR3 sequence
+        overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence
             to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
             to decide if clonotypes are equal
-        by_umi (bool): set =True for MiXCR4 clonosets to select count/frequency of clonotypes 
+        by_umi (bool): set `=True` for MiXCR4 clonosets to select count/frequency of clonotypes 
             in UMI's if they exist in implemented protocol
-        by_freq (bool): default is True - this means that the intersect metric is frequency of clonotype, 
+        by_freq (bool): default is `True` - this means that the intersect metric is frequency of clonotype, 
             but not its count
         only_functional (bool): use only functional clonotypes (do not contain stop codons or
             frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
@@ -31,7 +31,7 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
     combined into one with summation of counts/frequencies.
 
     Returns:
-        df (pd.DataFrame): dataframe with following columns: "clone", "sample1_count", "sample2_count", "sample1", "sample2", "pair"
+        df (pd.DataFrame): dataframe with following columns: `clone`, `sample1_count`, `sample2_count`, `sample1`, `sample2`, `pair`
             clone - is tuple, containing sequence (aa or nt), plus V or J if they are required by the metric
             count columns contain freq/count of the clone in sample
             pair column is made for easy separation of possibly huge DataFrame into overlapping pairs
@@ -78,7 +78,7 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0):
         task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], check_v, check_j, mismatches]
         tasks.append(task)
     
-    results = run_parallel_calculation(count_table_mp, tasks, "Counting features", object_name="pairs")
+    results = run_parallel_calculation(count_table_mp, tasks, "Counting features", object_name="clonosets")
     result_dict = dict()
     for result in results:
         result_dict.update(result)
