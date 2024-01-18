@@ -1,5 +1,13 @@
 import math
 import pandas as pd
+import numpy as np
+import itertools
+
+from statsmodels.stats.multitest import multipletests
+from scipy.stats import binom, poisson
+
+
+
 from .common_functions import print_progress_bar, run_parallel_calculation
 from .io import read_clonoset
 from .clonosets import filter_nonfunctional_clones, recount_fractions_for_clonoset, get_column_names_from_clonoset
@@ -116,7 +124,41 @@ def tcrnet(clonosets_df_exp, clonosets_df_control, cl_filter=None, cl_filter_c=N
     clonoset_control = pool_clonotypes_from_clonosets_df(clonosets_df_control, cl_filter=cl_filter_c)
     clonoset_control_dict = prepare_clonoset_for_intersection(clonoset_control, overlap_type=overlap_type, by_freq=False, retain_counts=False, len_vj_format=True)
     
+
+    tasks = []
+    chunks = 40
+    chunk_size = len(unique_clonotypes)//chunks+1
+    for i in range(chunks):
+        first = i*chunk_size
+        last = (i+1)*chunk_size
+        task = (unique_clonotypes[first:last], clonoset_exp_dict, clonoset_control_dict, mismatches)
+        tasks.append(task)
+        
+    results = run_parallel_calculation(tcrnet_mp, tasks, "Calc neighbours (TCRnet)", object_name="parts")
+    results = list(itertools.chain.from_iterable(results)) # unpack results from several workers
+
+    df = pd.DataFrame(results, columns=["clone", "count_exp", "count_control", "group_count_exp", "group_count_control"])
+    df = tcrnet_stats_calc(df)
+    return df
+
+
+def tcrnet_stats_calc(df):
+    result_df = df.copy()
+    result_df["fold"] = result_df.apply(lambda x: (x["count_exp"]+1)/x["group_count_exp"]/(x["count_control"]+1)*x["group_count_control"],axis=1)
+    result_df["p_value_b"] = result_df.apply(lambda x: 1-binom.cdf(x["count_exp"]-1, x["group_count_exp"], x["count_control"]/(x["group_count_control"]+1)), axis=1)
+    result_df["p_value_p"] = result_df.apply(lambda x: 1-poisson.cdf(x["count_exp"]-1, x["group_count_exp"]*x["count_control"]/(x["group_count_control"]+1)), axis=1)
+    result_df["p_value_b_adj"] = multipletests(result_df["p_value_b"], alpha=0.05, method='fdr_bh', is_sorted=False, returnsorted=False)[1]
+    result_df["p_value_p_adj"] = multipletests(result_df["p_value_p"], alpha=0.05, method='fdr_bh', is_sorted=False, returnsorted=False)[1]
+    result_df["log10_b_adj"] = -np.log(result_df["p_value_b_adj"])/np.log(10)
+    result_df["log10_p_adj"] = -np.log(result_df["p_value_p_adj"])/np.log(10)
+    result_df["log2_fc"] = np.log(result_df["fold"])/np.log(2)
+    return result_df
+
+
+def tcrnet_mp(args):
+    (unique_clonotypes, clonoset_exp_dict, clonoset_control_dict, mismatches) = args
     results = []
+
     for unique_clone in unique_clonotypes:
         compact_clone = (len(unique_clone[0]), *unique_clone[1:])
         seq1 = unique_clone[0]
@@ -137,25 +179,7 @@ def tcrnet(clonosets_df_exp, clonosets_df_control, cl_filter=None, cl_filter_c=N
                     count_control += 1
             group_count_control = len(clonoset_control_dict[compact_clone])
         results.append([unique_clone, count_exp, count_control, group_count_exp, group_count_control])
-
-    df = pd.DataFrame(results, columns=["clone", "count_exp", "count_control", "group_count_exp", "group_count_control"])
-    return df
-
-
-
-# def tcrnet_mp(args):
-#     (features, sample_id, clonoset_dict, check_v, check_j, mismatches) = args
-#     result = []
-#     for feature in features:
-#         count = 0
-#         len_feature = len(feature[0])
-#         if len_feature in clonoset_dict:
-#             clonotypes = clonoset_dict[len_feature]
-#             for clonotype in clonotypes:
-#                 if clonotypes_equal(feature, clonotype, check_v, check_j, mismatches=mismatches):
-#                     count += clonotype[-1]
-#         result.append(count)
-#     return {sample_id: result}
+    return results
         
 
 
