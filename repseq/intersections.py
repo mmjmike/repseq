@@ -16,7 +16,7 @@ from .clustering import pool_clonotypes_from_clonosets_df
 
 
 
-def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True):
+def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True, clonosets_df2=None, cl_filter2=None):
     """
     Calculating frequencies of intersecting clonotypes between multiple repseq samples.
     The result of this function may be used for scatterplots of frequencies/counts of 
@@ -49,27 +49,25 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
 
 
     print("Intersecting clones in clonosets\n"+"-"*50)
-    aa, check_v, check_j = overlap_type_to_flags(overlap_type)
     print(f"Overlap type: {overlap_type}")
     
-    if len(clonosets_df.sample_id.unique()) < len(clonosets_df):
-        raise ValueError("Input clonosets DataFrame contains non-unique sample ID's")
+    clonoset_lists, samples_total, two_dataframes, sample_list, sample_list2 = prepare_clonotypes_dfs_for_intersections(clonosets_df, clonosets_df2,
+                                                                                                                        cl_filter, cl_filter2,
+                                                                                                                        overlap_type, by_freq=by_freq)
+    # generating a set of tasks
     
-    # converting clonosets to compact dicts (clone: freq) based on overlap type and count/freq/umi
-    samples_total = len(clonosets_df)
-    clonoset_dicts = convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=cl_filter,
-                                                        overlap_type=overlap_type, by_freq=True,
-                                                        retain_counts=False)
-        
-    sample_list = list(clonosets_df.sort_values(by="sample_id").sample_id)
     tasks = []
-    clonosets_df.sort_values(by="sample_id")["sample_id"]
     
-    for i in range(samples_total):
-        for j in range(samples_total-i-1):
+    if two_dataframes:
+        for sample1 in sample_list:
+            for sample2 in sample_list2:
+                tasks.append((sample1, sample2, clonoset_lists))
+    else:
+        for i in range(samples_total):
             sample1 = sample_list[i]
-            sample2 = sample_list[j+i+1]
-            tasks.append((sample1, sample2, clonoset_dicts))
+            for j in range(samples_total-i-1):
+                sample2 = sample_list[j+i+1]
+                tasks.append((sample1, sample2, clonoset_lists))
     
     results = run_parallel_calculation(intersect_two_clone_dicts, tasks, "Intersecting clonosets", object_name="pairs")
     return pd.concat(results).reset_index(drop=True)
@@ -143,6 +141,7 @@ def tcrnet(clonosets_df_exp, clonosets_df_control, cl_filter=None, cl_filter_c=N
 
 
 def tcrnet_stats_calc(df):
+    print("Calculating TCRnet statistics...")
     result_df = df.copy()
     result_df["fold"] = result_df.apply(lambda x: (x["count_exp"]+1)/x["group_count_exp"]/(x["count_control"]+1)*x["group_count_control"],axis=1)
     result_df["p_value_b"] = result_df.apply(lambda x: 1-binom.cdf(x["count_exp"]-1, x["group_count_exp"], x["count_control"]/(x["group_count_control"]+1)), axis=1)
@@ -241,41 +240,15 @@ def overlap_distances(clonosets_df, cl_filter=None, overlap_type="aaV", mismatch
         raise ValueError(f"Metric {metric} is not supported. Possible values: {', '.join(metrics)}")
     
 
-    if len(clonosets_df.sample_id.unique()) < len(clonosets_df):
-        raise ValueError("Input clonosets in DataFrame have non-unique sample_id's")
-    clonosets_df_1 = clonosets_df[["sample_id", "filename"]]
-    two_dataframes = False
-    if isinstance(clonosets_df2, pd.DataFrame):
-        two_dataframes = True
-        if len(clonosets_df2.sample_id.unique()) < len(clonosets_df2):
-            raise ValueError("Input clonosets in DataFrame2 have non-unique sample_id's")
-        clonosets_df_2 = clonosets_df2[["sample_id", "filename"]]
-        intersecting_sample_ids = set(clonosets_df2.sample_id.unique()).intersection(set(clonosets_df.sample_id.unique()))
-        if len(intersecting_sample_ids) > 0 and cl_filter2 is not None:
-            print("WARNING! Some samples have the same sample_id in two sample_df's. The second filter will be applied to common samples")
-    
-
-    # converting clonosets to compact lists of clonotypes separated by CDR3 lengths to dictionary based on overlap type and count/freq/umi
-    clonoset_lists = convert_clonosets_to_compact_dicts(clonosets_df_1, cl_filter=cl_filter,
-                                                        overlap_type=overlap_type, by_freq=True)
-    if two_dataframes:
-        if cl_filter2 is None:
-            cl_filter2 = cl_filter
-        clonoset_lists_2 = convert_clonosets_to_compact_dicts(clonosets_df_2, cl_filter=cl_filter2,
-                                                        overlap_type=overlap_type, by_freq=True)
-        clonoset_lists.update(clonoset_lists_2)
-    
-    samples_total = len(clonosets_df_1)
-    if two_dataframes:
-        samples_total = len(pd.concat([clonosets_df_1, clonosets_df_2]))
+    clonoset_lists, samples_total, two_dataframes, sample_list, sample_list2 = prepare_clonotypes_dfs_for_intersections(clonosets_df, clonosets_df2,
+                                                                                                                        cl_filter, cl_filter2,
+                                                                                                                        overlap_type)
     
     # generating a set of tasks
     
     tasks = []
     
-    sample_list = list(clonosets_df_1.sort_values(by="sample_id").sample_id)
     if two_dataframes:
-        sample_list2 = list(clonosets_df_2.sort_values(by="sample_id").sample_id)
         for sample1 in sample_list:
             for sample2 in sample_list2:
                 tasks.append((sample1, sample2, clonoset_lists, check_v, check_j, mismatches, metric))        
@@ -305,6 +278,46 @@ def overlap_distances(clonosets_df, cl_filter=None, overlap_type="aaV", mismatch
 
 
 ### Supporting functions
+
+
+def prepare_clonotypes_dfs_for_intersections(clonosets_df, clonosets_df2, cl_filter, cl_filter2, overlap_type, by_freq=True):
+    
+    
+    if len(clonosets_df.sample_id.unique()) < len(clonosets_df):
+        raise ValueError("Input clonosets in DataFrame have non-unique sample_id's")
+    clonosets_df_1 = clonosets_df[["sample_id", "filename"]]
+    two_dataframes = False
+    if isinstance(clonosets_df2, pd.DataFrame):
+        two_dataframes = True
+        if len(clonosets_df2.sample_id.unique()) < len(clonosets_df2):
+            raise ValueError("Input clonosets in DataFrame2 have non-unique sample_id's")
+        clonosets_df_2 = clonosets_df2[["sample_id", "filename"]]
+        intersecting_sample_ids = set(clonosets_df2.sample_id.unique()).intersection(set(clonosets_df.sample_id.unique()))
+        if len(intersecting_sample_ids) > 0 and cl_filter2 is not None:
+            print("WARNING! Some samples have the same sample_id in two sample_df's. The second filter will be applied to common samples")
+    
+
+    # converting clonosets to compact lists of clonotypes separated by CDR3 lengths to dictionary based on overlap type and count/freq/umi
+    clonoset_lists = convert_clonosets_to_compact_dicts(clonosets_df_1, cl_filter=cl_filter,
+                                                        overlap_type=overlap_type, by_freq=by_freq)
+    if two_dataframes:
+        if cl_filter2 is None:
+            cl_filter2 = cl_filter
+        clonoset_lists_2 = convert_clonosets_to_compact_dicts(clonosets_df_2, cl_filter=cl_filter2,
+                                                        overlap_type=overlap_type, by_freq=by_freq)
+        clonoset_lists.update(clonoset_lists_2)
+    
+    samples_total = len(clonosets_df_1)
+    if two_dataframes:
+        samples_total = len(pd.concat([clonosets_df_1, clonosets_df_2]))
+
+    sample_list = list(clonosets_df_1.sort_values(by="sample_id").sample_id)
+    sample_list2 = None
+    if two_dataframes:
+        sample_list2 = list(clonosets_df_2.sort_values(by="sample_id").sample_id)
+
+    return clonoset_lists, samples_total, two_dataframes, sample_list, sample_list2
+
 
 def convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True, retain_counts=True):
     clonoset_dicts = {}
