@@ -108,8 +108,6 @@ class Filter:
         c_clonoset = clonoset.copy()
 
         # basic column name in clonoset DF
-        result_columns = ["count", "freq", "cdr3nt", "cdr3aa", "v", "d", "j"]
-        segment_borders_columns = ["VEnd", "DStart", "DEnd", "JStart"]
         
         count_column, fraction_column = decide_count_and_frac_columns(colnames, self.by_umi, suppress_warnings=True)
         
@@ -120,14 +118,25 @@ class Filter:
                        colnames["v_column"]: "v",
                        colnames["d_column"]: "d",
                        colnames["j_column"]: "j"}
+        result_columns = ["count", "freq"]
+        if "cdr3nt" in c_clonoset.columns:
+            result_columns.append("cdr3nt")
+        result_columns += ["cdr3aa", "v"]
+        segment_borders_columns = ["VEnd", "DStart", "DEnd", "JStart"]
+
+
         c_clonoset = c_clonoset.rename(columns=rename_dict)
         
         # In the case of MiXCR and Bioadaptive format the segment type columns
         # usually show several segment variants with particular allele and score.
         # Here we extract only the name of the best hit without allele ane score
         c_clonoset["v"] = c_clonoset["v"].apply(lambda x: extract_segment(x))
-        c_clonoset["d"] = c_clonoset["d"].apply(lambda x: extract_segment(x))
-        c_clonoset["j"] = c_clonoset["j"].apply(lambda x: extract_segment(x))
+        if "d" in c_clonoset.columns:
+            c_clonoset["d"] = c_clonoset["d"].apply(lambda x: extract_segment(x))
+            result_columns.append("d")
+        if "j" in c_clonoset.columns:
+            c_clonoset["j"] = c_clonoset["j"].apply(lambda x: extract_segment(x))
+            result_columns.append("j")
         
         # add the column for Constant segment if it exists in the original clonoset
         if colnames["c_column"] is not None:
