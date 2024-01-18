@@ -116,26 +116,29 @@ def tcrnet(clonosets_df_exp, clonosets_df_control, cl_filter=None, cl_filter_c=N
     clonoset_control = pool_clonotypes_from_clonosets_df(clonosets_df_control, cl_filter=cl_filter_c)
     clonoset_control_dict = prepare_clonoset_for_intersection(clonoset_control, overlap_type=overlap_type, by_freq=False, retain_counts=False, len_vj_format=True)
     
-    neighbour_counts_exp = []
-    neighbour_counts_control = []
+    results = []
     for unique_clone in unique_clonotypes:
         compact_clone = (len(unique_clone[0]), *unique_clone[1:])
         seq1 = unique_clone[0]
         count_exp = 0
         count_control = 0
-        
+        group_count_exp = 0
+        group_count_control = 0
+
         if compact_clone in clonoset_exp_dict:
             for seq_count2 in clonoset_exp_dict[compact_clone]:
                 if sum([a != b for a,b in zip(seq1,seq_count2[0])]) <= mismatches:
                     count_exp += 1
+            group_count_exp = len(clonoset_exp_dict[compact_clone])
 
         if compact_clone in clonoset_control_dict:
             for seq_count2 in clonoset_control_dict[compact_clone]:
                 if sum([a != b for a,b in zip(seq1,seq_count2[0])]) <= mismatches:
                     count_control += 1
-        neighbour_counts_exp.append(count_exp)
-        neighbour_counts_control.append(count_control)
-    df = pd.DataFrame({"clone":unique_clonotypes, "count_exp":neighbour_counts_exp, "count_control":neighbour_counts_control})
+            group_count_control = len(clonoset_control_dict[compact_clone])
+        results.append([unique_clone, count_exp, count_control, group_count_exp, group_count_control])
+
+    df = pd.DataFrame(results, columns=["clone", "count_exp", "count_control", "group_count_exp", "group_count_control"])
     return df
 
 
