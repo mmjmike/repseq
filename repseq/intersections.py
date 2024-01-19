@@ -423,7 +423,6 @@ def overlap_metric_two_clone_dicts(args):
     cl1_dict = clonoset_dicts[sample_id_1]
     cl2_dict = clonoset_dicts[sample_id_2]
 
-    clonotypes = []
     frequency = 0
     for c1_len, c1_clones in cl1_dict.items():
         if c1_len in cl2_dict:
@@ -439,7 +438,7 @@ def overlap_metric_two_clone_dicts(args):
                             frequency += math.sqrt(c1[-1]*c2[-1])
     if f_metric:
         frequency = math.sqrt(frequency)
-    return (sample_id_1, sample_id_2, frequency, clonotypes)
+    return (sample_id_1, sample_id_2, frequency)
 
 def clonotypes_equal(clonotype_1, clonotype_2, check_v, check_j, mismatches=0):
     seq1 = clonotype_1[0]
