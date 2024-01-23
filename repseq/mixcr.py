@@ -12,7 +12,7 @@ from IPython.display import Image, display, SVG
 
 
 def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
-                         mixcr_path="mixcr", memory=32, time_estimate=1.5):
+                         mixcr_path="mixcr", memory=32, time_estimate=1.5, custom_tag_pattern_column=None):
     
     """
     Function for batch runs of MiXCR software using SLURM.
@@ -42,9 +42,9 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
     max_memory = 1500
     min_memory = 16
 
-    program_name="MIXCR4.3 Analyze Batch"
+    program_name="MIXCR4 Analyze Batch"
     samples_num = sample_df.shape[0]
-    
+
     # by default use the most popular preset for MiLaboratory Human TCR UMI MULTIPLEX Kit
     default_command_template = "mixcr analyze milab-human-tcr-rna-multiplex-cdr3 -f r1 r2 output_prefix"
     if command_template is None:
@@ -53,6 +53,15 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
     # cut placeholders from command template
     remove_list = ["mixcr", "r1", "r2", "output_prefix"]
     command_template = ' '.join([w for w in command_template.split() if w not in remove_list])
+
+    # check input for custom tag pattern
+    custom_tag_pattern = False
+    if isinstance(custom_tag_pattern_column, str):
+        if custom_tag_pattern_column not in sample_df.columns:
+            raise ValueError(f"Specified tag-pattern columns '{custom_tag_pattern_column}' is not present in sample_df")
+        if "--tag-pattern" in command_template.split():
+            raise ValueError(f"Please, remove '--tag-pattern' option from command_template, when you use custom tag-pattern")
+        custom_tag_pattern = True
     
     # Create output dir if does not exist
     os.makedirs(output_folder, exist_ok=True)
@@ -81,7 +90,11 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
         r2 = r["R2"]
     #   output_prefix = os.path.join(output_folder, sample_id)
         output_prefix = sample_id
-        command = f'{mixcr_path} -Xmx{memory}g {command_template} {r1} {r2} {output_prefix}'
+        if custom_tag_pattern:
+            tag_pattern = r[custom_tag_pattern_column]
+            command = f'{mixcr_path} -Xmx{memory}g {command_template} --tag-pattern "{tag_pattern}" {r1} {r2} {output_prefix}'
+        else:
+            command = f'{mixcr_path} -Xmx{memory}g {command_template} {r1} {r2} {output_prefix}'
         command = f"cd {output_folder}; " + command
         jobname = f"mixcr_analyze_{sample_id}"
         
