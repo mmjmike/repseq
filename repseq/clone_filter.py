@@ -118,6 +118,8 @@ class Filter:
                        colnames["v_column"]: "v",
                        colnames["d_column"]: "d",
                        colnames["j_column"]: "j"}
+        c_clonoset = c_clonoset.rename(columns=rename_dict)
+        
         result_columns = ["count", "freq"]
         if "cdr3nt" in c_clonoset.columns:
             result_columns.append("cdr3nt")
@@ -125,7 +127,7 @@ class Filter:
         segment_borders_columns = ["VEnd", "DStart", "DEnd", "JStart"]
 
 
-        c_clonoset = c_clonoset.rename(columns=rename_dict)
+        
         
         # In the case of MiXCR and Bioadaptive format the segment type columns
         # usually show several segment variants with particular allele and score.
