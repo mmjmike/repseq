@@ -132,7 +132,10 @@ def find_nodes_and_edges(clonoset_input, mismatches=1, overlap_type="aaV", igh=F
         v = row["v"]
         j = row["j"]
         cdr3aa = row["cdr3aa"]
-        cdr3nt = row["cdr3nt"]
+        if "cdr3nt" in clonoset.columns:
+            cdr3nt = row["cdr3nt"]
+        else:
+            cdr3nt = "-"
         size = row[size_column_name]
         sample_id = row["sample_id"]
         len_cdr3aa = len(cdr3aa)
@@ -238,7 +241,10 @@ def find_nodes_and_edges_tcrdist_no_gaps(clonoset_input, radius=16, count_by_fre
             continue
         j = row["j"]
         cdr3aa = row["cdr3aa"]
-        cdr3nt = row["cdr3nt"]
+        if "cdr3nt" in clonoset.columns:
+            cdr3nt = row["cdr3nt"]
+        else:
+            cdr3nt = "-"
         size = row[size_column_name]
         sample_id = row["sample_id"]
         len_cdr3aa = len(cdr3aa)
@@ -605,6 +611,8 @@ def calc_cluster_consensus(cluster, seq_type="dna", weighed=False):
             weight = node.size
         if seq_type == "dna":
             seq = node.seq_nt
+            if seq == "-":
+                return "-"
         else:
             seq = node.seq_aa
         node_motif_dict = create_motif_dict(seq, seq_type=seq_type, weight=weight)
@@ -621,6 +629,8 @@ def plot_cluster_logo(cluster, seq_type="prot", weighed=False):
     for node in cluster:
         if seq_type == "dna":
             seq = node.seq_nt
+            if seq == "-":
+                raise ValueError(f"Node '{node.id}' does not have specified 'cdr3nt' value. Unable to create Logo for 'dna' seq_type")
         else:
             seq = node.seq_aa
         if weighed:
