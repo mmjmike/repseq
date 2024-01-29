@@ -21,7 +21,7 @@ def partition_by_time(t):
 
 def run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory, log_filename=None):
     # prepare task parameters and script name
-    os.makedirs(ALDAN_TEMP_SLURM_DIR, exists_ok=True)
+    os.makedirs(ALDAN_TEMP_SLURM_DIR, exist_ok=True)
     
     h=int(time_estimate)
     m=int((time_estimate-h)*60)
