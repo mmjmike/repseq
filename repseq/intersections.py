@@ -196,7 +196,7 @@ def find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts, check_v, check_j):
                 if check_j:
                     clone_len += 1
                 unique_clonotypes.add(tuple(clonotype[:clone_len]))
-    return unique_clonotypes
+    return list(unique_clonotypes)
     
 
 def overlap_distances(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, metric="F2", clonosets_df2=None, cl_filter2=None):
