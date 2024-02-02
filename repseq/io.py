@@ -225,7 +225,7 @@ def recode_vdj_names_bioadaptive(vdj_name):
     vdj_name = vdj_name.replace("TCR", "TR").split("/")[0].split("*")[0].split("-or")[0]
     name_split = vdj_name.split("-")
     if len(name_split) > 1:
-        subfamily_name = str(int(name_split[1]))
+        subfamily_name = str(int(name_split[1][:2])) + name_split[1][2:]
         try:
             family_name = str(int(name_split[0][-2:]))
             segment = name_split[0][:-2]
