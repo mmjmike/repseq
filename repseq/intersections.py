@@ -74,11 +74,9 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
 
     # df = pd.concat(results).index.set_names()
     df = pd.concat(results).reset_index(drop=True)
+    df = split_tuple_clone_column(df, overlap_type)
 
     return df
-
-
-
 
 
 def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0):
@@ -573,6 +571,28 @@ def intersect_two_clone_dicts(args):
     clones_intersect["sample2"] = sample_id_2
     clones_intersect["pair"] = f"{sample_id_1}_vs_{sample_id_2}"
     return clones_intersect
+
+def split_tuple_clone_column(df, overlap_type):
+    clone_column = "clone"
+    aa, check_v, check_j = overlap_type_to_flags(overlap_type)
+    
+    seq_column = "cdr3nt"
+    if aa:
+        seq_column = "cdr3aa"
+    df[seq_column] = df[clone_column].apply(lambda x: x[0])
+
+    if check_j:
+        df["j"] = df[clone_column].apply(lambda x: x[2])
+        df.insert(0, "j", df.pop("j"))
+
+    if check_v:
+        df["v"] = df[clone_column].apply(lambda x: x[1])
+        df.insert(0, "v", df.pop("v"))
+
+    df.insert(0, seq_column, df.pop(seq_column))
+    df = df.drop(columns=[clone_column])
+    return df
+
 
 def find_overlapping_clones_in_two_clone_dicts(args):
     (sample_id_1, sample_id_2, clonoset_dicts, check_v, check_j, mismatches) = args
