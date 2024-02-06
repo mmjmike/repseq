@@ -42,7 +42,8 @@ class Filter:
     """
 
     def __init__(self, name="default_filter", functionality="a", downsample=None,
-                 top=None, by_umi=False, mix_tails=False, count_threshold=None, seed=None):
+                 top=None, by_umi=False, mix_tails=False, count_threshold=None, 
+                 unweight=False, seed=None):
         self.name = name
         self.functionality = functionality
         self.downsample_size = downsample
@@ -51,6 +52,7 @@ class Filter:
         self.mix_tails = mix_tails
         self.seed = seed
         self.count_threshold = count_threshold
+        self.unweight = unweight
         self._check_input()
         
     def spawn(self):
@@ -98,6 +100,8 @@ class Filter:
         clonoset = self._downsample(clonoset, colnames)
         clonoset = self._get_top(clonoset, colnames)
 
+        if self.unweight:
+            clonoset = self._unweight(clonoset, colnames)
         # the fraction columns need to be recounted after filtering, as they
         # remain the same as in the original clonoset before filtration
         clonoset = self._recount_fractions_for_clonoset(clonoset, colnames)
@@ -159,9 +163,14 @@ class Filter:
         # save "sample_id" column if it is present in clonoset
         if "sample_id" in c_clonoset.columns:
             result_columns.append("sample_id")
-        
+        c_clonoset = c_clonoset.sort_values(by="count", ascending=False).reset_index(drop=True)
         return c_clonoset[result_columns]
         
+    def _unweight(self, clonoset_in, colnames):
+        clonoset = clonoset_in.copy()
+        clonoset[colnames["count_column"]] = 1
+        return clonoset
+
     
     def _recount_fractions_for_clonoset(self, clonoset_in, colnames):
         if self.is_empty():
@@ -330,7 +339,7 @@ class Filter:
         output += f"Functionality:\t{functionality[self.functionality]}\n"
         random = False
         change_size = False
-        if functionality != "a":
+        if self.functionality != "a":
             change_size = True
         if isinstance(self.count_threshold, int):
             output += f"Count threshold:\t{self.count_threshold}\n"
@@ -344,6 +353,8 @@ class Filter:
             change_size = True
             if self.mix_tails:
                 random = True
+        if self.unweight:
+            output += f"Clone size unweighted (all clone counts = 1)"
                 
         if change_size:
             if self.by_umi:
@@ -360,7 +371,7 @@ class Filter:
         return output
     
     def is_empty(self):
-        return self.functionality == "a" and self.downsample_size is None and self.top is None and self.count_threshold is None
+        return self.functionality == "a" and self.downsample_size is None and self.top is None and self.count_threshold is None and not self.unweight
 
     def _repr_html_(self):
         """
@@ -374,7 +385,7 @@ class Filter:
         output += f"<p>Functionality:\t{functionality[self.functionality]}</p>"
         random = False
         change_size = False
-        if functionality != "a":
+        if self.functionality != "a":
             change_size = True
         if isinstance(self.count_threshold, int):
             output += f"<p>Count threshold: {self.count_threshold}</p>"
@@ -388,6 +399,8 @@ class Filter:
             change_size = True
             if self.mix_tails:
                 random = True
+        if self.unweight:
+            output += f"<p>Clone size unweighted: (all clone counts = 1)</p>"
                 
         if change_size:
             if self.by_umi:
