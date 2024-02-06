@@ -53,7 +53,8 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
     
     clonoset_lists, samples_total, two_dataframes, sample_list, sample_list2 = prepare_clonotypes_dfs_for_intersections(clonosets_df, clonosets_df2,
                                                                                                                         cl_filter, cl_filter2,
-                                                                                                                        overlap_type, by_freq=by_freq)
+                                                                                                                        overlap_type, by_freq=by_freq,
+                                                                                                                        strict=True)
     # generating a set of tasks
     
     tasks = []
@@ -70,7 +71,11 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
                 tasks.append((sample1, sample2, clonoset_lists))
     
     results = run_parallel_calculation(intersect_two_clone_dicts, tasks, "Intersecting clonosets", object_name="pairs")
-    return pd.concat(results).reset_index(drop=True)
+
+    # df = pd.concat(results).index.set_names()
+    df = pd.concat(results).reset_index(drop=True)
+
+    return df
 
 
 
@@ -118,12 +123,12 @@ def tcrnet(clonosets_df_exp, clonosets_df_control, cl_filter=None, cl_filter_c=N
     print(f"Overlap type: {overlap_type}")
 
     clonoset_exp = pool_clonotypes_from_clonosets_df(clonosets_df_exp, cl_filter=cl_filter)
-    clonoset_exp_dict = prepare_clonoset_for_intersection(clonoset_exp, overlap_type=overlap_type, by_freq=False, retain_counts=False, len_vj_format=True)
+    clonoset_exp_dict = prepare_clonoset_for_intersection(clonoset_exp, overlap_type=overlap_type, by_freq=False, len_vj_format=True)
     
     unique_clonotypes = [(seq_count[0], *len_vj[1:]) for len_vj, seq_counts in clonoset_exp_dict.items() for seq_count in seq_counts]
     
     clonoset_control = pool_clonotypes_from_clonosets_df(clonosets_df_control, cl_filter=cl_filter_c)
-    clonoset_control_dict = prepare_clonoset_for_intersection(clonoset_control, overlap_type=overlap_type, by_freq=False, retain_counts=False, len_vj_format=True)
+    clonoset_control_dict = prepare_clonoset_for_intersection(clonoset_control, overlap_type=overlap_type, by_freq=False, len_vj_format=True)
     
 
     tasks = []
@@ -348,8 +353,29 @@ def find_intersecting_clonotypes(clonosets_df, cl_filter=None, overlap_type="aaV
 ### Supporting functions
 
 
-def prepare_clonotypes_dfs_for_intersections(clonosets_df, clonosets_df2, cl_filter, cl_filter2, overlap_type, by_freq=True):
-    
+def prepare_clonotypes_dfs_for_intersections(clonosets_df, clonosets_df2, cl_filter, cl_filter2, overlap_type, by_freq=True, strict=False):
+    """
+    Args:
+        clonosets_df (pd.DataFrame): _description_
+        clonosets_df2 (pd.DataFrame): _description_
+        cl_filter (Filter): _description_
+        cl_filter2 (Filter): _description_
+        overlap_type (str): _description_
+        by_freq (bool, optional): _description_. Defaults to True.
+
+    Raises:
+        ValueError: _description_
+        ValueError: _description_
+
+    Returns:
+        clonoset_lists (dict): dict of 
+        samples_total (int): 
+        two_dataframes (bool):
+        sample_list (list):
+        sample_list2 (list):
+    """
+    # output:
+    ### clonoset_lists
     
     if len(clonosets_df.sample_id.unique()) < len(clonosets_df):
         raise ValueError("Input clonosets in DataFrame have non-unique sample_id's")
@@ -367,12 +393,12 @@ def prepare_clonotypes_dfs_for_intersections(clonosets_df, clonosets_df2, cl_fil
 
     # converting clonosets to compact lists of clonotypes separated by CDR3 lengths to dictionary based on overlap type and count/freq/umi
     clonoset_lists = convert_clonosets_to_compact_dicts(clonosets_df_1, cl_filter=cl_filter,
-                                                        overlap_type=overlap_type, by_freq=by_freq)
+                                                        overlap_type=overlap_type, by_freq=by_freq, strict=strict)
     if two_dataframes:
         if cl_filter2 is None:
             cl_filter2 = cl_filter
         clonoset_lists_2 = convert_clonosets_to_compact_dicts(clonosets_df_2, cl_filter=cl_filter2,
-                                                        overlap_type=overlap_type, by_freq=by_freq)
+                                                        overlap_type=overlap_type, by_freq=by_freq, strict=strict)
         clonoset_lists.update(clonoset_lists_2)
     
     samples_total = len(clonosets_df_1)
@@ -387,8 +413,9 @@ def prepare_clonotypes_dfs_for_intersections(clonosets_df, clonosets_df2, cl_fil
     return clonoset_lists, samples_total, two_dataframes, sample_list, sample_list2
 
 
-def convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True, retain_counts=True):
+def convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True, strict=False):
     clonoset_dicts = {}
+    len_vj_format=not strict
     
     if cl_filter is None:
         cl_filter = Filter()
@@ -402,7 +429,7 @@ def convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=None, overlap_typ
         clonoset = read_clonoset(filename)
         clonoset = cl_filter.apply(clonoset)
         cl_dict = prepare_clonoset_for_intersection(clonoset, overlap_type=overlap_type,
-                                                    by_freq=by_freq, retain_counts=retain_counts)
+                                                    by_freq=by_freq, len_vj_format=len_vj_format)
         samples_read += 1
         print_progress_bar(samples_read, samples_total, "Reading clonosets")
         clonoset_dicts[sample_id] = cl_dict
@@ -468,7 +495,7 @@ def overlap_type_to_flags(overlap_type):
         check_j = True
     return aa, check_v, check_j
 
-def prepare_clonoset_for_intersection(clonoset, overlap_type="aaV", by_freq=True, retain_counts=False, len_vj_format=False):
+def prepare_clonoset_for_intersection(clonoset, overlap_type="aaV", by_freq=True, len_vj_format=False):
     aa, check_v, check_j = overlap_type_to_flags(overlap_type)
     
     colnames = get_column_names_from_clonoset(clonoset)
@@ -496,7 +523,7 @@ def prepare_clonoset_for_intersection(clonoset, overlap_type="aaV", by_freq=True
         result_colnames.append(cl_j_col)
     
     
-    if not retain_counts:
+    if not len_vj_format:
         clonoset["clone"] = clonoset.apply(lambda x: tuple(x[col] for col in result_colnames), axis=1)
         clonoset_dict = clonoset[["clone", weight_column]].groupby("clone").sum().sort_values(by=weight_column,ascending=False).to_dict()[weight_column]
     
