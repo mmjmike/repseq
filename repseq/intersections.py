@@ -115,7 +115,7 @@ def count_table_mp(args):
         result.append(count)
     return {sample_id: result}
         
-def tcrnet(clonosets_df_exp, clonosets_df_control, cl_filter=None, cl_filter_c=None, overlap_type="aaVJ", mismatches=0):
+def tcrnet(clonosets_df_exp, clonosets_df_control, cl_filter=None, cl_filter_c=None, overlap_type="aaVJ", mismatches=1):
     
     print("Running TCRnet neighbour count\n"+"-"*50)
     print(f"Overlap type: {overlap_type}")
