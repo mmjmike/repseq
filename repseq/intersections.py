@@ -225,8 +225,8 @@ def overlap_distances(clonosets_df, cl_filter=None, overlap_type="aaV", mismatch
             frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
             1 after filtering of non-functional clonotypes
     
-    Important: similar clonotypes by `overlap_type` in one particular clonoset are NOT combined into one
-    and are treated as different clonotypes.
+    Important: similar clonotypes by `overlap_type` in one particular clonoset will be combined into one
+        clonotype with sum for count.
 
     Returns:
         df (pd.DataFrame): dataframe with following columns: `clone`, `sample1_count`, `sample2_count`, `sample1`, `sample2`, `pair`. 
@@ -261,10 +261,12 @@ def overlap_distances(clonosets_df, cl_filter=None, overlap_type="aaV", mismatch
     else:
         if metric in ["F", "F2"] and not two_dataframes:
             for i in range(samples_total):
+                sample1 = sample_list[i]
                 for j in range(samples_total-i-1):
-                    sample1 = sample_list[i]
                     sample2 = sample_list[j+i+1]
                     tasks.append((sample1, sample2, clonoset_lists, check_v, check_j, mismatches, metric))
+                if metric == "F2":
+                    tasks.append((sample1, sample1, clonoset_lists, check_v, check_j, mismatches, metric))
         else:
             for i in range(samples_total):
                 for j in range(samples_total):
@@ -449,11 +451,14 @@ def overlap_metric_two_clone_dicts(args):
     cl2_dict = clonoset_dicts[sample_id_2]
 
     frequency = 0
-    for c1_len, c1_clones in cl1_dict.items():
-        if c1_len in cl2_dict:
-            for c1 in c1_clones:
-                for c2 in cl2_dict[c1_len]:
-                    if clonotypes_equal(c1, c2, check_v, check_j, mismatches=mismatches):
+
+
+
+    for c1_key, c1_seq_freq in cl1_dict.items():
+        if c1_key in cl2_dict:
+            for c1 in c1_seq_freq:
+                for c2 in cl2_dict[c1_key]:
+                    if clonotypes_equal(c1, c2, False, False, mismatches=mismatches):
                         if f_metric:
                             frequency += c1[-1]*c2[-1]
                         elif c_metric:
@@ -463,6 +468,23 @@ def overlap_metric_two_clone_dicts(args):
                             frequency += math.sqrt(c1[-1]*c2[-1])
     if f_metric:
         frequency = math.sqrt(frequency)
+
+    # for c1_len, c1_clones in cl1_dict.items():
+    #     if c1_len in cl2_dict:
+    #         for c1 in c1_clones:
+    #             for c2 in cl2_dict[c1_len]:
+    #                 if clonotypes_equal(c1, c2, check_v, check_j, mismatches=mismatches):
+    #                     if f_metric:
+    #                         frequency += c1[-1]*c2[-1]
+    #                     elif c_metric:
+    #                         frequency += c1[-1]
+    #                         break
+    #                     else:
+    #                         frequency += math.sqrt(c1[-1]*c2[-1])
+    # if f_metric:
+    #     frequency = math.sqrt(frequency)
+
+
     return (sample_id_1, sample_id_2, frequency)
 
 def clonotypes_equal(clonotype_1, clonotype_2, check_v, check_j, mismatches=0):
@@ -493,7 +515,7 @@ def overlap_type_to_flags(overlap_type):
         check_j = True
     return aa, check_v, check_j
 
-def prepare_clonoset_for_intersection(clonoset, overlap_type="aaV", by_freq=True, len_vj_format=False):
+def prepare_clonoset_for_intersection(clonoset, overlap_type="aaV", by_freq=True, len_vj_format=False, pool_clonotypes=True):
     aa, check_v, check_j = overlap_type_to_flags(overlap_type)
     
     colnames = get_column_names_from_clonoset(clonoset)
@@ -521,24 +543,38 @@ def prepare_clonoset_for_intersection(clonoset, overlap_type="aaV", by_freq=True
         result_colnames.append(cl_j_col)
     
     
-    if not len_vj_format:
+    if not len_vj_format or pool_clonotypes:
         clonoset["clone"] = clonoset.apply(lambda x: tuple(x[col] for col in result_colnames), axis=1)
         clonoset_dict = clonoset[["clone", weight_column]].groupby("clone").sum().sort_values(by=weight_column,ascending=False).to_dict()[weight_column]
-    
-
+        if len_vj_format:
+            clonoset_dict = clone_dict_to_len_vj_format(clonoset_dict)
     else:
         result_colnames.append(weight_column)
-        clonoset_list = list(clonoset.apply(lambda x: tuple(x[col] for col in result_colnames), axis=1))
+        clonoset_compact = clonoset[result_colnames]
         clonoset_dict = dict()
-        for clone in clonoset_list:
-            seq_len = len(clone[0])
-            if seq_len in clonoset_dict:
-                clonoset_dict[seq_len].append(clone)
+        for i,r in clonoset_compact.iterrows():
+            clone = [v for v in r]
+            clone_value = [clone[0], clone[-1]]
+            clone_key = tuple([len(clone[0])] + clone[1:-1])
+            if clone_key not in clonoset_dict:
+                clonoset_dict[clone_key] = [clone_value]
             else:
-                clonoset_dict[seq_len] = [clone]
+                clonoset_dict[clone_key].append(clone_value)
+
+        
+    # else:
+        
+    #     clonoset_list = list(clonoset.apply(lambda x: tuple(x[col] for col in result_colnames), axis=1))
+    #     clonoset_dict = dict()
+    #     for clone in clonoset_list:
+    #         seq_len = len(clone[0])
+    #         if seq_len in clonoset_dict:
+    #             clonoset_dict[seq_len].append(clone)
+    #         else:
+    #             clonoset_dict[seq_len] = [clone]
     
-    if len_vj_format:
-        clonoset_dict = clone_dict_to_len_vj_format(clonoset_dict)
+    # if len_vj_format:
+    #     clonoset_dict = clone_dict_to_len_vj_format(clonoset_dict)
     return clonoset_dict
 
 def clone_dict_to_len_vj_format(clone_dict):
