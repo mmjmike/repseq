@@ -5,7 +5,7 @@ from .clonosets import (decide_count_and_frac_columns,
 from .common_functions import (extract_segment,
                                extract_refpoint_position)
 
-from collections import Hashable
+from collections.abc import Hashable
 
 import random
 
