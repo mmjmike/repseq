@@ -99,6 +99,7 @@ def find_nodes_and_edges(clonoset_input, mismatches=1, overlap_type="aaV", igh=F
     if overlap_type not in possible_overlap_types:
         print("Incorrect overlap type. Possible values: {}".format(", ".join(possible_overlap_types)))    
         return None
+    aa = False
     if overlap_type[0:2] == "aa":
         aa = True
     check_v = False
