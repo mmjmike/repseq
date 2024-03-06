@@ -79,18 +79,18 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
     return df
 
 
-def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0):
+def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, strict_presense=False):
     
     print("Creating clonotypes count table\n"+"-"*50)
     print(f"Overlap type: {overlap_type}")
     aa, check_v, check_j = overlap_type_to_flags(overlap_type)
     clonoset_dicts = convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=cl_filter,
-                                                        overlap_type=overlap_type, by_freq=False)
+                                                        overlap_type=overlap_type, by_freq=False, strict=not bool(mismatches))
     unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts, check_v, check_j)
     
     tasks = []
     for sample_id in clonoset_dicts:
-        task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], check_v, check_j, mismatches]
+        task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], check_v, check_j, mismatches, strict_presense]
         tasks.append(task)
     
     results = run_parallel_calculation(count_table_mp, tasks, "Counting features", object_name="clonosetsq")
@@ -102,16 +102,30 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0):
     return count_table
 
 def count_table_mp(args):
-    (features, sample_id, clonoset_dict, check_v, check_j, mismatches) = args
+    (features, sample_id, clonoset_dict, check_v, check_j, mismatches, strict_presense) = args
     result = []
     for feature in features:
         count = 0
         len_feature = len(feature[0])
-        if len_feature in clonoset_dict:
-            clonotypes = clonoset_dict[len_feature]
-            for clonotype in clonotypes:
-                if clonotypes_equal(feature, clonotype, check_v, check_j, mismatches=mismatches):
-                    count += clonotype[-1]
+        
+        if mismatches:
+            feature_to_check = (len_feature, *feature[1:])
+            if feature_to_check in clonoset_dict:
+                clonotype_present = False
+                for clonotype in clonoset_dict[feature_to_check]:
+                    if clonotype[0] == feature[0]:
+                        clonotype_present = True
+                    if sum([a != b for a,b in zip(feature[0],clonotype[0])]) <= mismatches:
+                        count += clonotype[-1]
+                if strict_presense and not clonotype_present:
+                    result.append(0)
+                    continue
+        else:
+            if len_feature in clonoset_dict:
+                clonotypes = clonoset_dict[len_feature]
+                for clonotype in clonotypes:
+                    if clonotypes_equal(feature, clonotype, check_v, check_j, mismatches=mismatches):
+                        count += clonotype[-1]
         result.append(count)
     return {sample_id: result}
         
