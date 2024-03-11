@@ -27,7 +27,7 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
             'R1' and 'R2' columns, containing paths (recommended full paths) to raw read files
         output_folder (str): path to output folder
         command_template (str): MiXCR command template 
-            (default: 'mixcr analyze milab-human-tcr-rna-multiplex-cdr3 -f r1 r2 output_prefix').
+            (default: 'mixcr analyze milab-human-rna-tcr-umi-multiplex -f r1 r2 output_prefix').
             May be used as an example. Note that `mixcr analyze` and `r1 r2 output_prefix` are 
             "magical" parts of the template that should be kept as-is in the template, so change 
             only the part in-between these parts.
@@ -46,7 +46,7 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
     samples_num = sample_df.shape[0]
 
     # by default use the most popular preset for MiLaboratory Human TCR UMI MULTIPLEX Kit
-    default_command_template = "mixcr analyze milab-human-tcr-rna-multiplex-cdr3 -f r1 r2 output_prefix"
+    default_command_template = "mixcr analyze milab-human-rna-tcr-umi-multiplex -f r1 r2 output_prefix"
     if command_template is None:
         command_template = default_command_template
         
