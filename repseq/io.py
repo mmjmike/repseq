@@ -91,8 +91,11 @@ def read_clonoset(filename):
 
     d_types_vdjtools = {'cdr3aa': str, 'cdr3nt': str,
                         'v': str, 'd': str, 'j': str,
-                        'count': int, 'freq': float,
-                        'VEnd':int, 'DStart':int, 'DEnd':int, "JStart":int
+                        'CDR3aa': str, 'CDR3nt': str,
+                        'V': str, 'D': str, 'J': str,
+                        'C': str, "frequency": float#,
+                        #'count': int, 'freq': float#,
+                        #'VEnd':int, 'DStart':int, 'DEnd':int, "JStart":int
                         }
     
     d_types_bioadaptive = {'nucleotide': str, 'aminoAcid': str,
@@ -103,6 +106,8 @@ def read_clonoset(filename):
                             'n1Index': int,'dIndex': int,
                             'n2Index': int,'jIndex': int
                             }
+    
+
     datatypes = {**d_types_mixcr,**d_types_vdjtools, **d_types_bioadaptive}
     if file_extension == ".zip":
         archive = zipfile.ZipFile(filename, 'r')
