@@ -50,7 +50,7 @@ def calc_clonoset_stats(clonosets_df, cl_filter=None):
     df = df.astype(convert_dict)
     return df
 
-def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long"):
+def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long", by_count=False):
     """
     Calculates segment (`V`, `J`, or `C`) usage for several samples. By default outputs
     'long' table with four columns: segment name, `usage`, `sample_id` and `chain`.
@@ -83,33 +83,37 @@ def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long"):
     segment = segment.lower()
     if segment not in possible_segments:
         raise ValueError(f"Wrong segment value. Possible values: {', '.join(possible_segments)}")
-    df = generic_calculation(clonosets_df, calc_segment_usage_cl, clonoset_filter=cl_filter, program_name="CalcSegmentUsage", segment=segment)
+    df = generic_calculation(clonosets_df, calc_segment_usage_cl, clonoset_filter=cl_filter, program_name="CalcSegmentUsage", segment=segment, by_count=by_count)
     df = df.fillna(0)
     if table == "wide":
         return df
     else:
         return df.melt(id_vars=["sample_id", "chain"]).rename(columns={"value":"usage", "variable":segment})
 
-def calc_segment_usage_cl(clonoset_in, segment="v", colnames=None):
+def calc_segment_usage_cl(clonoset_in, segment="v", colnames=None, by_count=False):
     if segment == "vj":
-        return calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=False)
+        return calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=False, by_count=by_count)
     elif segment == "vlen":
-        return calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=False, include_len=True)
+        return calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=False, include_len=True, by_count=by_count)
     elif segment == "vjlen":
-        return calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=True)
+        return calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=True, by_count=by_count)
     colnames = get_column_names_from_clonoset(clonoset_in)
     freq_column = colnames["fraction_column"]
+    if by_count:
+        freq_column = colnames["count_column"]
     segment_column = colnames[f"{segment}_column"]
     result = clonoset_in[[freq_column, segment_column]].groupby(segment_column).sum().to_dict()[freq_column]
     return result
 
-def calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=False):
+def calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=False, by_count=False):
     if not include_j and not include_len:
         print("WARNING! 'calc_vjlen_usage_cl' must have at least one of the flags 'include_j' or 'include_len' equal to 'True'. Calling 'calc_segment_usage_cl' with segment='v' instead")
         return calc_segment_usage_cl(clonoset_in)
     if colnames is None:
         colnames = get_column_names_from_clonoset(clonoset_in)
     freq_column = colnames["fraction_column"]
+    if by_count:
+        freq_column = colnames["count_column"]
     clonoset = clonoset_in.copy()
     v_column = colnames["v_column"]
     columns_to_join = [v_column]
