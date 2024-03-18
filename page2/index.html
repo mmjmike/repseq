@@ -1,0 +1,2049 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../supporting_modules/">
+      
+      
+        <link rel="next" href="../examples/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.14">
+    
+    
+      
+        <title>Test page - Repseq Library for Immune repertoire postanalysis</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.10ba22f1.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#page-2" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Repseq Library for Immune repertoire postanalysis" class="md-header__button md-logo" aria-label="Repseq Library for Immune repertoire postanalysis" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Repseq Library for Immune repertoire postanalysis
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Test page
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6zm0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4zM7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="lime"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3Z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var media,input,key,value,palette=__md_get("__palette");if(palette&&palette.color){"(prefers-color-scheme)"===palette.color.media&&(media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']"),palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent"));for([key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../mixcr/" class="md-tabs__link">
+        
+  
+    
+  
+  MiXCR module
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../postanalysis/" class="md-tabs__link">
+        
+  
+    
+  
+  Postanalysis
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../filter/" class="md-tabs__link">
+        
+  
+    
+  
+  Clone filter
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../supporting_modules/" class="md-tabs__link">
+        
+  
+    
+  
+  Supporting modules
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+    
+  
+  Test page
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../examples/" class="md-tabs__link">
+        
+  
+    
+  
+  Examples
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Repseq Library for Immune repertoire postanalysis" class="md-nav__button md-logo" aria-label="Repseq Library for Immune repertoire postanalysis" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    Repseq Library for Immune repertoire postanalysis
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mixcr/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    MiXCR module
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../postanalysis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Postanalysis
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../filter/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Clone filter
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../supporting_modules/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Supporting modules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Test page
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Test page
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#code-annotation-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Code annotation examples
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Code annotation examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#code-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Code blocks
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plain-code-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Plain code blocks
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plain code blocks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#code-for-a-specific-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      Code for a specific language
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#code-with-a-title" class="md-nav__link">
+    <span class="md-ellipsis">
+      Code with a title
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#add-line-numbers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Add line numbers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#highlighting-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      Highlighting lines
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#icons-and-emojis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Icons and Emojis
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#try-to-show-all-the-functions-of-a-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      Try to show all the functions of a module
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#intersections" class="md-nav__link">
+    <span class="md-ellipsis">
+      intersections
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#intersections.find_intersecting_clonotypes" class="md-nav__link">
+    <span class="md-ellipsis">
+      find_intersecting_clonotypes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#intersections.intersect_clones_in_samples_batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      intersect_clones_in_samples_batch
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#intersections.overlap_distances" class="md-nav__link">
+    <span class="md-ellipsis">
+      overlap_distances
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#intersections.prepare_clonotypes_dfs_for_intersections" class="md-nav__link">
+    <span class="md-ellipsis">
+      prepare_clonotypes_dfs_for_intersections
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Examples
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+<h1 id="page-2">Page 2</h1>
+<h2 id="code-annotation-examples">Code annotation examples</h2>
+<h3 id="code-blocks">Code blocks</h3>
+<p>Some <code>code</code> goes here</p>
+<h3 id="plain-code-blocks">Plain code blocks</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>def read_json_report(sample_id, folder, report_type):
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    filename = os.path.join(folder, f&quot;{sample_id}.{report_type}.report.json&quot;)
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    with open(filename) as data_file:    
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>        for jsonObj in data_file:
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>            report = json.loads(jsonObj)
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    return report
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>// some comment
+</code></pre></div>
+<h4 id="code-for-a-specific-language">Code for a specific language</h4>
+<p>Some more code with the <code>py</code> at the start</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span> <span class="nn">sys</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">REPSEQ_PATH</span> <span class="o">=</span> <span class="s1">&#39;/home/mmyshkin/soft/repseq&#39;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">REPSEQ_PATH</span><span class="p">)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kn">from</span> <span class="nn">repseq</span> <span class="kn">import</span> <span class="n">slurm</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="kn">from</span> <span class="nn">repseq</span> <span class="kn">import</span> <span class="n">io</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="kn">from</span> <span class="nn">repseq</span> <span class="kn">import</span> <span class="n">common_functions</span> <span class="k">as</span> <span class="n">cf</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="kn">from</span> <span class="nn">repseq</span> <span class="kn">import</span> <span class="n">clonosets</span> <span class="k">as</span> <span class="n">cl</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="kn">from</span> <span class="nn">repseq</span> <span class="kn">import</span> <span class="n">clustering</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="kn">from</span> <span class="nn">repseq</span> <span class="kn">import</span> <span class="n">mixcr</span> <span class="k">as</span> <span class="n">mx</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="kn">from</span> <span class="nn">repseq</span> <span class="kn">import</span> <span class="n">segment_usage</span> <span class="k">as</span> <span class="n">su</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="kn">from</span> <span class="nn">repseq</span> <span class="kn">import</span> <span class="n">stats</span>
+</code></pre></div>
+<h4 id="code-with-a-title">Code with a title</h4>
+<div class="highlight"><span class="filename">import useful packages</span><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span> <span class="nn">os</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">Image</span><span class="p">,</span> <span class="n">display</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="kn">import</span> <span class="nn">json</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="kn">import</span> <span class="nn">re</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="kn">import</span> <span class="nn">math</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="kn">import</span> <span class="nn">random</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+</code></pre></div>
+<h4 id="add-line-numbers">Add line numbers</h4>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-3-1">1</a></span>
+<span class="normal"><a href="#__codelineno-3-2">2</a></span>
+<span class="normal"><a href="#__codelineno-3-3">3</a></span>
+<span class="normal"><a href="#__codelineno-3-4">4</a></span>
+<span class="normal"><a href="#__codelineno-3-5">5</a></span>
+<span class="normal"><a href="#__codelineno-3-6">6</a></span>
+<span class="normal"><a href="#__codelineno-3-7">7</a></span>
+<span class="normal"><a href="#__codelineno-3-8">8</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="k">def</span> <span class="nf">shannon_wiener</span><span class="p">(</span><span class="n">list_of_numbers</span><span class="p">):</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2"></a>    <span class="n">list_of_numbers</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">list_of_numbers</span><span class="p">)</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3"></a>    <span class="n">total_size</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">list_of_numbers</span><span class="p">)</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4"></a>    <span class="n">freqs</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span><span class="o">/</span><span class="n">total_size</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">list_of_numbers</span><span class="p">]</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5"></a>    <span class="n">diversity</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">list_of_numbers</span><span class="p">)</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6"></a>    <span class="n">sw</span> <span class="o">=</span> <span class="o">-</span><span class="nb">sum</span><span class="p">([</span><span class="n">f</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">freqs</span><span class="p">])</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7"></a>    <span class="n">sw_norm</span> <span class="o">=</span> <span class="n">sw</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">diversity</span><span class="p">)</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8"></a>    <span class="k">return</span> <span class="n">sw</span><span class="p">,</span> <span class="n">sw_norm</span><span class="p">,</span> <span class="n">diversity</span>
+</code></pre></div></td></tr></table></div>
+<h4 id="highlighting-lines">Highlighting lines</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span> <span class="nf">shannon_wiener</span><span class="p">(</span><span class="n">list_of_numbers</span><span class="p">):</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">list_of_numbers</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">list_of_numbers</span><span class="p">)</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">total_size</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">list_of_numbers</span><span class="p">)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">freqs</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span><span class="o">/</span><span class="n">total_size</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">list_of_numbers</span><span class="p">]</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="hll">    <span class="n">diversity</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">list_of_numbers</span><span class="p">)</span>
+</span><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="hll">    <span class="n">sw</span> <span class="o">=</span> <span class="o">-</span><span class="nb">sum</span><span class="p">([</span><span class="n">f</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">freqs</span><span class="p">])</span>
+</span><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="hll">    <span class="n">sw_norm</span> <span class="o">=</span> <span class="n">sw</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">diversity</span><span class="p">)</span>
+</span><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="k">return</span> <span class="n">sw</span><span class="p">,</span> <span class="n">sw_norm</span><span class="p">,</span> <span class="n">diversity</span>
+</code></pre></div>
+<h2 id="icons-and-emojis">Icons and Emojis</h2>
+<p><img alt="😄" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.0.3/assets/svg/1f604.svg" title=":smile:" /></p>
+<p><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M464 256a208 208 0 1 0-416 0 208 208 0 1 0 416 0zM0 256a256 256 0 1 1 512 0 256 256 0 1 1-512 0zm130.7 57.9c-4.2-13.6 7.1-25.9 21.3-25.9h212.5c14.2 0 25.5 12.4 21.3 25.9C369 368.4 318.2 408 258.2 408s-110.8-39.6-127.5-94.1zM144.4 192a32 32 0 1 1 64 0 32 32 0 1 1-64 0zm165.8 21.7c-7.6 8.1-20.2 8.5-28.3.9s-8.5-20.2-.9-28.3c14.5-15.5 35.2-22.3 54.6-22.3s40.1 6.8 54.6 22.3c7.6 8.1 7.1 20.7-.9 28.3s-20.7 7.1-28.3-.9c-5.5-5.8-14.8-9.7-25.4-9.7s-19.9 3.8-25.4 9.7z"/></svg></span></p>
+<p><span class="twemoji twitter"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M459.37 151.716c.325 4.548.325 9.097.325 13.645 0 138.72-105.583 298.558-298.558 298.558-59.452 0-114.68-17.219-161.137-47.106 8.447.974 16.568 1.299 25.34 1.299 49.055 0 94.213-16.568 130.274-44.832-46.132-.975-84.792-31.188-98.112-72.772 6.498.974 12.995 1.624 19.818 1.624 9.421 0 18.843-1.3 27.614-3.573-48.081-9.747-84.143-51.98-84.143-102.985v-1.299c13.969 7.797 30.214 12.67 47.431 13.319-28.264-18.843-46.781-51.005-46.781-87.391 0-19.492 5.197-37.36 14.294-52.954 51.655 63.675 129.3 105.258 216.365 109.807-1.624-7.797-2.599-15.918-2.599-24.04 0-57.828 46.782-104.934 104.934-104.934 30.213 0 57.502 12.67 76.67 33.137 23.715-4.548 46.456-13.32 66.599-25.34-7.798 24.366-24.366 44.833-46.132 57.827 21.117-2.273 41.584-8.122 60.426-16.243-14.292 20.791-32.161 39.308-52.628 54.253z"/></svg></span></p>
+<p><span class="twemoji heart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14 20.408c-.492.308-.903.546-1.192.709-.153.086-.308.17-.463.252h-.002a.75.75 0 0 1-.686 0 16.709 16.709 0 0 1-.465-.252 31.147 31.147 0 0 1-4.803-3.34C3.8 15.572 1 12.331 1 8.513 1 5.052 3.829 2.5 6.736 2.5 9.03 2.5 10.881 3.726 12 5.605 13.12 3.726 14.97 2.5 17.264 2.5 20.17 2.5 23 5.052 23 8.514c0 3.818-2.801 7.06-5.389 9.262A31.146 31.146 0 0 1 14 20.408Z"/></svg></span></p>
+<h2 id="try-to-show-all-the-functions-of-a-module">Try to show all the functions of a module</h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="intersections"></a>
+  <div class="doc doc-contents first">
+
+  
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<h2 id="intersections.find_intersecting_clonotypes" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">find_intersecting_clonotypes</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overlap_type</span><span class="o">=</span><span class="s1">&#39;aaV&#39;</span><span class="p">,</span> <span class="n">mismatches</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="s1">&#39;F2&#39;</span><span class="p">,</span> <span class="n">clonosets_df2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cl_filter2</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h2>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>Calculating overlap distances between multiple repseq samples using F2 of F metrics
+The result of this function may be used for heatmap+clusterization of samples or for MDS plots</p>
+
+
+
+  <p><strong>Parameters:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td><code>clonosets_df</code></td>
+          <td>
+                <code><span title="pandas.DataFrame">DataFrame</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>contains three columns - <code>sample_id</code> and <code>filename</code> columns,
+filename - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
+sample_id's should be all unique in this DF</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>overlap_type</code></td>
+          <td>
+                <code>str</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>possible values are <code>aa</code>, <code>aaV</code>, <code>aaVJ</code>, <code>nt</code>, <code>ntV</code>, <code>ntVJ</code>. aa/nt define which CDR3 sequence
+to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
+to decide if clonotypes are equal</p>
+            </div>
+          </td>
+          <td>
+                <code>&#39;aaV&#39;</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>mismatches</code></td>
+          <td>
+                <code>int</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>The permissible number of single-letter mismatches in clonotypes sequences 
+for them to be treated similar, i.e. hamming distance.</p>
+            </div>
+          </td>
+          <td>
+                <code>0</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>by_umi</code></td>
+          <td>
+                <code>bool</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>set =True for MiXCR4 clonosets to select count/frequency of clonotypes 
+in UMI's if they exist in implemented protocol</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>metric</code></td>
+          <td>
+                <code>str</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>possible values - <code>F</code>, <code>F2</code> or <code>C</code>. Default <code>F2</code>. <code>F2</code> - sum of sqrt of product of 
+similar clonotype frequencies in two clonosets. <code>F</code> - sqrt of the sum of frequency products.
+<code>C</code> - total frequency of clonotypes in <code>sample1</code>, that are similar to clonotypes in <code>sample2</code></p>
+            </div>
+          </td>
+          <td>
+                <code>&#39;F2&#39;</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>only_functional</code></td>
+          <td>
+                <code>bool</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>use only functional clonotypes (do not contain stop codons or
+frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
+1 after filtering of non-functional clonotypes</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+      <p>Important: similar clonotypes by <code>overlap_type</code> in one particular clonoset are NOT combined into one
+and are treated as different clonotypes.</p>
+
+
+
+  <p><strong>Returns:</strong></p>
+  <table>
+    <thead>
+      <tr>
+<th>Name</th>        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+<td><code>df</code></td>          <td>
+                <code><span title="pandas.DataFrame">DataFrame</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>dataframe with following columns: <code>clone</code>, <code>sample1_count</code>, <code>sample2_count</code>, <code>sample1</code>, <code>sample2</code>, <code>pair</code>. 
+<code>clone</code> - is tuple, containing sequence (aa or nt), plus V or J if they are required by the metric
+count columns contain freq/count of the clone in sample
+pair column is made for easy separation of possibly huge DataFrame into overlapping pairs</p>
+            </div>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+          <details class="quote">
+            <summary>Source code in <code>repseq/intersections.py</code></summary>
+            <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-329">329</a></span>
+<span class="normal"><a href="#__codelineno-0-330">330</a></span>
+<span class="normal"><a href="#__codelineno-0-331">331</a></span>
+<span class="normal"><a href="#__codelineno-0-332">332</a></span>
+<span class="normal"><a href="#__codelineno-0-333">333</a></span>
+<span class="normal"><a href="#__codelineno-0-334">334</a></span>
+<span class="normal"><a href="#__codelineno-0-335">335</a></span>
+<span class="normal"><a href="#__codelineno-0-336">336</a></span>
+<span class="normal"><a href="#__codelineno-0-337">337</a></span>
+<span class="normal"><a href="#__codelineno-0-338">338</a></span>
+<span class="normal"><a href="#__codelineno-0-339">339</a></span>
+<span class="normal"><a href="#__codelineno-0-340">340</a></span>
+<span class="normal"><a href="#__codelineno-0-341">341</a></span>
+<span class="normal"><a href="#__codelineno-0-342">342</a></span>
+<span class="normal"><a href="#__codelineno-0-343">343</a></span>
+<span class="normal"><a href="#__codelineno-0-344">344</a></span>
+<span class="normal"><a href="#__codelineno-0-345">345</a></span>
+<span class="normal"><a href="#__codelineno-0-346">346</a></span>
+<span class="normal"><a href="#__codelineno-0-347">347</a></span>
+<span class="normal"><a href="#__codelineno-0-348">348</a></span>
+<span class="normal"><a href="#__codelineno-0-349">349</a></span>
+<span class="normal"><a href="#__codelineno-0-350">350</a></span>
+<span class="normal"><a href="#__codelineno-0-351">351</a></span>
+<span class="normal"><a href="#__codelineno-0-352">352</a></span>
+<span class="normal"><a href="#__codelineno-0-353">353</a></span>
+<span class="normal"><a href="#__codelineno-0-354">354</a></span>
+<span class="normal"><a href="#__codelineno-0-355">355</a></span>
+<span class="normal"><a href="#__codelineno-0-356">356</a></span>
+<span class="normal"><a href="#__codelineno-0-357">357</a></span>
+<span class="normal"><a href="#__codelineno-0-358">358</a></span>
+<span class="normal"><a href="#__codelineno-0-359">359</a></span>
+<span class="normal"><a href="#__codelineno-0-360">360</a></span>
+<span class="normal"><a href="#__codelineno-0-361">361</a></span>
+<span class="normal"><a href="#__codelineno-0-362">362</a></span>
+<span class="normal"><a href="#__codelineno-0-363">363</a></span>
+<span class="normal"><a href="#__codelineno-0-364">364</a></span>
+<span class="normal"><a href="#__codelineno-0-365">365</a></span>
+<span class="normal"><a href="#__codelineno-0-366">366</a></span>
+<span class="normal"><a href="#__codelineno-0-367">367</a></span>
+<span class="normal"><a href="#__codelineno-0-368">368</a></span>
+<span class="normal"><a href="#__codelineno-0-369">369</a></span>
+<span class="normal"><a href="#__codelineno-0-370">370</a></span>
+<span class="normal"><a href="#__codelineno-0-371">371</a></span>
+<span class="normal"><a href="#__codelineno-0-372">372</a></span>
+<span class="normal"><a href="#__codelineno-0-373">373</a></span>
+<span class="normal"><a href="#__codelineno-0-374">374</a></span>
+<span class="normal"><a href="#__codelineno-0-375">375</a></span>
+<span class="normal"><a href="#__codelineno-0-376">376</a></span>
+<span class="normal"><a href="#__codelineno-0-377">377</a></span>
+<span class="normal"><a href="#__codelineno-0-378">378</a></span>
+<span class="normal"><a href="#__codelineno-0-379">379</a></span>
+<span class="normal"><a href="#__codelineno-0-380">380</a></span>
+<span class="normal"><a href="#__codelineno-0-381">381</a></span>
+<span class="normal"><a href="#__codelineno-0-382">382</a></span>
+<span class="normal"><a href="#__codelineno-0-383">383</a></span>
+<span class="normal"><a href="#__codelineno-0-384">384</a></span>
+<span class="normal"><a href="#__codelineno-0-385">385</a></span>
+<span class="normal"><a href="#__codelineno-0-386">386</a></span>
+<span class="normal"><a href="#__codelineno-0-387">387</a></span>
+<span class="normal"><a href="#__codelineno-0-388">388</a></span>
+<span class="normal"><a href="#__codelineno-0-389">389</a></span>
+<span class="normal"><a href="#__codelineno-0-390">390</a></span>
+<span class="normal"><a href="#__codelineno-0-391">391</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-329" name="__codelineno-0-329"></a><span class="k">def</span> <span class="nf">find_intersecting_clonotypes</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overlap_type</span><span class="o">=</span><span class="s2">&quot;aaV&quot;</span><span class="p">,</span> <span class="n">mismatches</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="s2">&quot;F2&quot;</span><span class="p">,</span> <span class="n">clonosets_df2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cl_filter2</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<a id="__codelineno-0-330" name="__codelineno-0-330"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-0-331" name="__codelineno-0-331"></a><span class="sd">    Calculating overlap distances between multiple repseq samples using F2 of F metrics</span>
+<a id="__codelineno-0-332" name="__codelineno-0-332"></a><span class="sd">    The result of this function may be used for heatmap+clusterization of samples or for MDS plots</span>
+<a id="__codelineno-0-333" name="__codelineno-0-333"></a>
+<a id="__codelineno-0-334" name="__codelineno-0-334"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-335" name="__codelineno-0-335"></a><span class="sd">        clonosets_df (pd.DataFrame): contains three columns - `sample_id` and `filename` columns,</span>
+<a id="__codelineno-0-336" name="__codelineno-0-336"></a><span class="sd">            filename - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format</span>
+<a id="__codelineno-0-337" name="__codelineno-0-337"></a><span class="sd">            sample_id&#39;s should be all unique in this DF</span>
+<a id="__codelineno-0-338" name="__codelineno-0-338"></a><span class="sd">        overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence</span>
+<a id="__codelineno-0-339" name="__codelineno-0-339"></a><span class="sd">            to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments</span>
+<a id="__codelineno-0-340" name="__codelineno-0-340"></a><span class="sd">            to decide if clonotypes are equal</span>
+<a id="__codelineno-0-341" name="__codelineno-0-341"></a><span class="sd">        mismatches (int): The permissible number of single-letter mismatches in clonotypes sequences </span>
+<a id="__codelineno-0-342" name="__codelineno-0-342"></a><span class="sd">            for them to be treated similar, i.e. hamming distance.</span>
+<a id="__codelineno-0-343" name="__codelineno-0-343"></a><span class="sd">        by_umi (bool): set =True for MiXCR4 clonosets to select count/frequency of clonotypes </span>
+<a id="__codelineno-0-344" name="__codelineno-0-344"></a><span class="sd">            in UMI&#39;s if they exist in implemented protocol</span>
+<a id="__codelineno-0-345" name="__codelineno-0-345"></a><span class="sd">        metric (str): possible values - `F`, `F2` or `C`. Default `F2`. `F2` - sum of sqrt of product of </span>
+<a id="__codelineno-0-346" name="__codelineno-0-346"></a><span class="sd">            similar clonotype frequencies in two clonosets. `F` - sqrt of the sum of frequency products.</span>
+<a id="__codelineno-0-347" name="__codelineno-0-347"></a><span class="sd">            `C` - total frequency of clonotypes in `sample1`, that are similar to clonotypes in `sample2`</span>
+<a id="__codelineno-0-348" name="__codelineno-0-348"></a><span class="sd">        only_functional (bool): use only functional clonotypes (do not contain stop codons or</span>
+<a id="__codelineno-0-349" name="__codelineno-0-349"></a><span class="sd">            frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to</span>
+<a id="__codelineno-0-350" name="__codelineno-0-350"></a><span class="sd">            1 after filtering of non-functional clonotypes</span>
+<a id="__codelineno-0-351" name="__codelineno-0-351"></a>
+<a id="__codelineno-0-352" name="__codelineno-0-352"></a><span class="sd">    Important: similar clonotypes by `overlap_type` in one particular clonoset are NOT combined into one</span>
+<a id="__codelineno-0-353" name="__codelineno-0-353"></a><span class="sd">    and are treated as different clonotypes.</span>
+<a id="__codelineno-0-354" name="__codelineno-0-354"></a>
+<a id="__codelineno-0-355" name="__codelineno-0-355"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-356" name="__codelineno-0-356"></a><span class="sd">        df (pd.DataFrame): dataframe with following columns: `clone`, `sample1_count`, `sample2_count`, `sample1`, `sample2`, `pair`. </span>
+<a id="__codelineno-0-357" name="__codelineno-0-357"></a><span class="sd">            `clone` - is tuple, containing sequence (aa or nt), plus V or J if they are required by the metric</span>
+<a id="__codelineno-0-358" name="__codelineno-0-358"></a><span class="sd">            count columns contain freq/count of the clone in sample</span>
+<a id="__codelineno-0-359" name="__codelineno-0-359"></a><span class="sd">            pair column is made for easy separation of possibly huge DataFrame into overlapping pairs</span>
+<a id="__codelineno-0-360" name="__codelineno-0-360"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-361" name="__codelineno-0-361"></a>
+<a id="__codelineno-0-362" name="__codelineno-0-362"></a>
+<a id="__codelineno-0-363" name="__codelineno-0-363"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Intersecting clones in clonosets</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">+</span><span class="s2">&quot;-&quot;</span><span class="o">*</span><span class="mi">50</span><span class="p">)</span>
+<a id="__codelineno-0-364" name="__codelineno-0-364"></a>    <span class="n">aa</span><span class="p">,</span> <span class="n">check_v</span><span class="p">,</span> <span class="n">check_j</span> <span class="o">=</span> <span class="n">overlap_type_to_flags</span><span class="p">(</span><span class="n">overlap_type</span><span class="p">)</span>
+<a id="__codelineno-0-365" name="__codelineno-0-365"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Overlap type: </span><span class="si">{</span><span class="n">overlap_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-366" name="__codelineno-0-366"></a>
+<a id="__codelineno-0-367" name="__codelineno-0-367"></a>    <span class="n">clonoset_lists</span><span class="p">,</span> <span class="n">samples_total</span><span class="p">,</span> <span class="n">two_dataframes</span><span class="p">,</span> <span class="n">sample_list</span><span class="p">,</span> <span class="n">sample_list2</span> <span class="o">=</span> <span class="n">prepare_clonotypes_dfs_for_intersections</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">clonosets_df2</span><span class="p">,</span>
+<a id="__codelineno-0-368" name="__codelineno-0-368"></a>                                                                                                                        <span class="n">cl_filter</span><span class="p">,</span> <span class="n">cl_filter2</span><span class="p">,</span>
+<a id="__codelineno-0-369" name="__codelineno-0-369"></a>                                                                                                                        <span class="n">overlap_type</span><span class="p">)</span>
+<a id="__codelineno-0-370" name="__codelineno-0-370"></a>
+<a id="__codelineno-0-371" name="__codelineno-0-371"></a>    <span class="c1"># generating a set of tasks</span>
+<a id="__codelineno-0-372" name="__codelineno-0-372"></a>
+<a id="__codelineno-0-373" name="__codelineno-0-373"></a>    <span class="n">tasks</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-0-374" name="__codelineno-0-374"></a>
+<a id="__codelineno-0-375" name="__codelineno-0-375"></a>    <span class="k">if</span> <span class="n">two_dataframes</span><span class="p">:</span>
+<a id="__codelineno-0-376" name="__codelineno-0-376"></a>        <span class="k">for</span> <span class="n">sample1</span> <span class="ow">in</span> <span class="n">sample_list</span><span class="p">:</span>
+<a id="__codelineno-0-377" name="__codelineno-0-377"></a>            <span class="k">for</span> <span class="n">sample2</span> <span class="ow">in</span> <span class="n">sample_list2</span><span class="p">:</span>
+<a id="__codelineno-0-378" name="__codelineno-0-378"></a>                <span class="n">tasks</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">sample1</span><span class="p">,</span> <span class="n">sample2</span><span class="p">,</span> <span class="n">clonoset_lists</span><span class="p">,</span> <span class="n">check_v</span><span class="p">,</span> <span class="n">check_j</span><span class="p">,</span> <span class="n">mismatches</span><span class="p">))</span>        
+<a id="__codelineno-0-379" name="__codelineno-0-379"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-380" name="__codelineno-0-380"></a>        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">samples_total</span><span class="p">):</span>
+<a id="__codelineno-0-381" name="__codelineno-0-381"></a>            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">samples_total</span><span class="p">):</span>
+<a id="__codelineno-0-382" name="__codelineno-0-382"></a>                <span class="n">sample1</span> <span class="o">=</span> <span class="n">sample_list</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+<a id="__codelineno-0-383" name="__codelineno-0-383"></a>                <span class="n">sample2</span> <span class="o">=</span> <span class="n">sample_list</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+<a id="__codelineno-0-384" name="__codelineno-0-384"></a>                <span class="k">if</span> <span class="n">sample1</span> <span class="o">!=</span> <span class="n">sample2</span><span class="p">:</span>
+<a id="__codelineno-0-385" name="__codelineno-0-385"></a>                    <span class="n">tasks</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">sample1</span><span class="p">,</span> <span class="n">sample2</span><span class="p">,</span> <span class="n">clonoset_lists</span><span class="p">,</span> <span class="n">check_v</span><span class="p">,</span> <span class="n">check_j</span><span class="p">,</span> <span class="n">mismatches</span><span class="p">))</span>
+<a id="__codelineno-0-386" name="__codelineno-0-386"></a>
+<a id="__codelineno-0-387" name="__codelineno-0-387"></a>
+<a id="__codelineno-0-388" name="__codelineno-0-388"></a>    <span class="c1"># run calculation in parallel</span>
+<a id="__codelineno-0-389" name="__codelineno-0-389"></a>    <span class="n">result_list</span> <span class="o">=</span> <span class="n">run_parallel_calculation</span><span class="p">(</span><span class="n">find_overlapping_clones_in_two_clone_dicts</span><span class="p">,</span> <span class="n">tasks</span><span class="p">,</span> <span class="s2">&quot;Intersecting clonosets&quot;</span><span class="p">,</span> <span class="n">object_name</span><span class="o">=</span><span class="s2">&quot;pairs&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-390" name="__codelineno-0-390"></a>
+<a id="__codelineno-0-391" name="__codelineno-0-391"></a>    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">result_list</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+          </details>
+  </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<h2 id="intersections.intersect_clones_in_samples_batch" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">intersect_clones_in_samples_batch</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overlap_type</span><span class="o">=</span><span class="s1">&#39;aaV&#39;</span><span class="p">,</span> <span class="n">by_freq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">clonosets_df2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cl_filter2</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h2>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>Calculating frequencies of intersecting clonotypes between multiple repseq samples.
+The result of this function may be used for scatterplots of frequencies/counts of 
+overlapping clonotypes</p>
+
+
+
+  <p><strong>Parameters:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td><code>clonosets_df</code></td>
+          <td>
+                <code><span title="pandas.DataFrame">DataFrame</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>contains three columns - <code>sample_id</code> and <code>filename</code> columns,
+<code>filename</code> - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
+sample_id's should be all unique in this DF</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>overlap_type</code></td>
+          <td>
+                <code>str</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>possible values are <code>aa</code>, <code>aaV</code>, <code>aaVJ</code>, <code>nt</code>, <code>ntV</code>, <code>ntVJ</code>. aa/nt define which CDR3 sequence
+to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
+to decide if clonotypes are equal</p>
+            </div>
+          </td>
+          <td>
+                <code>&#39;aaV&#39;</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>by_umi</code></td>
+          <td>
+                <code>bool</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>set <code>=True</code> for MiXCR4 clonosets to select count/frequency of clonotypes 
+in UMI's if they exist in implemented protocol</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>by_freq</code></td>
+          <td>
+                <code>bool</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>default is <code>True</code> - this means that the intersect metric is frequency of clonotype, 
+but not its count</p>
+            </div>
+          </td>
+          <td>
+                <code>True</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>only_functional</code></td>
+          <td>
+                <code>bool</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>use only functional clonotypes (do not contain stop codons or
+frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
+1 after filtering of non-functional clonotypes</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+      <p>Important: when using particular overlap type, similar clonotypes in one particular clonoset are
+combined into one with summation of counts/frequencies.</p>
+
+
+
+  <p><strong>Returns:</strong></p>
+  <table>
+    <thead>
+      <tr>
+<th>Name</th>        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+<td><code>df</code></td>          <td>
+                <code><span title="pandas.DataFrame">DataFrame</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>dataframe with following columns: <code>clone</code>, <code>sample1_count</code>, <code>sample2_count</code>, <code>sample1</code>, <code>sample2</code>, <code>pair</code>
+clone - is tuple, containing sequence (aa or nt), plus V or J if they are required by the metric
+count columns contain freq/count of the clone in sample
+pair column is made for easy separation of possibly huge DataFrame into overlapping pairs</p>
+            </div>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+          <details class="quote">
+            <summary>Source code in <code>repseq/intersections.py</code></summary>
+            <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-19">19</a></span>
+<span class="normal"><a href="#__codelineno-0-20">20</a></span>
+<span class="normal"><a href="#__codelineno-0-21">21</a></span>
+<span class="normal"><a href="#__codelineno-0-22">22</a></span>
+<span class="normal"><a href="#__codelineno-0-23">23</a></span>
+<span class="normal"><a href="#__codelineno-0-24">24</a></span>
+<span class="normal"><a href="#__codelineno-0-25">25</a></span>
+<span class="normal"><a href="#__codelineno-0-26">26</a></span>
+<span class="normal"><a href="#__codelineno-0-27">27</a></span>
+<span class="normal"><a href="#__codelineno-0-28">28</a></span>
+<span class="normal"><a href="#__codelineno-0-29">29</a></span>
+<span class="normal"><a href="#__codelineno-0-30">30</a></span>
+<span class="normal"><a href="#__codelineno-0-31">31</a></span>
+<span class="normal"><a href="#__codelineno-0-32">32</a></span>
+<span class="normal"><a href="#__codelineno-0-33">33</a></span>
+<span class="normal"><a href="#__codelineno-0-34">34</a></span>
+<span class="normal"><a href="#__codelineno-0-35">35</a></span>
+<span class="normal"><a href="#__codelineno-0-36">36</a></span>
+<span class="normal"><a href="#__codelineno-0-37">37</a></span>
+<span class="normal"><a href="#__codelineno-0-38">38</a></span>
+<span class="normal"><a href="#__codelineno-0-39">39</a></span>
+<span class="normal"><a href="#__codelineno-0-40">40</a></span>
+<span class="normal"><a href="#__codelineno-0-41">41</a></span>
+<span class="normal"><a href="#__codelineno-0-42">42</a></span>
+<span class="normal"><a href="#__codelineno-0-43">43</a></span>
+<span class="normal"><a href="#__codelineno-0-44">44</a></span>
+<span class="normal"><a href="#__codelineno-0-45">45</a></span>
+<span class="normal"><a href="#__codelineno-0-46">46</a></span>
+<span class="normal"><a href="#__codelineno-0-47">47</a></span>
+<span class="normal"><a href="#__codelineno-0-48">48</a></span>
+<span class="normal"><a href="#__codelineno-0-49">49</a></span>
+<span class="normal"><a href="#__codelineno-0-50">50</a></span>
+<span class="normal"><a href="#__codelineno-0-51">51</a></span>
+<span class="normal"><a href="#__codelineno-0-52">52</a></span>
+<span class="normal"><a href="#__codelineno-0-53">53</a></span>
+<span class="normal"><a href="#__codelineno-0-54">54</a></span>
+<span class="normal"><a href="#__codelineno-0-55">55</a></span>
+<span class="normal"><a href="#__codelineno-0-56">56</a></span>
+<span class="normal"><a href="#__codelineno-0-57">57</a></span>
+<span class="normal"><a href="#__codelineno-0-58">58</a></span>
+<span class="normal"><a href="#__codelineno-0-59">59</a></span>
+<span class="normal"><a href="#__codelineno-0-60">60</a></span>
+<span class="normal"><a href="#__codelineno-0-61">61</a></span>
+<span class="normal"><a href="#__codelineno-0-62">62</a></span>
+<span class="normal"><a href="#__codelineno-0-63">63</a></span>
+<span class="normal"><a href="#__codelineno-0-64">64</a></span>
+<span class="normal"><a href="#__codelineno-0-65">65</a></span>
+<span class="normal"><a href="#__codelineno-0-66">66</a></span>
+<span class="normal"><a href="#__codelineno-0-67">67</a></span>
+<span class="normal"><a href="#__codelineno-0-68">68</a></span>
+<span class="normal"><a href="#__codelineno-0-69">69</a></span>
+<span class="normal"><a href="#__codelineno-0-70">70</a></span>
+<span class="normal"><a href="#__codelineno-0-71">71</a></span>
+<span class="normal"><a href="#__codelineno-0-72">72</a></span>
+<span class="normal"><a href="#__codelineno-0-73">73</a></span>
+<span class="normal"><a href="#__codelineno-0-74">74</a></span>
+<span class="normal"><a href="#__codelineno-0-75">75</a></span>
+<span class="normal"><a href="#__codelineno-0-76">76</a></span>
+<span class="normal"><a href="#__codelineno-0-77">77</a></span>
+<span class="normal"><a href="#__codelineno-0-78">78</a></span>
+<span class="normal"><a href="#__codelineno-0-79">79</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-19" name="__codelineno-0-19"></a><span class="k">def</span> <span class="nf">intersect_clones_in_samples_batch</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overlap_type</span><span class="o">=</span><span class="s2">&quot;aaV&quot;</span><span class="p">,</span> <span class="n">by_freq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">clonosets_df2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cl_filter2</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21"></a><span class="sd">    Calculating frequencies of intersecting clonotypes between multiple repseq samples.</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22"></a><span class="sd">    The result of this function may be used for scatterplots of frequencies/counts of </span>
+<a id="__codelineno-0-23" name="__codelineno-0-23"></a><span class="sd">    overlapping clonotypes</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24"></a>
+<a id="__codelineno-0-25" name="__codelineno-0-25"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26"></a><span class="sd">        clonosets_df (pd.DataFrame): contains three columns - `sample_id` and `filename` columns,</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27"></a><span class="sd">            `filename` - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format</span>
+<a id="__codelineno-0-28" name="__codelineno-0-28"></a><span class="sd">            sample_id&#39;s should be all unique in this DF</span>
+<a id="__codelineno-0-29" name="__codelineno-0-29"></a><span class="sd">        overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence</span>
+<a id="__codelineno-0-30" name="__codelineno-0-30"></a><span class="sd">            to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments</span>
+<a id="__codelineno-0-31" name="__codelineno-0-31"></a><span class="sd">            to decide if clonotypes are equal</span>
+<a id="__codelineno-0-32" name="__codelineno-0-32"></a><span class="sd">        by_umi (bool): set `=True` for MiXCR4 clonosets to select count/frequency of clonotypes </span>
+<a id="__codelineno-0-33" name="__codelineno-0-33"></a><span class="sd">            in UMI&#39;s if they exist in implemented protocol</span>
+<a id="__codelineno-0-34" name="__codelineno-0-34"></a><span class="sd">        by_freq (bool): default is `True` - this means that the intersect metric is frequency of clonotype, </span>
+<a id="__codelineno-0-35" name="__codelineno-0-35"></a><span class="sd">            but not its count</span>
+<a id="__codelineno-0-36" name="__codelineno-0-36"></a><span class="sd">        only_functional (bool): use only functional clonotypes (do not contain stop codons or</span>
+<a id="__codelineno-0-37" name="__codelineno-0-37"></a><span class="sd">            frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to</span>
+<a id="__codelineno-0-38" name="__codelineno-0-38"></a><span class="sd">            1 after filtering of non-functional clonotypes</span>
+<a id="__codelineno-0-39" name="__codelineno-0-39"></a>
+<a id="__codelineno-0-40" name="__codelineno-0-40"></a><span class="sd">    Important: when using particular overlap type, similar clonotypes in one particular clonoset are</span>
+<a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="sd">    combined into one with summation of counts/frequencies.</span>
+<a id="__codelineno-0-42" name="__codelineno-0-42"></a>
+<a id="__codelineno-0-43" name="__codelineno-0-43"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-44" name="__codelineno-0-44"></a><span class="sd">        df (pd.DataFrame): dataframe with following columns: `clone`, `sample1_count`, `sample2_count`, `sample1`, `sample2`, `pair`</span>
+<a id="__codelineno-0-45" name="__codelineno-0-45"></a><span class="sd">            clone - is tuple, containing sequence (aa or nt), plus V or J if they are required by the metric</span>
+<a id="__codelineno-0-46" name="__codelineno-0-46"></a><span class="sd">            count columns contain freq/count of the clone in sample</span>
+<a id="__codelineno-0-47" name="__codelineno-0-47"></a><span class="sd">            pair column is made for easy separation of possibly huge DataFrame into overlapping pairs</span>
+<a id="__codelineno-0-48" name="__codelineno-0-48"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-49" name="__codelineno-0-49"></a>
+<a id="__codelineno-0-50" name="__codelineno-0-50"></a>
+<a id="__codelineno-0-51" name="__codelineno-0-51"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Intersecting clones in clonosets</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">+</span><span class="s2">&quot;-&quot;</span><span class="o">*</span><span class="mi">50</span><span class="p">)</span>
+<a id="__codelineno-0-52" name="__codelineno-0-52"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Overlap type: </span><span class="si">{</span><span class="n">overlap_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-53" name="__codelineno-0-53"></a>
+<a id="__codelineno-0-54" name="__codelineno-0-54"></a>    <span class="n">clonoset_lists</span><span class="p">,</span> <span class="n">samples_total</span><span class="p">,</span> <span class="n">two_dataframes</span><span class="p">,</span> <span class="n">sample_list</span><span class="p">,</span> <span class="n">sample_list2</span> <span class="o">=</span> <span class="n">prepare_clonotypes_dfs_for_intersections</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">clonosets_df2</span><span class="p">,</span>
+<a id="__codelineno-0-55" name="__codelineno-0-55"></a>                                                                                                                        <span class="n">cl_filter</span><span class="p">,</span> <span class="n">cl_filter2</span><span class="p">,</span>
+<a id="__codelineno-0-56" name="__codelineno-0-56"></a>                                                                                                                        <span class="n">overlap_type</span><span class="p">,</span> <span class="n">by_freq</span><span class="o">=</span><span class="n">by_freq</span><span class="p">,</span>
+<a id="__codelineno-0-57" name="__codelineno-0-57"></a>                                                                                                                        <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-0-58" name="__codelineno-0-58"></a>    <span class="c1"># generating a set of tasks</span>
+<a id="__codelineno-0-59" name="__codelineno-0-59"></a>
+<a id="__codelineno-0-60" name="__codelineno-0-60"></a>    <span class="n">tasks</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-0-61" name="__codelineno-0-61"></a>
+<a id="__codelineno-0-62" name="__codelineno-0-62"></a>    <span class="k">if</span> <span class="n">two_dataframes</span><span class="p">:</span>
+<a id="__codelineno-0-63" name="__codelineno-0-63"></a>        <span class="k">for</span> <span class="n">sample1</span> <span class="ow">in</span> <span class="n">sample_list</span><span class="p">:</span>
+<a id="__codelineno-0-64" name="__codelineno-0-64"></a>            <span class="k">for</span> <span class="n">sample2</span> <span class="ow">in</span> <span class="n">sample_list2</span><span class="p">:</span>
+<a id="__codelineno-0-65" name="__codelineno-0-65"></a>                <span class="n">tasks</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">sample1</span><span class="p">,</span> <span class="n">sample2</span><span class="p">,</span> <span class="n">clonoset_lists</span><span class="p">))</span>
+<a id="__codelineno-0-66" name="__codelineno-0-66"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-67" name="__codelineno-0-67"></a>        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">samples_total</span><span class="p">):</span>
+<a id="__codelineno-0-68" name="__codelineno-0-68"></a>            <span class="n">sample1</span> <span class="o">=</span> <span class="n">sample_list</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+<a id="__codelineno-0-69" name="__codelineno-0-69"></a>            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">samples_total</span><span class="o">-</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+<a id="__codelineno-0-70" name="__codelineno-0-70"></a>                <span class="n">sample2</span> <span class="o">=</span> <span class="n">sample_list</span><span class="p">[</span><span class="n">j</span><span class="o">+</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-0-71" name="__codelineno-0-71"></a>                <span class="n">tasks</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">sample1</span><span class="p">,</span> <span class="n">sample2</span><span class="p">,</span> <span class="n">clonoset_lists</span><span class="p">))</span>
+<a id="__codelineno-0-72" name="__codelineno-0-72"></a>
+<a id="__codelineno-0-73" name="__codelineno-0-73"></a>    <span class="n">results</span> <span class="o">=</span> <span class="n">run_parallel_calculation</span><span class="p">(</span><span class="n">intersect_two_clone_dicts</span><span class="p">,</span> <span class="n">tasks</span><span class="p">,</span> <span class="s2">&quot;Intersecting clonosets&quot;</span><span class="p">,</span> <span class="n">object_name</span><span class="o">=</span><span class="s2">&quot;pairs&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-74" name="__codelineno-0-74"></a>
+<a id="__codelineno-0-75" name="__codelineno-0-75"></a>    <span class="c1"># df = pd.concat(results).index.set_names()</span>
+<a id="__codelineno-0-76" name="__codelineno-0-76"></a>    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">results</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-0-77" name="__codelineno-0-77"></a>    <span class="n">df</span> <span class="o">=</span> <span class="n">split_tuple_clone_column</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">overlap_type</span><span class="p">)</span>
+<a id="__codelineno-0-78" name="__codelineno-0-78"></a>
+<a id="__codelineno-0-79" name="__codelineno-0-79"></a>    <span class="k">return</span> <span class="n">df</span>
+</code></pre></div></td></tr></table></div>
+          </details>
+  </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<h2 id="intersections.overlap_distances" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">overlap_distances</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overlap_type</span><span class="o">=</span><span class="s1">&#39;aaV&#39;</span><span class="p">,</span> <span class="n">mismatches</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="s1">&#39;F2&#39;</span><span class="p">,</span> <span class="n">clonosets_df2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cl_filter2</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h2>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>Calculating overlap distances between multiple repseq samples using F2 of F metrics
+The result of this function may be used for heatmap+clusterization of samples or for MDS plots</p>
+
+
+
+  <p><strong>Parameters:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td><code>clonosets_df</code></td>
+          <td>
+                <code><span title="pandas.DataFrame">DataFrame</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>contains three columns - <code>sample_id</code> and <code>filename</code> columns,
+filename - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
+sample_id's should be all unique in this DF</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>overlap_type</code></td>
+          <td>
+                <code>str</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>possible values are <code>aa</code>, <code>aaV</code>, <code>aaVJ</code>, <code>nt</code>, <code>ntV</code>, <code>ntVJ</code>. aa/nt define which CDR3 sequence
+to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
+to decide if clonotypes are equal</p>
+            </div>
+          </td>
+          <td>
+                <code>&#39;aaV&#39;</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>mismatches</code></td>
+          <td>
+                <code>int</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>The permissible number of single-letter mismatches in clonotypes sequences 
+for them to be treated similar, i.e. hamming distance.</p>
+            </div>
+          </td>
+          <td>
+                <code>0</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>by_umi</code></td>
+          <td>
+                <code>bool</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>set =True for MiXCR4 clonosets to select count/frequency of clonotypes 
+in UMI's if they exist in implemented protocol</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>metric</code></td>
+          <td>
+                <code>str</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>possible values - <code>F</code>, <code>F2</code> or <code>C</code>. Default <code>F2</code>. <code>F2</code> - sum of sqrt of product of 
+similar clonotype frequencies in two clonosets. <code>F</code> - sqrt of the sum of frequency products.
+<code>C</code> - total frequency of clonotypes in <code>sample1</code>, that are similar to clonotypes in <code>sample2</code></p>
+            </div>
+          </td>
+          <td>
+                <code>&#39;F2&#39;</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>only_functional</code></td>
+          <td>
+                <code>bool</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>use only functional clonotypes (do not contain stop codons or
+frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
+1 after filtering of non-functional clonotypes</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+<details class="important" open>
+  <summary>similar clonotypes by <code>overlap_type</code> in one particular clonoset will be combined into one</summary>
+  <p>clonotype with sum for count.</p>
+</details>
+
+
+  <p><strong>Returns:</strong></p>
+  <table>
+    <thead>
+      <tr>
+<th>Name</th>        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+<td><code>df</code></td>          <td>
+                <code><span title="pandas.DataFrame">DataFrame</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>dataframe with following columns: <code>clone</code>, <code>sample1_count</code>, <code>sample2_count</code>, <code>sample1</code>, <code>sample2</code>, <code>pair</code>. 
+<code>clone</code> - is tuple, containing sequence (aa or nt), plus V or J if they are required by the metric
+count columns contain freq/count of the clone in sample
+pair column is made for easy separation of possibly huge DataFrame into overlapping pairs</p>
+            </div>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+          <details class="quote">
+            <summary>Source code in <code>repseq/intersections.py</code></summary>
+            <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-246">246</a></span>
+<span class="normal"><a href="#__codelineno-0-247">247</a></span>
+<span class="normal"><a href="#__codelineno-0-248">248</a></span>
+<span class="normal"><a href="#__codelineno-0-249">249</a></span>
+<span class="normal"><a href="#__codelineno-0-250">250</a></span>
+<span class="normal"><a href="#__codelineno-0-251">251</a></span>
+<span class="normal"><a href="#__codelineno-0-252">252</a></span>
+<span class="normal"><a href="#__codelineno-0-253">253</a></span>
+<span class="normal"><a href="#__codelineno-0-254">254</a></span>
+<span class="normal"><a href="#__codelineno-0-255">255</a></span>
+<span class="normal"><a href="#__codelineno-0-256">256</a></span>
+<span class="normal"><a href="#__codelineno-0-257">257</a></span>
+<span class="normal"><a href="#__codelineno-0-258">258</a></span>
+<span class="normal"><a href="#__codelineno-0-259">259</a></span>
+<span class="normal"><a href="#__codelineno-0-260">260</a></span>
+<span class="normal"><a href="#__codelineno-0-261">261</a></span>
+<span class="normal"><a href="#__codelineno-0-262">262</a></span>
+<span class="normal"><a href="#__codelineno-0-263">263</a></span>
+<span class="normal"><a href="#__codelineno-0-264">264</a></span>
+<span class="normal"><a href="#__codelineno-0-265">265</a></span>
+<span class="normal"><a href="#__codelineno-0-266">266</a></span>
+<span class="normal"><a href="#__codelineno-0-267">267</a></span>
+<span class="normal"><a href="#__codelineno-0-268">268</a></span>
+<span class="normal"><a href="#__codelineno-0-269">269</a></span>
+<span class="normal"><a href="#__codelineno-0-270">270</a></span>
+<span class="normal"><a href="#__codelineno-0-271">271</a></span>
+<span class="normal"><a href="#__codelineno-0-272">272</a></span>
+<span class="normal"><a href="#__codelineno-0-273">273</a></span>
+<span class="normal"><a href="#__codelineno-0-274">274</a></span>
+<span class="normal"><a href="#__codelineno-0-275">275</a></span>
+<span class="normal"><a href="#__codelineno-0-276">276</a></span>
+<span class="normal"><a href="#__codelineno-0-277">277</a></span>
+<span class="normal"><a href="#__codelineno-0-278">278</a></span>
+<span class="normal"><a href="#__codelineno-0-279">279</a></span>
+<span class="normal"><a href="#__codelineno-0-280">280</a></span>
+<span class="normal"><a href="#__codelineno-0-281">281</a></span>
+<span class="normal"><a href="#__codelineno-0-282">282</a></span>
+<span class="normal"><a href="#__codelineno-0-283">283</a></span>
+<span class="normal"><a href="#__codelineno-0-284">284</a></span>
+<span class="normal"><a href="#__codelineno-0-285">285</a></span>
+<span class="normal"><a href="#__codelineno-0-286">286</a></span>
+<span class="normal"><a href="#__codelineno-0-287">287</a></span>
+<span class="normal"><a href="#__codelineno-0-288">288</a></span>
+<span class="normal"><a href="#__codelineno-0-289">289</a></span>
+<span class="normal"><a href="#__codelineno-0-290">290</a></span>
+<span class="normal"><a href="#__codelineno-0-291">291</a></span>
+<span class="normal"><a href="#__codelineno-0-292">292</a></span>
+<span class="normal"><a href="#__codelineno-0-293">293</a></span>
+<span class="normal"><a href="#__codelineno-0-294">294</a></span>
+<span class="normal"><a href="#__codelineno-0-295">295</a></span>
+<span class="normal"><a href="#__codelineno-0-296">296</a></span>
+<span class="normal"><a href="#__codelineno-0-297">297</a></span>
+<span class="normal"><a href="#__codelineno-0-298">298</a></span>
+<span class="normal"><a href="#__codelineno-0-299">299</a></span>
+<span class="normal"><a href="#__codelineno-0-300">300</a></span>
+<span class="normal"><a href="#__codelineno-0-301">301</a></span>
+<span class="normal"><a href="#__codelineno-0-302">302</a></span>
+<span class="normal"><a href="#__codelineno-0-303">303</a></span>
+<span class="normal"><a href="#__codelineno-0-304">304</a></span>
+<span class="normal"><a href="#__codelineno-0-305">305</a></span>
+<span class="normal"><a href="#__codelineno-0-306">306</a></span>
+<span class="normal"><a href="#__codelineno-0-307">307</a></span>
+<span class="normal"><a href="#__codelineno-0-308">308</a></span>
+<span class="normal"><a href="#__codelineno-0-309">309</a></span>
+<span class="normal"><a href="#__codelineno-0-310">310</a></span>
+<span class="normal"><a href="#__codelineno-0-311">311</a></span>
+<span class="normal"><a href="#__codelineno-0-312">312</a></span>
+<span class="normal"><a href="#__codelineno-0-313">313</a></span>
+<span class="normal"><a href="#__codelineno-0-314">314</a></span>
+<span class="normal"><a href="#__codelineno-0-315">315</a></span>
+<span class="normal"><a href="#__codelineno-0-316">316</a></span>
+<span class="normal"><a href="#__codelineno-0-317">317</a></span>
+<span class="normal"><a href="#__codelineno-0-318">318</a></span>
+<span class="normal"><a href="#__codelineno-0-319">319</a></span>
+<span class="normal"><a href="#__codelineno-0-320">320</a></span>
+<span class="normal"><a href="#__codelineno-0-321">321</a></span>
+<span class="normal"><a href="#__codelineno-0-322">322</a></span>
+<span class="normal"><a href="#__codelineno-0-323">323</a></span>
+<span class="normal"><a href="#__codelineno-0-324">324</a></span>
+<span class="normal"><a href="#__codelineno-0-325">325</a></span>
+<span class="normal"><a href="#__codelineno-0-326">326</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-246" name="__codelineno-0-246"></a><span class="k">def</span> <span class="nf">overlap_distances</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overlap_type</span><span class="o">=</span><span class="s2">&quot;aaV&quot;</span><span class="p">,</span> <span class="n">mismatches</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="s2">&quot;F2&quot;</span><span class="p">,</span> <span class="n">clonosets_df2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cl_filter2</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<a id="__codelineno-0-247" name="__codelineno-0-247"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-0-248" name="__codelineno-0-248"></a><span class="sd">    Calculating overlap distances between multiple repseq samples using F2 of F metrics</span>
+<a id="__codelineno-0-249" name="__codelineno-0-249"></a><span class="sd">    The result of this function may be used for heatmap+clusterization of samples or for MDS plots</span>
+<a id="__codelineno-0-250" name="__codelineno-0-250"></a>
+<a id="__codelineno-0-251" name="__codelineno-0-251"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-252" name="__codelineno-0-252"></a><span class="sd">        clonosets_df (pd.DataFrame): contains three columns - `sample_id` and `filename` columns,</span>
+<a id="__codelineno-0-253" name="__codelineno-0-253"></a><span class="sd">            filename - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format</span>
+<a id="__codelineno-0-254" name="__codelineno-0-254"></a><span class="sd">            sample_id&#39;s should be all unique in this DF</span>
+<a id="__codelineno-0-255" name="__codelineno-0-255"></a><span class="sd">        overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence</span>
+<a id="__codelineno-0-256" name="__codelineno-0-256"></a><span class="sd">            to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments</span>
+<a id="__codelineno-0-257" name="__codelineno-0-257"></a><span class="sd">            to decide if clonotypes are equal</span>
+<a id="__codelineno-0-258" name="__codelineno-0-258"></a><span class="sd">        mismatches (int): The permissible number of single-letter mismatches in clonotypes sequences </span>
+<a id="__codelineno-0-259" name="__codelineno-0-259"></a><span class="sd">            for them to be treated similar, i.e. hamming distance.</span>
+<a id="__codelineno-0-260" name="__codelineno-0-260"></a><span class="sd">        by_umi (bool): set =True for MiXCR4 clonosets to select count/frequency of clonotypes </span>
+<a id="__codelineno-0-261" name="__codelineno-0-261"></a><span class="sd">            in UMI&#39;s if they exist in implemented protocol</span>
+<a id="__codelineno-0-262" name="__codelineno-0-262"></a><span class="sd">        metric (str): possible values - `F`, `F2` or `C`. Default `F2`. `F2` - sum of sqrt of product of </span>
+<a id="__codelineno-0-263" name="__codelineno-0-263"></a><span class="sd">            similar clonotype frequencies in two clonosets. `F` - sqrt of the sum of frequency products.</span>
+<a id="__codelineno-0-264" name="__codelineno-0-264"></a><span class="sd">            `C` - total frequency of clonotypes in `sample1`, that are similar to clonotypes in `sample2`</span>
+<a id="__codelineno-0-265" name="__codelineno-0-265"></a><span class="sd">        only_functional (bool): use only functional clonotypes (do not contain stop codons or</span>
+<a id="__codelineno-0-266" name="__codelineno-0-266"></a><span class="sd">            frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to</span>
+<a id="__codelineno-0-267" name="__codelineno-0-267"></a><span class="sd">            1 after filtering of non-functional clonotypes</span>
+<a id="__codelineno-0-268" name="__codelineno-0-268"></a>
+<a id="__codelineno-0-269" name="__codelineno-0-269"></a><span class="sd">    Important: similar clonotypes by `overlap_type` in one particular clonoset will be combined into one</span>
+<a id="__codelineno-0-270" name="__codelineno-0-270"></a><span class="sd">        clonotype with sum for count.</span>
+<a id="__codelineno-0-271" name="__codelineno-0-271"></a>
+<a id="__codelineno-0-272" name="__codelineno-0-272"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-273" name="__codelineno-0-273"></a><span class="sd">        df (pd.DataFrame): dataframe with following columns: `clone`, `sample1_count`, `sample2_count`, `sample1`, `sample2`, `pair`. </span>
+<a id="__codelineno-0-274" name="__codelineno-0-274"></a><span class="sd">            `clone` - is tuple, containing sequence (aa or nt), plus V or J if they are required by the metric</span>
+<a id="__codelineno-0-275" name="__codelineno-0-275"></a><span class="sd">            count columns contain freq/count of the clone in sample</span>
+<a id="__codelineno-0-276" name="__codelineno-0-276"></a><span class="sd">            pair column is made for easy separation of possibly huge DataFrame into overlapping pairs</span>
+<a id="__codelineno-0-277" name="__codelineno-0-277"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-278" name="__codelineno-0-278"></a>
+<a id="__codelineno-0-279" name="__codelineno-0-279"></a>
+<a id="__codelineno-0-280" name="__codelineno-0-280"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Intersecting clones in clonosets</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">+</span><span class="s2">&quot;-&quot;</span><span class="o">*</span><span class="mi">50</span><span class="p">)</span>
+<a id="__codelineno-0-281" name="__codelineno-0-281"></a>    <span class="n">aa</span><span class="p">,</span> <span class="n">check_v</span><span class="p">,</span> <span class="n">check_j</span> <span class="o">=</span> <span class="n">overlap_type_to_flags</span><span class="p">(</span><span class="n">overlap_type</span><span class="p">)</span>
+<a id="__codelineno-0-282" name="__codelineno-0-282"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Overlap type: </span><span class="si">{</span><span class="n">overlap_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-283" name="__codelineno-0-283"></a>
+<a id="__codelineno-0-284" name="__codelineno-0-284"></a>    <span class="n">metric</span> <span class="o">=</span> <span class="n">metric</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+<a id="__codelineno-0-285" name="__codelineno-0-285"></a>    <span class="n">metrics</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;F&quot;</span><span class="p">,</span> <span class="s2">&quot;F2&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">]</span>
+<a id="__codelineno-0-286" name="__codelineno-0-286"></a>    <span class="k">if</span> <span class="n">metric</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">metrics</span><span class="p">:</span>
+<a id="__codelineno-0-287" name="__codelineno-0-287"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Metric </span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2"> is not supported. Possible values: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">metrics</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-288" name="__codelineno-0-288"></a>
+<a id="__codelineno-0-289" name="__codelineno-0-289"></a>
+<a id="__codelineno-0-290" name="__codelineno-0-290"></a>    <span class="n">clonoset_lists</span><span class="p">,</span> <span class="n">samples_total</span><span class="p">,</span> <span class="n">two_dataframes</span><span class="p">,</span> <span class="n">sample_list</span><span class="p">,</span> <span class="n">sample_list2</span> <span class="o">=</span> <span class="n">prepare_clonotypes_dfs_for_intersections</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">clonosets_df2</span><span class="p">,</span>
+<a id="__codelineno-0-291" name="__codelineno-0-291"></a>                                                                                                                        <span class="n">cl_filter</span><span class="p">,</span> <span class="n">cl_filter2</span><span class="p">,</span>
+<a id="__codelineno-0-292" name="__codelineno-0-292"></a>                                                                                                                        <span class="n">overlap_type</span><span class="p">)</span>
+<a id="__codelineno-0-293" name="__codelineno-0-293"></a>
+<a id="__codelineno-0-294" name="__codelineno-0-294"></a>    <span class="c1"># generating a set of tasks</span>
+<a id="__codelineno-0-295" name="__codelineno-0-295"></a>
+<a id="__codelineno-0-296" name="__codelineno-0-296"></a>    <span class="n">tasks</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-0-297" name="__codelineno-0-297"></a>
+<a id="__codelineno-0-298" name="__codelineno-0-298"></a>    <span class="k">if</span> <span class="n">two_dataframes</span><span class="p">:</span>
+<a id="__codelineno-0-299" name="__codelineno-0-299"></a>        <span class="k">for</span> <span class="n">sample1</span> <span class="ow">in</span> <span class="n">sample_list</span><span class="p">:</span>
+<a id="__codelineno-0-300" name="__codelineno-0-300"></a>            <span class="k">for</span> <span class="n">sample2</span> <span class="ow">in</span> <span class="n">sample_list2</span><span class="p">:</span>
+<a id="__codelineno-0-301" name="__codelineno-0-301"></a>                <span class="n">tasks</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">sample1</span><span class="p">,</span> <span class="n">sample2</span><span class="p">,</span> <span class="n">clonoset_lists</span><span class="p">,</span> <span class="n">check_v</span><span class="p">,</span> <span class="n">check_j</span><span class="p">,</span> <span class="n">mismatches</span><span class="p">,</span> <span class="n">metric</span><span class="p">))</span>        
+<a id="__codelineno-0-302" name="__codelineno-0-302"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-303" name="__codelineno-0-303"></a>        <span class="k">if</span> <span class="n">metric</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;F&quot;</span><span class="p">,</span> <span class="s2">&quot;F2&quot;</span><span class="p">]</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">two_dataframes</span><span class="p">:</span>
+<a id="__codelineno-0-304" name="__codelineno-0-304"></a>            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">samples_total</span><span class="p">):</span>
+<a id="__codelineno-0-305" name="__codelineno-0-305"></a>                <span class="n">sample1</span> <span class="o">=</span> <span class="n">sample_list</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+<a id="__codelineno-0-306" name="__codelineno-0-306"></a>                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">samples_total</span><span class="o">-</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+<a id="__codelineno-0-307" name="__codelineno-0-307"></a>                    <span class="n">sample2</span> <span class="o">=</span> <span class="n">sample_list</span><span class="p">[</span><span class="n">j</span><span class="o">+</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-0-308" name="__codelineno-0-308"></a>                    <span class="n">tasks</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">sample1</span><span class="p">,</span> <span class="n">sample2</span><span class="p">,</span> <span class="n">clonoset_lists</span><span class="p">,</span> <span class="n">check_v</span><span class="p">,</span> <span class="n">check_j</span><span class="p">,</span> <span class="n">mismatches</span><span class="p">,</span> <span class="n">metric</span><span class="p">))</span>
+<a id="__codelineno-0-309" name="__codelineno-0-309"></a>                <span class="k">if</span> <span class="n">metric</span> <span class="o">==</span> <span class="s2">&quot;F2&quot;</span><span class="p">:</span>
+<a id="__codelineno-0-310" name="__codelineno-0-310"></a>                    <span class="n">tasks</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">sample1</span><span class="p">,</span> <span class="n">sample1</span><span class="p">,</span> <span class="n">clonoset_lists</span><span class="p">,</span> <span class="n">check_v</span><span class="p">,</span> <span class="n">check_j</span><span class="p">,</span> <span class="n">mismatches</span><span class="p">,</span> <span class="n">metric</span><span class="p">))</span>
+<a id="__codelineno-0-311" name="__codelineno-0-311"></a>        <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-312" name="__codelineno-0-312"></a>            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">samples_total</span><span class="p">):</span>
+<a id="__codelineno-0-313" name="__codelineno-0-313"></a>                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">samples_total</span><span class="p">):</span>
+<a id="__codelineno-0-314" name="__codelineno-0-314"></a>                    <span class="n">sample1</span> <span class="o">=</span> <span class="n">sample_list</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+<a id="__codelineno-0-315" name="__codelineno-0-315"></a>                    <span class="n">sample2</span> <span class="o">=</span> <span class="n">sample_list</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+<a id="__codelineno-0-316" name="__codelineno-0-316"></a>                    <span class="k">if</span> <span class="n">sample1</span> <span class="o">!=</span> <span class="n">sample2</span><span class="p">:</span>
+<a id="__codelineno-0-317" name="__codelineno-0-317"></a>                        <span class="n">tasks</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">sample1</span><span class="p">,</span> <span class="n">sample2</span><span class="p">,</span> <span class="n">clonoset_lists</span><span class="p">,</span> <span class="n">check_v</span><span class="p">,</span> <span class="n">check_j</span><span class="p">,</span> <span class="n">mismatches</span><span class="p">,</span> <span class="n">metric</span><span class="p">))</span>
+<a id="__codelineno-0-318" name="__codelineno-0-318"></a>
+<a id="__codelineno-0-319" name="__codelineno-0-319"></a>
+<a id="__codelineno-0-320" name="__codelineno-0-320"></a>    <span class="c1"># run calculation in parallel</span>
+<a id="__codelineno-0-321" name="__codelineno-0-321"></a>    <span class="n">result_list</span> <span class="o">=</span> <span class="n">run_parallel_calculation</span><span class="p">(</span><span class="n">overlap_metric_two_clone_dicts</span><span class="p">,</span> <span class="n">tasks</span><span class="p">,</span> <span class="s2">&quot;Intersecting clonosets&quot;</span><span class="p">,</span> <span class="n">object_name</span><span class="o">=</span><span class="s2">&quot;pairs&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-322" name="__codelineno-0-322"></a>
+<a id="__codelineno-0-323" name="__codelineno-0-323"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">two_dataframes</span> <span class="ow">and</span> <span class="n">metric</span> <span class="o">!=</span> <span class="s2">&quot;C&quot;</span><span class="p">:</span>
+<a id="__codelineno-0-324" name="__codelineno-0-324"></a>        <span class="n">result_list</span> <span class="o">=</span> <span class="n">result_list</span> <span class="o">+</span> <span class="p">[(</span><span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">result_list</span><span class="p">]</span>
+<a id="__codelineno-0-325" name="__codelineno-0-325"></a>    <span class="n">overlap_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">result_list</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;sample1&quot;</span><span class="p">,</span> <span class="s2">&quot;sample2&quot;</span><span class="p">,</span> <span class="n">metric</span><span class="o">.</span><span class="n">lower</span><span class="p">()])</span><span class="o">.</span><span class="n">pivot_table</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">&quot;sample1&quot;</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;sample2&quot;</span><span class="p">],</span> <span class="n">values</span><span class="o">=</span><span class="n">metric</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">&quot;sample1&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<a id="__codelineno-0-326" name="__codelineno-0-326"></a>    <span class="k">return</span> <span class="n">overlap_df</span>
+</code></pre></div></td></tr></table></div>
+          </details>
+  </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<h2 id="intersections.prepare_clonotypes_dfs_for_intersections" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">prepare_clonotypes_dfs_for_intersections</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">clonosets_df2</span><span class="p">,</span> <span class="n">cl_filter</span><span class="p">,</span> <span class="n">cl_filter2</span><span class="p">,</span> <span class="n">overlap_type</span><span class="p">,</span> <span class="n">by_freq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+
+</h2>
+
+
+  <div class="doc doc-contents ">
+  
+
+
+
+  <p><strong>Parameters:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td><code>clonosets_df</code></td>
+          <td>
+                <code><span title="pandas.DataFrame">DataFrame</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p><em>description</em></p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>clonosets_df2</code></td>
+          <td>
+                <code><span title="pandas.DataFrame">DataFrame</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p><em>description</em></p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>cl_filter</code></td>
+          <td>
+                <code><span title="repseq.clone_filter.Filter">Filter</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p><em>description</em></p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>cl_filter2</code></td>
+          <td>
+                <code><span title="repseq.clone_filter.Filter">Filter</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p><em>description</em></p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>overlap_type</code></td>
+          <td>
+                <code>str</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p><em>description</em></p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>by_freq</code></td>
+          <td>
+                <code>bool</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p><em>description</em>. Defaults to True.</p>
+            </div>
+          </td>
+          <td>
+                <code>True</code>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+
+
+  <p><strong>Raises:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td>
+                <code>ValueError</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p><em>description</em></p>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>
+                <code>ValueError</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p><em>description</em></p>
+            </div>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+
+
+  <p><strong>Returns:</strong></p>
+  <table>
+    <thead>
+      <tr>
+<th>Name</th>        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+<td><code>clonoset_lists</code></td>          <td>
+                <code>dict</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>dict of </p>
+            </div>
+          </td>
+        </tr>
+        <tr>
+<td><code>samples_total</code></td>          <td>
+                <code>int</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              
+            </div>
+          </td>
+        </tr>
+        <tr>
+<td><code>two_dataframes</code></td>          <td>
+                <code>bool</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              
+            </div>
+          </td>
+        </tr>
+        <tr>
+<td><code>sample_list</code></td>          <td>
+                <code>list</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              
+            </div>
+          </td>
+        </tr>
+        <tr>
+<td><code>sample_list2</code></td>          <td>
+                <code>list</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              
+            </div>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+          <details class="quote">
+            <summary>Source code in <code>repseq/intersections.py</code></summary>
+            <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-397">397</a></span>
+<span class="normal"><a href="#__codelineno-0-398">398</a></span>
+<span class="normal"><a href="#__codelineno-0-399">399</a></span>
+<span class="normal"><a href="#__codelineno-0-400">400</a></span>
+<span class="normal"><a href="#__codelineno-0-401">401</a></span>
+<span class="normal"><a href="#__codelineno-0-402">402</a></span>
+<span class="normal"><a href="#__codelineno-0-403">403</a></span>
+<span class="normal"><a href="#__codelineno-0-404">404</a></span>
+<span class="normal"><a href="#__codelineno-0-405">405</a></span>
+<span class="normal"><a href="#__codelineno-0-406">406</a></span>
+<span class="normal"><a href="#__codelineno-0-407">407</a></span>
+<span class="normal"><a href="#__codelineno-0-408">408</a></span>
+<span class="normal"><a href="#__codelineno-0-409">409</a></span>
+<span class="normal"><a href="#__codelineno-0-410">410</a></span>
+<span class="normal"><a href="#__codelineno-0-411">411</a></span>
+<span class="normal"><a href="#__codelineno-0-412">412</a></span>
+<span class="normal"><a href="#__codelineno-0-413">413</a></span>
+<span class="normal"><a href="#__codelineno-0-414">414</a></span>
+<span class="normal"><a href="#__codelineno-0-415">415</a></span>
+<span class="normal"><a href="#__codelineno-0-416">416</a></span>
+<span class="normal"><a href="#__codelineno-0-417">417</a></span>
+<span class="normal"><a href="#__codelineno-0-418">418</a></span>
+<span class="normal"><a href="#__codelineno-0-419">419</a></span>
+<span class="normal"><a href="#__codelineno-0-420">420</a></span>
+<span class="normal"><a href="#__codelineno-0-421">421</a></span>
+<span class="normal"><a href="#__codelineno-0-422">422</a></span>
+<span class="normal"><a href="#__codelineno-0-423">423</a></span>
+<span class="normal"><a href="#__codelineno-0-424">424</a></span>
+<span class="normal"><a href="#__codelineno-0-425">425</a></span>
+<span class="normal"><a href="#__codelineno-0-426">426</a></span>
+<span class="normal"><a href="#__codelineno-0-427">427</a></span>
+<span class="normal"><a href="#__codelineno-0-428">428</a></span>
+<span class="normal"><a href="#__codelineno-0-429">429</a></span>
+<span class="normal"><a href="#__codelineno-0-430">430</a></span>
+<span class="normal"><a href="#__codelineno-0-431">431</a></span>
+<span class="normal"><a href="#__codelineno-0-432">432</a></span>
+<span class="normal"><a href="#__codelineno-0-433">433</a></span>
+<span class="normal"><a href="#__codelineno-0-434">434</a></span>
+<span class="normal"><a href="#__codelineno-0-435">435</a></span>
+<span class="normal"><a href="#__codelineno-0-436">436</a></span>
+<span class="normal"><a href="#__codelineno-0-437">437</a></span>
+<span class="normal"><a href="#__codelineno-0-438">438</a></span>
+<span class="normal"><a href="#__codelineno-0-439">439</a></span>
+<span class="normal"><a href="#__codelineno-0-440">440</a></span>
+<span class="normal"><a href="#__codelineno-0-441">441</a></span>
+<span class="normal"><a href="#__codelineno-0-442">442</a></span>
+<span class="normal"><a href="#__codelineno-0-443">443</a></span>
+<span class="normal"><a href="#__codelineno-0-444">444</a></span>
+<span class="normal"><a href="#__codelineno-0-445">445</a></span>
+<span class="normal"><a href="#__codelineno-0-446">446</a></span>
+<span class="normal"><a href="#__codelineno-0-447">447</a></span>
+<span class="normal"><a href="#__codelineno-0-448">448</a></span>
+<span class="normal"><a href="#__codelineno-0-449">449</a></span>
+<span class="normal"><a href="#__codelineno-0-450">450</a></span>
+<span class="normal"><a href="#__codelineno-0-451">451</a></span>
+<span class="normal"><a href="#__codelineno-0-452">452</a></span>
+<span class="normal"><a href="#__codelineno-0-453">453</a></span>
+<span class="normal"><a href="#__codelineno-0-454">454</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-397" name="__codelineno-0-397"></a><span class="k">def</span> <span class="nf">prepare_clonotypes_dfs_for_intersections</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">clonosets_df2</span><span class="p">,</span> <span class="n">cl_filter</span><span class="p">,</span> <span class="n">cl_filter2</span><span class="p">,</span> <span class="n">overlap_type</span><span class="p">,</span> <span class="n">by_freq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<a id="__codelineno-0-398" name="__codelineno-0-398"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-0-399" name="__codelineno-0-399"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-400" name="__codelineno-0-400"></a><span class="sd">        clonosets_df (pd.DataFrame): _description_</span>
+<a id="__codelineno-0-401" name="__codelineno-0-401"></a><span class="sd">        clonosets_df2 (pd.DataFrame): _description_</span>
+<a id="__codelineno-0-402" name="__codelineno-0-402"></a><span class="sd">        cl_filter (Filter): _description_</span>
+<a id="__codelineno-0-403" name="__codelineno-0-403"></a><span class="sd">        cl_filter2 (Filter): _description_</span>
+<a id="__codelineno-0-404" name="__codelineno-0-404"></a><span class="sd">        overlap_type (str): _description_</span>
+<a id="__codelineno-0-405" name="__codelineno-0-405"></a><span class="sd">        by_freq (bool, optional): _description_. Defaults to True.</span>
+<a id="__codelineno-0-406" name="__codelineno-0-406"></a>
+<a id="__codelineno-0-407" name="__codelineno-0-407"></a><span class="sd">    Raises:</span>
+<a id="__codelineno-0-408" name="__codelineno-0-408"></a><span class="sd">        ValueError: _description_</span>
+<a id="__codelineno-0-409" name="__codelineno-0-409"></a><span class="sd">        ValueError: _description_</span>
+<a id="__codelineno-0-410" name="__codelineno-0-410"></a>
+<a id="__codelineno-0-411" name="__codelineno-0-411"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-412" name="__codelineno-0-412"></a><span class="sd">        clonoset_lists (dict): dict of </span>
+<a id="__codelineno-0-413" name="__codelineno-0-413"></a><span class="sd">        samples_total (int): </span>
+<a id="__codelineno-0-414" name="__codelineno-0-414"></a><span class="sd">        two_dataframes (bool):</span>
+<a id="__codelineno-0-415" name="__codelineno-0-415"></a><span class="sd">        sample_list (list):</span>
+<a id="__codelineno-0-416" name="__codelineno-0-416"></a><span class="sd">        sample_list2 (list):</span>
+<a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-418" name="__codelineno-0-418"></a>    <span class="c1"># output:</span>
+<a id="__codelineno-0-419" name="__codelineno-0-419"></a>    <span class="c1">### clonoset_lists</span>
+<a id="__codelineno-0-420" name="__codelineno-0-420"></a>
+<a id="__codelineno-0-421" name="__codelineno-0-421"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">clonosets_df</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">):</span>
+<a id="__codelineno-0-422" name="__codelineno-0-422"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input clonosets in DataFrame have non-unique sample_id&#39;s&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-423" name="__codelineno-0-423"></a>    <span class="n">clonosets_df_1</span> <span class="o">=</span> <span class="n">clonosets_df</span><span class="p">[[</span><span class="s2">&quot;sample_id&quot;</span><span class="p">,</span> <span class="s2">&quot;filename&quot;</span><span class="p">]]</span>
+<a id="__codelineno-0-424" name="__codelineno-0-424"></a>    <span class="n">two_dataframes</span> <span class="o">=</span> <span class="kc">False</span>
+<a id="__codelineno-0-425" name="__codelineno-0-425"></a>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">clonosets_df2</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+<a id="__codelineno-0-426" name="__codelineno-0-426"></a>        <span class="n">two_dataframes</span> <span class="o">=</span> <span class="kc">True</span>
+<a id="__codelineno-0-427" name="__codelineno-0-427"></a>        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">clonosets_df2</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">clonosets_df2</span><span class="p">):</span>
+<a id="__codelineno-0-428" name="__codelineno-0-428"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input clonosets in DataFrame2 have non-unique sample_id&#39;s&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-429" name="__codelineno-0-429"></a>        <span class="n">clonosets_df_2</span> <span class="o">=</span> <span class="n">clonosets_df2</span><span class="p">[[</span><span class="s2">&quot;sample_id&quot;</span><span class="p">,</span> <span class="s2">&quot;filename&quot;</span><span class="p">]]</span>
+<a id="__codelineno-0-430" name="__codelineno-0-430"></a>        <span class="n">intersecting_sample_ids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">clonosets_df2</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">clonosets_df</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">unique</span><span class="p">()))</span>
+<a id="__codelineno-0-431" name="__codelineno-0-431"></a>        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">intersecting_sample_ids</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">cl_filter2</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-432" name="__codelineno-0-432"></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;WARNING! Some samples have the same sample_id in two sample_df&#39;s. The second filter will be applied to common samples&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-433" name="__codelineno-0-433"></a>
+<a id="__codelineno-0-434" name="__codelineno-0-434"></a>
+<a id="__codelineno-0-435" name="__codelineno-0-435"></a>    <span class="c1"># converting clonosets to compact lists of clonotypes separated by CDR3 lengths to dictionary based on overlap type and count/freq/umi</span>
+<a id="__codelineno-0-436" name="__codelineno-0-436"></a>    <span class="n">clonoset_lists</span> <span class="o">=</span> <span class="n">convert_clonosets_to_compact_dicts</span><span class="p">(</span><span class="n">clonosets_df_1</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="n">cl_filter</span><span class="p">,</span>
+<a id="__codelineno-0-437" name="__codelineno-0-437"></a>                                                        <span class="n">overlap_type</span><span class="o">=</span><span class="n">overlap_type</span><span class="p">,</span> <span class="n">by_freq</span><span class="o">=</span><span class="n">by_freq</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="n">strict</span><span class="p">)</span>
+<a id="__codelineno-0-438" name="__codelineno-0-438"></a>    <span class="k">if</span> <span class="n">two_dataframes</span><span class="p">:</span>
+<a id="__codelineno-0-439" name="__codelineno-0-439"></a>        <span class="k">if</span> <span class="n">cl_filter2</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-440" name="__codelineno-0-440"></a>            <span class="n">cl_filter2</span> <span class="o">=</span> <span class="n">cl_filter</span>
+<a id="__codelineno-0-441" name="__codelineno-0-441"></a>        <span class="n">clonoset_lists_2</span> <span class="o">=</span> <span class="n">convert_clonosets_to_compact_dicts</span><span class="p">(</span><span class="n">clonosets_df_2</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="n">cl_filter2</span><span class="p">,</span>
+<a id="__codelineno-0-442" name="__codelineno-0-442"></a>                                                        <span class="n">overlap_type</span><span class="o">=</span><span class="n">overlap_type</span><span class="p">,</span> <span class="n">by_freq</span><span class="o">=</span><span class="n">by_freq</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="n">strict</span><span class="p">)</span>
+<a id="__codelineno-0-443" name="__codelineno-0-443"></a>        <span class="n">clonoset_lists</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">clonoset_lists_2</span><span class="p">)</span>
+<a id="__codelineno-0-444" name="__codelineno-0-444"></a>
+<a id="__codelineno-0-445" name="__codelineno-0-445"></a>    <span class="n">samples_total</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">clonosets_df_1</span><span class="p">)</span>
+<a id="__codelineno-0-446" name="__codelineno-0-446"></a>    <span class="k">if</span> <span class="n">two_dataframes</span><span class="p">:</span>
+<a id="__codelineno-0-447" name="__codelineno-0-447"></a>        <span class="n">samples_total</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">clonosets_df_1</span><span class="p">,</span> <span class="n">clonosets_df_2</span><span class="p">]))</span>
+<a id="__codelineno-0-448" name="__codelineno-0-448"></a>
+<a id="__codelineno-0-449" name="__codelineno-0-449"></a>    <span class="n">sample_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">clonosets_df_1</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="s2">&quot;sample_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">sample_id</span><span class="p">)</span>
+<a id="__codelineno-0-450" name="__codelineno-0-450"></a>    <span class="n">sample_list2</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-451" name="__codelineno-0-451"></a>    <span class="k">if</span> <span class="n">two_dataframes</span><span class="p">:</span>
+<a id="__codelineno-0-452" name="__codelineno-0-452"></a>        <span class="n">sample_list2</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">clonosets_df_2</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="s2">&quot;sample_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">sample_id</span><span class="p">)</span>
+<a id="__codelineno-0-453" name="__codelineno-0-453"></a>
+<a id="__codelineno-0-454" name="__codelineno-0-454"></a>    <span class="k">return</span> <span class="n">clonoset_lists</span><span class="p">,</span> <span class="n">samples_total</span><span class="p">,</span> <span class="n">two_dataframes</span><span class="p">,</span> <span class="n">sample_list</span><span class="p">,</span> <span class="n">sample_list2</span>
+</code></pre></div></td></tr></table></div>
+          </details>
+  </div>
+
+</div>
+
+
+
+  </div>
+
+  </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      &copy; 2023 <a href="https://github.com/mmjmike" target="_blank" rel="noopener">Mikhail Myshkin</a>
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        <div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/mmjmike" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M186.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1zM480 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2zm-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3zm-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.tabs", "navigation.sections", "toc.integrate", "navigation.top", "search.suggest", "search.highlight", "content.tabs.link", "content.code.annotation", "content.code.copy"], "search": "../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.bd41221c.min.js"></script>
+      
+    
+  </body>
+</html>
