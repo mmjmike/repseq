@@ -93,7 +93,7 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
         task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], check_v, check_j, mismatches, strict_presense]
         tasks.append(task)
     
-    results = run_parallel_calculation(count_table_mp, tasks, "Counting features", object_name="clonosetsq")
+    results = run_parallel_calculation(count_table_mp, tasks, "Counting features", object_name="clonosets")
     result_dict = dict()
     for result in results:
         result_dict.update(result)
@@ -121,11 +121,13 @@ def count_table_mp(args):
                     result.append(0)
                     continue
         else:
-            if len_feature in clonoset_dict:
-                clonotypes = clonoset_dict[len_feature]
-                for clonotype in clonotypes:
-                    if clonotypes_equal(feature, clonotype, check_v, check_j, mismatches=mismatches):
-                        count += clonotype[-1]
+            if feature in clonoset_dict:
+                count += clonoset_dict[feature]
+            # if len_feature in clonoset_dict:
+            #     clonotypes = clonoset_dict[len_feature]
+            #     for clonotype in clonotypes:
+            #         if clonotypes_equal(feature, clonotype, check_v, check_j, mismatches=mismatches):
+            #             count += clonotype[-1]
         result.append(count)
     return {sample_id: result}
         
@@ -204,15 +206,40 @@ def tcrnet_mp(args):
 
 def find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts, check_v, check_j):
     unique_clonotypes = set()
-    for sample_id in clonoset_dicts:
-        for cdr3len in clonoset_dicts[sample_id]:
-            for clonotype in clonoset_dicts[sample_id][cdr3len]:
-                clone_len = 1
-                if check_v:
-                    clone_len += 1
-                if check_j:
-                    clone_len += 1
-                unique_clonotypes.add(tuple(clonotype[:clone_len]))
+    # first = True
+    for sample_id, clone_groups in clonoset_dicts.items():
+        # if first:
+        #     first= False
+        #     i = 10
+        #     for clone_group, clone_subgroup in clone_groups.items():    
+        #         print(clone_group, clone_subgroup)
+        #         i-=1
+        #         if i <0:
+        #             break
+        for clone_group, clone_subgroup in clone_groups.items():
+            # if clone_group is int - it is cdr3len value
+            # clone_subgroup is dict with keys - tuples of cdr3seq,(v),(j) - and freq as values
+            if isinstance(clone_group, int):        
+                for clone in clone_subgroup:
+                    unique_clonotypes.add(tuple(clone[:-1]))
+            # if clone_subgroup is numeric, it means strict comparison
+            # and clone_subgroup is itself a clone
+            elif isinstance(clone_subgroup, (int, float, complex)):
+                unique_clonotypes.add(clone_group)
+            # if clone_group is not int - it is (cdr3len,(v),(j)) tuple
+            # clone_subgroup is list of (cdr3seq,freq) tuples
+            else:
+                for clone in clone_subgroup:
+                    unique_clonotypes.add(tuple([clone[0]] + list(clone_group[1:])))
+
+        # for cdr3len in clonoset_dicts[sample_id]:
+        #     for clonotype in clonoset_dicts[sample_id][cdr3len]:
+        #         clone_len = 1
+        #         if check_v:
+        #             clone_len += 1
+        #         if check_j:
+        #             clone_len += 1
+        #         unique_clonotypes.add(tuple(clonotype[:clone_len]))
     return list(unique_clonotypes)
     
 
