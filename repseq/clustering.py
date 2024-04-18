@@ -370,7 +370,15 @@ def create_clusters(clonoset_df, cl_filter=None, mismatches=1, overlap_type="aaV
     singletons = total_clusters - cluster_num
     print(f"Found {cluster_num} clusters (2 or more nodes) and {singletons} single nodes. Total: {total_clusters}")
     clusters.sort(key=lambda x: len(x), reverse=True)
+    write_cluster_no_to_nodes(clusters)
     return clusters
+
+def write_cluster_no_to_nodes(clusters):
+    cluster_no = 0
+    for cluster in clusters:
+        for node in cluster:
+            node.additional_properties["cluster_no"] = cluster_no
+        cluster_no += 1
 
 def find_cluster_communities_louvain(clusters, resolution=1, threshold=1e-07, seed=1):
     total_communities = 0
