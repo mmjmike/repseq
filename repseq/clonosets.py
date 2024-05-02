@@ -7,6 +7,36 @@ from .common_functions import print_progress_bar
 import random
 
 
+class Clonoset:
+
+    def __init__(self, sample_id, filename, chain) -> None:
+        self.sample_id = sample_id
+        self.filename = filename
+        self.clonoset_df = None
+        self.chain = chain
+        self.cache = None
+    
+    def filter(self, cl_filter):
+        return cl_filter.apply(self)
+    
+    def save_to_file(self, filename, cl_filter=None, verbose=True):
+        if cl_filter is not None:
+            df = self.filter(cl_filter=cl_filter)
+        else:
+            df = self.clonoset_df
+        df.to_csv(filename, sep="\t", index=False)
+        if verbose:
+            print(f"Clonoset {self.sample_id} saved to: {filename}")
+
+
+class Clonosets:
+
+    def __init__(self, sample_df) -> None:
+        self.sample_df = sample_df
+
+
+
+
 
 CHAIN_VARIANTS = {"TRA": {"TRAD", "TRA"},
                   "TRB": {"TRB"},

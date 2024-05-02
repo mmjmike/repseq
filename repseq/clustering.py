@@ -67,6 +67,33 @@ class Node:
             self.additional_properties.update(metadata[self.sample_id])
 
 
+class Clusters:
+
+    def __init__(self, clonosets, overlap_type="aaV"):
+        self.clonosets = clonosets
+        self.overlap_type = overlap_type
+        self.cluster_list = None
+        
+    def calculate(self):
+        pass
+
+    def properties(self):
+        pass
+
+    def save_to_cytoscape(self, output_prefix):
+        pass
+
+    def split(self, method="leiden", resolution=0.5, threshold=1e-07, seed=1):
+        pass
+
+
+class Cluster:
+
+    def __init__(self, nx_graph):
+        self.graph = nx_graph 
+
+
+
 def pool_clonotypes_from_clonosets_df(clonosets_df, cl_filter=None):
     
     if cl_filter is None:
@@ -400,6 +427,8 @@ def find_cluster_communities_louvain(clusters, resolution=1, threshold=1e-07, se
                 new_clusters.append(cluster.subgraph(com_nodes))
     new_clusters.sort(key=lambda x: len(x), reverse=True)
     return new_clusters
+
+
 
 def filter_one_node_clusters(clusters):
     return [c for c in clusters if len(c)>1]
