@@ -154,7 +154,7 @@ def count_table_by_cluster(clonosets_df, clusters_list, cl_filter=None, overlap_
     result_dict = dict()
     for result in results:
         result_dict.update(result)
-    count_table = pd.DataFrame(result_dict).rename(columns = {"index":"feature_id"})
+    count_table = pd.DataFrame(result_dict).reset_index().rename(columns = {"index":"feature_id"})
     count_table["feature_id"] = count_table["feature_id"].apply(lambda x: f"cluster_{x}")
 
     return count_table
