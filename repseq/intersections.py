@@ -79,18 +79,18 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
     return df
 
 
-def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, strict_presense=False):
+def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, strict_presense=False, by_freq=False):
     
     print("Creating clonotypes count table\n"+"-"*50)
     print(f"Overlap type: {overlap_type}")
     aa, check_v, check_j = overlap_type_to_flags(overlap_type)
     clonoset_dicts = convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=cl_filter,
-                                                        overlap_type=overlap_type, by_freq=False, strict=not bool(mismatches))
+                                                        overlap_type=overlap_type, by_freq=by_freq, strict=not bool(mismatches))
     unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts, check_v, check_j)
     
     tasks = []
     for sample_id in clonoset_dicts:
-        task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], check_v, check_j, mismatches, strict_presense]
+        task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], mismatches, strict_presense]
         tasks.append(task)
     
     results = run_parallel_calculation(count_table_mp, tasks, "Counting features", object_name="clonosets")
@@ -102,7 +102,7 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
     return count_table
 
 def count_table_mp(args):
-    (features, sample_id, clonoset_dict, check_v, check_j, mismatches, strict_presense) = args
+    (features, sample_id, clonoset_dict, mismatches, strict_presense) = args
     result = []
     for feature in features:
         count = 0
@@ -123,11 +123,7 @@ def count_table_mp(args):
         else:
             if feature in clonoset_dict:
                 count += clonoset_dict[feature]
-            # if len_feature in clonoset_dict:
-            #     clonotypes = clonoset_dict[len_feature]
-            #     for clonotype in clonotypes:
-            #         if clonotypes_equal(feature, clonotype, check_v, check_j, mismatches=mismatches):
-            #             count += clonotype[-1]
+
         result.append(count)
     return {sample_id: result}
 
