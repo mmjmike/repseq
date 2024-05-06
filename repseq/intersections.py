@@ -130,7 +130,92 @@ def count_table_mp(args):
             #             count += clonotype[-1]
         result.append(count)
     return {sample_id: result}
-        
+
+
+
+def count_table_by_cluster(clonosets_df, clusters_list, cl_filter=None, overlap_type="aaV", mismatches=0, by_freq=True):
+    
+    print("Creating clonotypes count table\n"+"-"*50)
+    print(f"Overlap type: {overlap_type}")
+    
+    aa, check_v, check_j = overlap_type_to_flags(overlap_type)
+    
+    clonoset_dicts = convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=cl_filter,
+                                                        overlap_type=overlap_type, by_freq=by_freq, strict=not bool(mismatches))
+    
+    clonotypes_by_cluster = convert_clusters_to_clonotype_list(clusters_list, aa, check_v, check_j, mismatches)
+
+    tasks = []
+    for sample_id in clonoset_dicts:
+        task = [clonotypes_by_cluster, sample_id, clonoset_dicts[sample_id], mismatches]
+        tasks.append(task)
+    
+    results = run_parallel_calculation(count_table_by_cluster_mp, tasks, "Counting cluster presence", object_name="clonosets")
+    result_dict = dict()
+    for result in results:
+        result_dict.update(result)
+    count_table = pd.DataFrame(result_dict).rename(columns = {"index":"feature_id"})
+    count_table["feature_id"] = count_table["feature_id"].apply(lambda x: f"cluster_{x}")
+
+    return count_table
+
+def convert_clusters_to_clonotype_list(clusters_list, aa, check_v, check_j, mismatches):
+    cluster_no = 0
+    clonotypes_by_cluster = dict()
+    
+    for cluster in clusters_list:
+        cluster_clonotypes_dict = dict()
+        for node in cluster:
+            if aa:
+                seq = node.seq_aa
+            else:
+                seq = node.seq_nt
+
+            if mismatches:            
+                clone = [len(seq)]
+            else:
+                clone = [seq]
+                
+            if check_v:
+                clone.append(node.v)
+            if check_j:
+                clone.append(node.j)
+            clone = tuple(clone)
+            
+            if mismatches:
+                if clone in cluster_clonotypes_dict:
+                    cluster_clonotypes_dict[clone].add(seq)
+                else:
+                    cluster_clonotypes_dict[clone] = {seq}
+            else:
+                cluster_clonotypes_dict.update({clone:1})
+        clonotypes_by_cluster[cluster_no] = cluster_clonotypes_dict
+        cluster_no += 1
+    return clonotypes_by_cluster
+
+def count_table_by_cluster_mp(args):
+    (clonotypes_by_cluster, sample_id, clonoset_dict, mismatches) = args
+    result = dict()
+    for cluster_no in clonotypes_by_cluster:
+        cluster_clonotypes_dict = clonotypes_by_cluster[cluster_no]
+        count = 0
+        for clone in clonoset_dict:
+            if mismatches:
+                if clone in cluster_clonotypes_dict:
+                    for seq_count in clonoset_dict[clone]:
+                        (seq, clone_count) = seq_count
+                        for seq2 in cluster_clonotypes_dict[clone]:
+                            if sum([a != b for a,b in zip(seq,seq2)]) <= mismatches:
+                                count += clone_count
+                                break
+            else:
+                if clone in cluster_clonotypes_dict:
+                    count += clonoset_dict[clone]
+        result[cluster_no] = count
+    return {sample_id: result}
+
+
+
 def tcrnet(clonosets_df_exp, clonosets_df_control, cl_filter=None, cl_filter_c=None, overlap_type="aaVJ", mismatches=1):
     
     print("Running TCRnet neighbour count\n"+"-"*50)
