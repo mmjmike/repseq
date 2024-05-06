@@ -5,7 +5,7 @@ import numpy as np
 from .common_functions import run_parallel_calculation
 
 
-def wilcox_diff_expression(count_table, sample_metadata, min_samples=2, freq_threshold=0.00005, pval_cutoff=0.05):
+def wilcox_diff_expression(count_table, sample_metadata, min_samples=2, count_threshold=0.00005, pval_cutoff=0.05):
     
     # sample_metadata must contain column 'group' and 'sample_id'
     # sample_id's in sample_metadata must pair with count table column_names
@@ -32,7 +32,7 @@ def wilcox_diff_expression(count_table, sample_metadata, min_samples=2, freq_thr
         group2_samples = list(sample_metadata_subset[sample_metadata_subset["group"] == group2]["sample_id"])
         pair = f"{group1}_vs_{group2}"
         
-        df = calc_mann_whitney_for_group_pair(count_table, pair, group1_samples, group2_samples, freq_threshold, min_samples)
+        df = calc_mann_whitney_for_group_pair(count_table, pair, group1_samples, group2_samples, count_threshold, min_samples)
         
         result_df = df
         result_df = result_df.sort_values(by="p_adj").reset_index(drop=True)
@@ -66,7 +66,7 @@ def wilcox_diff_expression(count_table, sample_metadata, min_samples=2, freq_thr
             group1_samples = group_sample_list[0]
             group2_samples = group_sample_list[1]
             
-            task = (count_table, pair, group1_samples, group2_samples, freq_threshold, min_samples)
+            task = (count_table, pair, group1_samples, group2_samples, count_threshold, min_samples)
             tasks.append(task)
             
         result_dfs = run_parallel_calculation(calc_mann_whitney_for_group_pair_mp, tasks, "Calc Mann-Whitney For Pairs", object_name="pairs")
@@ -121,9 +121,9 @@ def find_p_val_and_logFC_for_pair(feature_id, group1, group2, full_result_df):
 def calc_mann_whitney_for_group_pair_mp(args):
     return calc_mann_whitney_for_group_pair(*args)
 
-def calc_mann_whitney_for_group_pair(count_table, pair, group1_samples, group2_samples, freq_threshold, min_samples):
+def calc_mann_whitney_for_group_pair(count_table, pair, group1_samples, group2_samples, count_threshold, min_samples):
     df = count_table[group1_samples + group2_samples].copy()
-    df = df[df.select_dtypes(include=['float', 'int']).apply(lambda x: x > freq_threshold).sum(axis=1) >= min_samples]
+    df = df[df.select_dtypes(include=['float', 'int']).apply(lambda x: x > count_threshold).sum(axis=1) >= min_samples]
     df[["logFC", "U", "p"]] = df.apply(lambda x: mann_whitney_two_groups(x, group1_samples, group2_samples), axis=1, result_type='expand')
     df["pair"] = pair
     df["p_adj"] = multipletests(df["p"], alpha=0.05, method='fdr_bh', is_sorted=False, returnsorted=False)[1]
