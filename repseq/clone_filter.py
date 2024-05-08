@@ -43,7 +43,8 @@ class Filter:
 
     def __init__(self, name="default_filter", functionality="a", downsample=None,
                  top=None, by_umi=False, mix_tails=False, count_threshold=None, 
-                 unweight=False, seed=None):
+                 unweight=False, seed=None, recount_fractions=True,
+                 white_list=[], black_list=[]):
         self.name = name
         self.functionality = functionality
         self.downsample_size = downsample
@@ -53,6 +54,9 @@ class Filter:
         self.seed = seed
         self.count_threshold = count_threshold
         self.unweight = unweight
+        self.recount_fractions = recount_fractions
+        self.white_list = white_list
+        self.black_list = black_list
         self._check_input()
         
     def spawn(self):
@@ -65,7 +69,12 @@ class Filter:
         return Filter(name=self.name, functionality=self.functionality,
                       downsample=self.downsample_size, top=self.top,
                       by_umi=self.by_umi, mix_tails=self.mix_tails,
-                      count_threshold=self.count_threshold, seed=self.seed)
+                      count_threshold=self.count_threshold, seed=self.seed,
+                      unweight=self.unweight,
+                      recount_fractions=self.recount_fractions,
+                      white_list = self.white_list,
+                      black_list = self.black_list
+                      )
         
     def apply(self, input_clonoset, colnames=None):
         """
@@ -104,7 +113,12 @@ class Filter:
             clonoset = self._unweight(clonoset, colnames)
         # the fraction columns need to be recounted after filtering, as they
         # remain the same as in the original clonoset before filtration
-        clonoset = self._recount_fractions_for_clonoset(clonoset, colnames)
+        if self.recount_fractions:
+            clonoset = self._recount_fractions_for_clonoset(clonoset, colnames)
+        if len(self.white_list) > 0:
+            clonoset = self._filter_clonotypes(clonoset, list_type="white")
+        if len(self.black_list) > 0:
+            clonoset = self._filter_clonotypes(clonoset, list_type="black")
         return clonoset
     
     def _convert_clonoset(self, clonoset, colnames):
@@ -370,6 +384,69 @@ class Filter:
                  
         return output
     
+    def _filter_clonotypes(self, clonoset_in, list_type):
+        if list_type == "white":
+            clonotypes_list = self.white_list
+        elif list_type == "black":
+            clonotypes_list = self.black_list
+        else:
+            raise ValueError("list_type must be 'white' or 'black'")
+        
+        clonoset = clonoset_in.copy()
+        
+        clonoset["filter_pass"] = clonoset.apply(lambda x: self._compare_clonoset_list_row_with_clonotype(x, clonotypes_list), axis=1)
+        if list_type == "white":
+            clonoset = clonoset[clonoset["filter_pass"]].drop(columns=["filter_pass"]).reset_index(drop=True)
+        else:
+            clonoset = clonoset[~clonoset["filter_pass"]].drop(columns=["filter_pass"]).reset_index(drop=True)
+        return clonoset
+
+
+# def convert_clonoset_to_clonotype_filter_list(clonoset_df, overlap_type="aaVJ"):
+#     clonotypes_list = []
+#     aa, include_v, include_j = intersections.overlap_type_to_flags(overlap_type)
+#     for i,r in clonoset_df.iterrows():
+#         clonotype = []
+#         if aa:
+#             clonotype.append(row["cdr3aa"])
+#         else:
+#             clonotype.append(row["cdr3nt"])
+#         if include_v:
+#             clonotype.append(row["v"])
+#         if include_j:
+#             clonotype.append(row["j"])
+    
+#         clonotype = tuple(clonotype)
+#         clonotypes_list.append(clonotype)
+#     return clonotypes_list
+     
+    
+    def _compare_clonoset_row_with_clonotype(row, clonotype):
+        c_len = len(clonotype)
+        if c_len == 1:
+            if row["cdr3aa"] == clonotype[0]:
+                return True
+        elif c_len == 2:
+            if row["cdr3aa"] == clonotype[0] and row["v"] == clonotype[1]:
+                return True
+        elif c_len == 3:
+            if row["cdr3aa"] == clonotype[0] and row["v"] == clonotype[1] and row["j"] == clonotype[2]:
+                return True
+        else:
+            # need to write better explanation for error
+            raise ValueError("clonotypes must contain from 1 to 3 values")
+            
+        return False
+
+
+    def _compare_clonoset_list_row_with_clonotype(row, clonotypes_list):
+        for clonotype in clonotypes_list:
+            if self._compare_clonoset_row_with_clonotype(row, clonotype):
+                return True
+        return False
+
+
+
     def is_empty(self):
         return self.functionality == "a" and self.downsample_size is None and self.top is None and self.count_threshold is None and not self.unweight
 
