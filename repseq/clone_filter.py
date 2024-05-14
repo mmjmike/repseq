@@ -421,7 +421,7 @@ class Filter:
 #     return clonotypes_list
      
     
-    def _compare_clonoset_row_with_clonotype(row, clonotype):
+    def _compare_clonoset_row_with_clonotype(self, row, clonotype):
         c_len = len(clonotype)
         if c_len == 1:
             if row["cdr3aa"] == clonotype[0]:
@@ -439,7 +439,7 @@ class Filter:
         return False
 
 
-    def _compare_clonoset_list_row_with_clonotype(row, clonotypes_list):
+    def _compare_clonoset_list_row_with_clonotype(self, row, clonotypes_list):
         for clonotype in clonotypes_list:
             if self._compare_clonoset_row_with_clonotype(row, clonotype):
                 return True
