@@ -8,7 +8,7 @@ from scipy.stats import binom, poisson
 
 
 
-from .common_functions import print_progress_bar, run_parallel_calculation
+from .common_functions import print_progress_bar, run_parallel_calculation, overlap_type_to_flags
 from .io import read_clonoset
 from .clonosets import filter_nonfunctional_clones, recount_fractions_for_clonoset, get_column_names_from_clonoset
 from repseq.clone_filter import Filter
@@ -621,21 +621,6 @@ def clonotypes_equal(clonotype_1, clonotype_2, check_v, check_j, mismatches=0):
     if mismatches==0:
         return seq1 == seq2
     return sum([a != b for a,b in zip(seq1,seq2)]) <= mismatches
-
-def overlap_type_to_flags(overlap_type):
-    possible_overlap_types = ["aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ"]
-    if overlap_type not in possible_overlap_types:
-        raise ValueError("Incorrect overlap type. Possible values: {}".format(", ".join(possible_overlap_types)))    
-    aa = False
-    if overlap_type[0:2] == "aa":
-        aa = True
-    check_v = False
-    if "V" in overlap_type:
-        check_v = True
-    check_j = False
-    if "J" in overlap_type:
-        check_j = True
-    return aa, check_v, check_j
 
 def prepare_clonoset_for_intersection(clonoset, overlap_type="aaV", by_freq=True, len_vj_format=False, pool_clonotypes=True):
     aa, check_v, check_j = overlap_type_to_flags(overlap_type)

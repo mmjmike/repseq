@@ -93,4 +93,17 @@ def calc_insert_size(vend,dstart,dend,jstart):
     return insert
 
 
-
+def overlap_type_to_flags(overlap_type):
+    possible_overlap_types = ["aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ"]
+    if overlap_type not in possible_overlap_types:
+        raise ValueError("Incorrect overlap type. Possible values: {}".format(", ".join(possible_overlap_types)))    
+    aa = False
+    if overlap_type[0:2] == "aa":
+        aa = True
+    check_v = False
+    if "V" in overlap_type:
+        check_v = True
+    check_j = False
+    if "J" in overlap_type:
+        check_j = True
+    return aa, check_v, check_j
