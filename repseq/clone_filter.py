@@ -393,13 +393,13 @@ class Filter:
         aa, check_v, check_j = overlap_type_to_flags(self.pool_by)
         columns_for_pool = []
         if aa:
-            columns_for_pool.append[colnames["cdr3aa_column"]]
+            columns_for_pool.append(colnames["cdr3aa_column"])
         else:
-            columns_for_pool.append[colnames["cdr3nt_column"]]
+            columns_for_pool.append(colnames["cdr3nt_column"])
         if check_v:
-            columns_for_pool.append[colnames["v_column"]]
+            columns_for_pool.append(colnames["v_column"])
         if check_j:
-            columns_for_pool.append[colnames["j_column"]]
+            columns_for_pool.append(colnames["j_column"])
 
         # create column combining all pool columns
         clonoset["pool_id"] = clonoset.apply(lambda x: "|".join([x[colname] for colname in columns_for_pool]), axis=1)
