@@ -3,7 +3,7 @@ from .clonosets import (decide_count_and_frac_columns,
                         filter_by_functionality)
 
 from .common_functions import (extract_segment,
-                               extract_refpoint_position)
+                               extract_refpoint_position, overlap_type_to_flags)
 
 from collections.abc import Hashable
 
@@ -44,7 +44,7 @@ class Filter:
     def __init__(self, name="default_filter", functionality="a", downsample=None,
                  top=None, by_umi=False, mix_tails=False, count_threshold=None, 
                  unweight=False, seed=None, recount_fractions=True,
-                 white_list=[], black_list=[]):
+                 white_list=[], black_list=[], pool_clonoset_by=""):
         self.name = name
         self.functionality = functionality
         self.downsample_size = downsample
@@ -57,6 +57,7 @@ class Filter:
         self.recount_fractions = recount_fractions
         self.white_list = white_list
         self.black_list = black_list
+        self.pool_by = pool_clonoset_by
         self._check_input()
         
     def spawn(self):
@@ -115,6 +116,8 @@ class Filter:
         # remain the same as in the original clonoset before filtration
         if self.recount_fractions:
             clonoset = self._recount_fractions_for_clonoset(clonoset, colnames)
+        if self.pool_by:
+            clonoset = self._pool_clonoset(clonoset, colnames)
         if len(self.white_list) > 0:
             clonoset = self._filter_clonotypes(clonoset, list_type="white")
         if len(self.black_list) > 0:
@@ -184,7 +187,6 @@ class Filter:
         clonoset = clonoset_in.copy()
         clonoset[colnames["count_column"]] = 1
         return clonoset
-
     
     def _recount_fractions_for_clonoset(self, clonoset_in, colnames):
         if self.is_empty():
@@ -209,8 +211,6 @@ class Filter:
         clonoset = clonoset.loc[clonoset[count_column] >= self.count_threshold]
 
         return clonoset
-
-
 
     def _check_input(self):
 
@@ -242,8 +242,10 @@ class Filter:
                 raise ValueError(f"Incorrect value '{self.top}' for top. Value too low")
         if not isinstance(self.seed, Hashable):
             raise ValueError(f"Incorrect value '{self.seed}' for seed. Must be hashable")
-
-    
+        pool_by_options = ["", "aa", "aaV", "aaVj", "nt", "ntV", "ntVJ"]
+        if self.pool_by not in pool_by_options:
+            raise ValueError(f"Incorrect value '{self.pool_by}' for clonoset pool. Possible values: {', '.join(pool_by_options)}")
+  
     def _downsample(self, clonoset_in, colnames):
         """
         Downsample clonoset.
@@ -343,7 +345,6 @@ class Filter:
             
         return clonoset.reset_index(drop=True)
             
-    
     def __str__(self):
         
         functionality = {"a": "any",
@@ -384,6 +385,44 @@ class Filter:
                  
         return output
     
+    def _pool_clonoset(self, clonoset_in, colnames):
+        # copy clonoset and sort by clone counts and reset index for order
+        clonoset = clonoset_in.copy().sort_values(by=colnames["count_column"], ascending=False).reset_index(drop=True)
+        
+        # create list of pool columns
+        aa, check_v, check_j = overlap_type_to_flags(self.pool_by)
+        columns_for_pool = []
+        if aa:
+            columns_for_pool.append[colnames["cdr3aa_column"]]
+        else:
+            columns_for_pool.append[colnames["cdr3nt_column"]]
+        if check_v:
+            columns_for_pool.append[colnames["v_column"]]
+        if check_j:
+            columns_for_pool.append[colnames["j_column"]]
+
+        # create column combining all pool columns
+        clonoset["pool_id"] = clonoset.apply(lambda x: "|".join([x[colname] for colname in columns_for_pool]), axis=1)
+        
+        indices_to_retain = []
+
+        for pool_id in clonoset["pool_id"].unique():
+            pool_clonoset = clonoset.loc[clonoset["pool_id"] == pool_id]
+
+            # select the clone with biggest count - it will represent pooled clonotypes by
+            # columns other that count and freq
+            top_index = pool_clonoset.index[0]
+            indices_to_retain.append(top_index)
+            
+            # sum counts and fractions for pooled clonotypes
+            clonoset.loc[top_index,colnames["count_column"]] = pool_clonoset[colnames["count_column"]].sum()
+            clonoset.loc[top_index,colnames["fraction_column"]] = pool_clonoset[colnames["fraction_column"]].sum()
+        
+        # retain only rows with representative clonotypes and remove technical column
+        clonoset = clonoset.loc[indices_to_retain].drop(columns=["pool_id"])
+
+        return clonoset
+
     def _filter_clonotypes(self, clonoset_in, list_type):
         if list_type == "white":
             clonotypes_list = self.white_list
@@ -420,7 +459,6 @@ class Filter:
 #         clonotypes_list.append(clonotype)
 #     return clonotypes_list
      
-    
     def _compare_clonoset_row_with_clonotype(self, row, clonotype):
         c_len = len(clonotype)
         if c_len == 1:
@@ -438,14 +476,11 @@ class Filter:
             
         return False
 
-
     def _compare_clonoset_list_row_with_clonotype(self, row, clonotypes_list):
         for clonotype in clonotypes_list:
             if self._compare_clonoset_row_with_clonotype(row, clonotype):
                 return True
         return False
-
-
 
     def is_empty(self):
         return self.functionality == "a" and self.downsample_size is None and self.top is None and self.count_threshold is None and not self.unweight
