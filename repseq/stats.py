@@ -8,7 +8,7 @@ from .clonosets import (get_column_names_from_clonoset,
 from .common_functions import (calc_insert_size,
                                extract_refpoint_position,
                                center_5,
-                               shannon_wiener,
+                               diversity_metrics,
                                run_parallel_calculation)
 from .io import read_clonoset
 from repseq.clone_filter import Filter
@@ -299,11 +299,7 @@ def calculate_diversity_stats_cl(clonoset_in, colnames=None):
 
     counts = clonoset[colnames["count_column"]]
     
-    sw, sw_norm, diversity = shannon_wiener(counts)
-    
-    result = {"diversity": diversity,
-              "shannon_wiener": sw,
-              "normalized_shannon_wiener": sw_norm}
+    result = diversity_metrics(counts)
                     
     return result
 

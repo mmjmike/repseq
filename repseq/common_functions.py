@@ -41,14 +41,38 @@ def run_parallel_calculation(function, tasks, program_name, object_name="tasks")
             print_progress_bar(tasks_done, tasks_total, program_name, object_name=object_name)
     return result_list
 
-def shannon_wiener(list_of_numbers):
+def diversity_metrics(list_of_numbers):
     list_of_numbers = list(list_of_numbers)
     total_size = sum(list_of_numbers)
     freqs = [s/total_size for s in list_of_numbers]
     diversity = len(list_of_numbers)
     sw = -sum([f*np.log(f) for f in freqs])
     sw_norm = sw/np.log(diversity)
-    return sw, sw_norm, diversity
+    clonality = 1 - sw_norm
+    chao1 = calc_chao1_index(list_of_numbers)
+
+    results = {"shannon_wiener": sw,
+               "norm_shannon_wiener": sw_norm,
+               "diversity": diversity,
+               "clonality": clonality,
+               "chao1": chao1
+               }
+
+    return results
+
+def calc_chao1_index(counts):
+    S_obs = np.sum(np.array(counts) > 0)
+
+    f1 = np.sum(np.array(counts) == 1)
+    f2 = np.sum(np.array(counts) == 2)
+    
+    if f2 == 0:  # To avoid division by zero
+        chao1 = S_obs + (f1 * (f1 - 1)) / (2 * (f2 + 1))
+    else:
+        chao1 = S_obs + (f1 * (f1 - 1)) / (2 * f2)
+    
+    return chao1
+
 
 def extract_segment(s):
     segm = str(s).split("*")[0]
