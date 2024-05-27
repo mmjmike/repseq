@@ -151,3 +151,27 @@ def bray_curtis_dissimilarity(list1, list2):
     denominator = np.sum(list1 + list2)
     
     return numerator / denominator
+
+def kl_divergence(p, q):
+    p = np.asarray(p, dtype=np.float64)
+    q = np.asarray(q, dtype=np.float64)
+    return np.sum(np.where(p != 0, p * np.log(p / q), 0))
+
+def jensen_shannon_divergence(p, q):
+    p = np.asarray(p, dtype=np.float64)
+    q = np.asarray(q, dtype=np.float64)
+    
+    # Normalize the distributions
+    p /= np.sum(p)
+    q /= np.sum(q)
+    
+    # Calculate the average distribution
+    m = 0.5 * (p + q)
+    
+    # Calculate KLD for each distribution
+    kld_p_m = kl_divergence(p, m)
+    kld_q_m = kl_divergence(q, m)
+    
+    # Calculate JSD
+    jsd = 0.5 * kld_p_m + 0.5 * kld_q_m
+    return jsd

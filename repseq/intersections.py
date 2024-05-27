@@ -9,7 +9,7 @@ from scipy.stats import binom, poisson
 
 
 from .common_functions import (print_progress_bar, run_parallel_calculation, overlap_type_to_flags,
-                               jaccard_index, bray_curtis_dissimilarity)
+                               jaccard_index, bray_curtis_dissimilarity, jensen_shannon_divergence)
 from .io import read_clonoset
 from .clonosets import filter_nonfunctional_clones, recount_fractions_for_clonoset, get_column_names_from_clonoset
 from repseq.clone_filter import Filter
@@ -366,7 +366,7 @@ def overlap_distances(clonosets_df, cl_filter=None, overlap_type="aaV", mismatch
     print(f"Overlap type: {overlap_type}")
     
     metric = metric.upper()
-    metrics = ["F", "F2", "C", "BC", "J"]
+    metrics = ["F", "F2", "C", "BC", "J", "JSD"]
     mismatch_metrics = ["F", "C"]
     non_symmetry_metrics = ["C"]
     frequency_metrics = ["F", "F2", "C"]
@@ -588,7 +588,7 @@ def overlap_metric_two_clone_dicts(args):
     if metric == "J":
         return (sample_id_1, sample_id_2, jaccard_index(cl1_dict, cl2_dict))
     
-    if metric == "BC":
+    if metric == "BC" or "JSD":
         clonoset_dicts_for_pair = {sample_id_1: cl1_dict,
                                    sample_id_2: cl2_dict}
         unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts_for_pair)
@@ -599,8 +599,12 @@ def overlap_metric_two_clone_dicts(args):
             counts_dict.update(result)
         count_table = pd.DataFrame(counts_dict)
         count_table.index = unique_clonotypes
-        bc = bray_curtis_dissimilarity(count_table[sample_id_1], count_table[sample_id_2])
-        return (sample_id_1, sample_id_2, bc)
+        if metric == "BC":
+            metric_value = bray_curtis_dissimilarity(count_table[sample_id_1], count_table[sample_id_2])
+        if metric == "JSD":
+            metric_value = jensen_shannon_divergence(count_table[sample_id_1], count_table[sample_id_2])
+        return (sample_id_1, sample_id_2, metric_value)
+
 
     frequency = 0
     for c1_key, c1_seq_freq in cl1_dict.items():
