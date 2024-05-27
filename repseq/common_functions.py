@@ -131,3 +131,23 @@ def overlap_type_to_flags(overlap_type):
     if "J" in overlap_type:
         check_j = True
     return aa, check_v, check_j
+
+
+
+def jaccard_index(list1, list2):
+    set1 = set(list1)
+    set2 = set(list2)
+    
+    intersection = set1.intersection(set2)
+    union = set1.union(set2)
+    
+    return len(intersection) / len(union)
+
+def bray_curtis_dissimilarity(list1, list2):
+    list1 = np.array(list1)
+    list2 = np.array(list2)
+    
+    numerator = np.sum(np.abs(list1 - list2))
+    denominator = np.sum(list1 + list2)
+    
+    return numerator / denominator

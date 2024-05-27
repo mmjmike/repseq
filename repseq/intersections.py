@@ -8,7 +8,8 @@ from scipy.stats import binom, poisson
 
 
 
-from .common_functions import print_progress_bar, run_parallel_calculation, overlap_type_to_flags
+from .common_functions import (print_progress_bar, run_parallel_calculation, overlap_type_to_flags,
+                               jaccard_index, bray_curtis_dissimilarity)
 from .io import read_clonoset
 from .clonosets import filter_nonfunctional_clones, recount_fractions_for_clonoset, get_column_names_from_clonoset
 from repseq.clone_filter import Filter
@@ -86,7 +87,7 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
     aa, check_v, check_j = overlap_type_to_flags(overlap_type)
     clonoset_dicts = convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=cl_filter,
                                                         overlap_type=overlap_type, by_freq=by_freq, strict=not bool(mismatches))
-    unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts, check_v, check_j)
+    unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts)
     
     tasks = []
     for sample_id in clonoset_dicts:
@@ -100,6 +101,8 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
     count_table = pd.DataFrame(result_dict)
     count_table.index = unique_clonotypes
     return count_table
+
+
 
 def count_table_mp(args):
     (features, sample_id, clonoset_dict, mismatches, strict_presense) = args
@@ -285,7 +288,7 @@ def tcrnet_mp(args):
         
 
 
-def find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts, check_v, check_j):
+def find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts):
     unique_clonotypes = set()
     # first = True
     for sample_id, clone_groups in clonoset_dicts.items():
@@ -363,14 +366,23 @@ def overlap_distances(clonosets_df, cl_filter=None, overlap_type="aaV", mismatch
     print(f"Overlap type: {overlap_type}")
     
     metric = metric.upper()
-    metrics = ["F", "F2", "C"]
+    metrics = ["F", "F2", "C", "BC", "J"]
+    mismatch_metrics = ["F", "C"]
+    non_symmetry_metrics = ["C"]
+    frequency_metrics = ["F", "F2", "C"]
+    
+
     if metric not in metrics:
         raise ValueError(f"Metric {metric} is not supported. Possible values: {', '.join(metrics)}")
     
+    if mismatches and metric not in mismatch_metrics:
+        raise ValueError(f"Metric {metric} does not allow mismatches. Mismatches only possible for: {', '.join(mismatch_metrics)}")
+
+    by_freq = metric in frequency_metrics
 
     clonoset_lists, samples_total, two_dataframes, sample_list, sample_list2 = prepare_clonotypes_dfs_for_intersections(clonosets_df, clonosets_df2,
                                                                                                                         cl_filter, cl_filter2,
-                                                                                                                        overlap_type)
+                                                                                                                        overlap_type, by_freq=by_freq)
     
     # generating a set of tasks
     
@@ -379,23 +391,23 @@ def overlap_distances(clonosets_df, cl_filter=None, overlap_type="aaV", mismatch
     if two_dataframes:
         for sample1 in sample_list:
             for sample2 in sample_list2:
-                tasks.append((sample1, sample2, clonoset_lists, check_v, check_j, mismatches, metric))        
+                tasks.append((sample1, sample2, clonoset_lists, mismatches, metric))        
     else:
-        if metric in ["F", "F2"] and not two_dataframes:
+        if metric not in non_symmetry_metrics and not two_dataframes:
             for i in range(samples_total):
                 sample1 = sample_list[i]
                 for j in range(samples_total-i-1):
                     sample2 = sample_list[j+i+1]
-                    tasks.append((sample1, sample2, clonoset_lists, check_v, check_j, mismatches, metric))
+                    tasks.append((sample1, sample2, clonoset_lists, mismatches, metric))
                 if metric == "F2":
-                    tasks.append((sample1, sample1, clonoset_lists, check_v, check_j, mismatches, metric))
+                    tasks.append((sample1, sample1, clonoset_lists, mismatches, metric))
         else:
             for i in range(samples_total):
                 for j in range(samples_total):
                     sample1 = sample_list[i]
                     sample2 = sample_list[j]
                     if sample1 != sample2:
-                        tasks.append((sample1, sample2, clonoset_lists, check_v, check_j, mismatches, metric))
+                        tasks.append((sample1, sample2, clonoset_lists, mismatches, metric))
     
     
     # run calculation in parallel
@@ -559,8 +571,9 @@ def convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=None, overlap_typ
 
 
 def overlap_metric_two_clone_dicts(args):
-    (sample_id_1, sample_id_2, clonoset_dicts, check_v, check_j, mismatches, metric) = args
-    
+    (sample_id_1, sample_id_2, clonoset_dicts, mismatches, metric) = args
+
+
     f_metric = False
     c_metric = False
     if metric == "F":
@@ -572,10 +585,24 @@ def overlap_metric_two_clone_dicts(args):
     cl1_dict = clonoset_dicts[sample_id_1]
     cl2_dict = clonoset_dicts[sample_id_2]
 
+    if metric == "J":
+        return (sample_id_1, sample_id_2, jaccard_index(cl1_dict, cl2_dict))
+    
+    if metric == "BC":
+        clonoset_dicts_for_pair = {sample_id_1: cl1_dict,
+                                   sample_id_2: cl2_dict}
+        unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts_for_pair)
+        counts_dict = dict()
+        for sample_id in clonoset_dicts_for_pair:
+            args = (unique_clonotypes, sample_id, clonoset_dicts_for_pair, mismatches, False)
+            result = count_table_mp(args)
+            counts_dict.update(result)
+        count_table = pd.DataFrame(counts_dict)
+        count_table.index = unique_clonotypes
+        bc = bray_curtis_dissimilarity(count_table[sample_id_1], count_table[sample_id_2])
+        return (sample_id_1, sample_id_2, bc)
+
     frequency = 0
-
-
-
     for c1_key, c1_seq_freq in cl1_dict.items():
         if c1_key in cl2_dict:
             for c1 in c1_seq_freq:
