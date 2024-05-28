@@ -623,8 +623,10 @@ def cluster_properties(clusters, weighed=False):
     properties_list = ["cluster_id", "nodes", "edges", "diameter", "density", "eccentricity",
                        "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j"]
     results = []
-    cluster_no = 0
     for cluster in clusters:
+        for node in cluster:
+            break
+        cluster_no = node.additional_properties["cluster_no"]
         cluster_id = f"cluster_{cluster_no}"
         average_eccentricity = np.mean(list(nx.eccentricity(cluster).values()))
         aa_consensus = calc_cluster_consensus(cluster, seq_type="prot", weighed=weighed)
@@ -642,7 +644,6 @@ def cluster_properties(clusters, weighed=False):
                   v_consensus,
                   j_consensus)
         results.append(result)
-        cluster_no += 1
     return pd.DataFrame(results, columns=properties_list)
         
 def calc_cluster_consensus(cluster, seq_type="dna", weighed=False):

@@ -159,10 +159,13 @@ def count_table_by_cluster(clonosets_df, clusters_list, cl_filter=None, overlap_
     return count_table
 
 def convert_clusters_to_clonotype_list(clusters_list, aa, check_v, check_j, mismatches):
-    cluster_no = 0
+    
     clonotypes_by_cluster = dict()
     
     for cluster in clusters_list:
+        for node in cluster:
+            break
+        cluster_no = node.additional_properties["cluster_no"]
         cluster_clonotypes_dict = dict()
         for node in cluster:
             if aa:
@@ -189,7 +192,7 @@ def convert_clusters_to_clonotype_list(clusters_list, aa, check_v, check_j, mism
             else:
                 cluster_clonotypes_dict.update({clone:1})
         clonotypes_by_cluster[cluster_no] = cluster_clonotypes_dict
-        cluster_no += 1
+        
     return clonotypes_by_cluster
 
 def count_table_by_cluster_mp(args):
