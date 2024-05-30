@@ -591,7 +591,7 @@ def overlap_metric_two_clone_dicts(args):
     if metric == "J":
         return (sample_id_1, sample_id_2, jaccard_index(cl1_dict, cl2_dict))
     
-    if metric == "BC" or "JSD":
+    if metric == "BC" or metric == "JSD":
         clonoset_dicts_for_pair = {sample_id_1: cl1_dict,
                                    sample_id_2: cl2_dict}
         unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts_for_pair)
