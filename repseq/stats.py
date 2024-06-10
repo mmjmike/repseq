@@ -357,7 +357,7 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
             raise ValueError("Clonoset_df contains nonunique sample_id+chain combinations")
         if len(clonosets_df) != len(clonosets_df.sample_id.unique()):
             clonosets_df["sample_id"] = clonosets_df["sample_id"] + "_" + clonosets_df["chain"]
-            split_chain_after_calculation = False
+            split_chain_after_calculation = True
 
     random_filter = False
     need_downsample = False
