@@ -789,12 +789,9 @@ def find_overlapping_clones_in_two_clone_dicts(args):
                             clone_2 = (c2[0], *c1_len_vj[1:])
                             results.append([clone_1, clone_2, c1[-1], c2[-1]])    
     else:
-        for c1_len, c1_clones in cl1_dict.items():
-            if c1_len in cl2_dict:
-                for c1 in c1_clones:
-                    for c2 in cl2_dict[c1_len]:
-                        if clonotypes_equal(c1, c2, check_v, check_j, mismatches=mismatches):
-                            results.append([c1, c1, c1[-1], c2[-1]])
+        for c1, c1_count in cl1_dict.items():
+            if c1 in cl2_dict:
+                results.append([c1, c1, c1_count, cl2_dict[c1]])
     clones_intersect = pd.DataFrame(results, columns = ["clone1", "clone2", "sample1_count", "sample2_count"])
     clones_intersect["sample1"] = sample_id_1
     clones_intersect["sample2"] = sample_id_2
