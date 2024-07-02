@@ -462,7 +462,7 @@ def find_intersecting_clonotypes(clonosets_df, cl_filter=None, overlap_type="aaV
         
     clonoset_lists, samples_total, two_dataframes, sample_list, sample_list2 = prepare_clonotypes_dfs_for_intersections(clonosets_df, clonosets_df2,
                                                                                                                         cl_filter, cl_filter2,
-                                                                                                                        overlap_type)
+                                                                                                                        overlap_type, strict=not bool(mismatches))
     
     # generating a set of tasks
     
