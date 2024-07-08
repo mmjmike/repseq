@@ -76,7 +76,7 @@ def get_logo_for_clonoset(clonoset_df, weight_freq=False, seq_type="dna", plot=T
             weight = r["freq"]
             clone = (seq, weight)
         else:
-            clone = (seq)
+            clone = tuple([seq])
         list_of_clonotypes.append(clone)
 
     get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=plot)
