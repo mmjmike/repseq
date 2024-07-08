@@ -680,7 +680,7 @@ def plot_cluster_logo(cluster, seq_type="prot", weighed=False):
             weight = node.size
             clone = (seq, weight)
         else:
-            clone = (seq)
+            clone = (seq,)
         list_of_clonotypes.append(clone)
     get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=True)
 
