@@ -304,7 +304,7 @@ def calculate_diversity_stats_cl(clonoset_in, colnames=None):
     return result
 
 
-def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, program_name="Calculation", iterations=1, seed=None, drop_small_samples=False, verbose=True, **kwargs):
+def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, program_name="Calculation", iterations=1, seed=None, drop_small_samples=False, verbose=True, skip_checks=False, **kwargs):
     '''
     Main function that applies batch calculations for multiple clonosets
     using a `calc_function`. It checks inputs, checks if clonotype counts are 
@@ -380,7 +380,8 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
 
     exclude_samples = set()
 
-    if clonoset_filter is not None:
+    
+    if clonoset_filter is not None and not skip_checks:
         if isinstance(clonoset_filter.downsample_size, int):
             need_downsample = True
         if isinstance(clonoset_filter.top, int):
