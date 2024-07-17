@@ -304,7 +304,7 @@ def calculate_diversity_stats_cl(clonoset_in, colnames=None):
     return result
 
 
-def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, program_name="Calculation", iterations=1, seed=None, drop_small_samples=False, **kwargs):
+def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, program_name="Calculation", iterations=1, seed=None, drop_small_samples=False, verbose=True, **kwargs):
     '''
     Main function that applies batch calculations for multiple clonosets
     using a `calc_function`. It checks inputs, checks if clonotype counts are 
@@ -451,7 +451,7 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
             task = (sample_id, filename, calc_function, None, iterations, seed, program_name, random_filter, kwargs)
         tasks.append(task)
     
-    results = run_parallel_calculation(perform_generic_calculation_mp, tasks, program_name, object_name="calcultaion(s)")
+    results = run_parallel_calculation(perform_generic_calculation_mp, tasks, program_name, object_name="calcultaion(s)", verbose=verbose)
     clonosets_df = clonosets_df[columns_retain]
     df = clonosets_df.merge(pd.DataFrame(results), how="left")
     if split_chain_after_calculation:
