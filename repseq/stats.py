@@ -17,7 +17,7 @@ REPSEQ_PATH = os.path.join(os.path.expanduser("~"), "soft", "repseq")
 AA_PROPS_PATH = os.path.join(REPSEQ_PATH, "repseq", "resourses", "aa_property_table.txt")
 
 
-def calc_clonoset_stats(clonosets_df, cl_filter=None):
+def calc_clonoset_stats(clonosets_df, cl_filter=None, verbose=True):
     """
     Calculates statistics for clonosets regarding clonotype, read and UMI counts.
     Also gives counts for functional clonotypes and non-singletons: clonotypes, 
@@ -33,7 +33,7 @@ def calc_clonoset_stats(clonosets_df, cl_filter=None):
         pd.DataFrame: dataframe with clonotype statistics for each sample in clonosets_df
     """
 
-    df = generic_calculation(clonosets_df, calculate_clonoset_stats_cl, clonoset_filter=cl_filter, program_name="CalcClonosetStats")
+    df = generic_calculation(clonosets_df, calculate_clonoset_stats_cl, clonoset_filter=cl_filter, program_name="CalcClonosetStats", verbose=verbose)
     convert_dict = {"clones": int,
                     "clones_func": int,
                     "clones_func_singletons": int,
@@ -387,7 +387,7 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
             need_top = True
         if need_downsample or need_top:
             print("Calcultating stats for original clonosets\n" + "_"*41)
-            stats = calc_clonoset_stats(clonosets_df)
+            stats = calc_clonoset_stats(clonosets_df, verbose=verbose)
             downsample_column = count_column_by_umi_and_functionality[clonoset_filter.by_umi][clonoset_filter.functionality]
             read_column = count_column_by_umi_and_functionality[False][clonoset_filter.functionality]
             top_column = clone_column_by_functionality[clonoset_filter.functionality]
