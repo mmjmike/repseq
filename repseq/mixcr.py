@@ -10,7 +10,6 @@ from subprocess import Popen, PIPE
 from IPython.display import Image, display, SVG
 
 
-
 def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
                          mixcr_path="mixcr", memory=32, time_estimate=1.5, custom_tag_pattern_column=None):
     
@@ -105,6 +104,81 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
         stdout, stderr = run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory)
         print(stdout, stderr)
     
+    print(f"{samples_num} tasks added to slurm queue\n")
+    print(f'To see running progress bar run this function in the next jupyter cell:\nslurm.check_slurm_progress("{slurm_batch_filename}", loop=True)')
+    print(f'To see current progress:\nslurm.check_slurm_progress("{slurm_batch_filename}")')
+
+
+def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=32, time_estimate=1.5):
+    
+    # default mixcr analyze slurm parameters. They are quite excessive, works fine.
+    max_memory = 1500
+    min_memory = 16
+    cpus=40
+    
+    program_name="MIXCR4 Analyze 7genes Batch"
+    samples_num = sample_df.shape[0]
+        
+    # Create output dir if does not exist
+    os.makedirs(output_folder, exist_ok=True)
+
+    
+    if not isinstance(memory, int):
+        raise TypeError("memory parameter must be an integer")
+    if memory < min_memory:
+        print(f"{memory} < than limit ({min_memory}), using {min_memory} GB")
+        memory = min_memory
+    if memory > max_memory:
+        print(f"{memory} > than limit ({max_memory}), using {max_memory} GB")
+        memory = max_memory
+        
+    # create slurm batch file for progress tracking
+    slurm_batch_filename = os.path.join(output_folder, "mixcr_analyze_slurm_batch.log")
+    create_slurm_batch_file(slurm_batch_filename, program_name, samples_num)
+    
+    list_of_incomplete_rearrangements = ["DJ_TRB", "VDD_TRD", "DDJ_TRD", "DD_TRD", "DJ_IGH", "VKDE_IGK", "CINTRON_KDE_IGK"]
+
+    # main cycle by samples
+    for i,r in sample_df.iterrows():
+        sample_id = r["sample_id"]
+        r1 = r["R1"]
+        r2 = r["R2"]
+        output_prefix = sample_id
+        
+        R1na = f"{sample_id}_R1_not_aligned.fastq.gz"
+        R2na = f"{sample_id}_R2_not_aligned.fastq.gz"
+        
+        commands = [f"cd {output_folder}"]
+        
+        first_command = f'{mixcr_path} -Xmx{memory}g analyze milab-human-dna-xcr-7genes-multiplex -f --not-aligned-R1 {R1na} --not-aligned-R2 {R2na} {r1} {r2} {output_prefix}'
+        commands.append(first_command)
+        
+        for rearrangement in list_of_incomplete_rearrangements:
+            
+            # swap r and Rna so we would not implement copy of R_na
+            r1, R1na = R1na, r1
+            r2, R2na = R2na, r2
+            
+            output_prefix = os.path.join(rearrangement, sample_id)
+            
+            R1na = f"{output_prefix}_R1_not_aligned.fastq.gz"
+            R2na = f"{output_prefix}_R2_not_aligned.fastq.gz"
+            
+            i_r_command = f'{mixcr_path} -Xmx{memory}g analyze generic-amplicon -f --species hs --library {rearrangement} --dna --floating-left-alignment-boundary --floating-right-alignment-boundary J -MexportClones.splitFilesBy=[] --not-aligned-R1 {R1na} --not-aligned-R2 {R2na} {r1} {r2} {output_prefix}'
+            commands.append(i_r_command)
+        
+        jobname = f"mixcr_analyze_{sample_id}"
+        
+        # for batch task finish tracking:
+        commands.append(f'echo "{jobname} finished" >> {slurm_batch_filename}')
+        
+        # join commands by && so that next command runs if previous was finished without error and add new lines to the script
+        command = " && \\ \n".join(commands)
+        
+        # create slurm script and add job to queue, print stdout of sbatch
+        stdout, stderr = run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory)
+        print(stdout, stderr)
+        # print(command)
     print(f"{samples_num} tasks added to slurm queue\n")
     print(f'To see running progress bar run this function in the next jupyter cell:\nslurm.check_slurm_progress("{slurm_batch_filename}", loop=True)')
     print(f'To see current progress:\nslurm.check_slurm_progress("{slurm_batch_filename}")')
@@ -272,6 +346,7 @@ def get_processing_table(folder, show_offtarget=False, off_target_chain_threshol
     if not show_offtarget:
         result_df = result_df.loc[result_df.reads_in_clones/result_df.reads_in_clones_total > off_target_chain_threshold]
     return result_df.sort_values(by="sample_id").reset_index(drop=True)
+
 
 def show_report_images(folder):
     """

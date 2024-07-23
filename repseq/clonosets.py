@@ -47,7 +47,8 @@ CHAIN_VARIANTS = {"TRA": {"TRAD", "TRA"},
                   "IGH": {"IGH"},
                   "IGK": {"IGK"},
                   "IGL": {"IGL"},
-                  "BCR": {"IGH", "IGK", "IGL"}}
+                  "BCR": {"IGH", "IGK", "IGL"},
+                  "IR": {"IR"}}
 
 def find_all_exported_clonosets(folders, chain=None, remove_non_target=False, non_target_threshold=0.01):
     """
