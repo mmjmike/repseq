@@ -495,7 +495,10 @@ def clusters_to_df(clusters):
             add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
             nodes.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.size, *add_properties_values))
     properties_names = ["node_id", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "size"] + additional_properties
-    return pd.DataFrame(nodes, columns=properties_names)
+    df = pd.DataFrame(nodes, columns=properties_names)
+    first_columns = ["cluster_no", "node_id"]
+    df = df[first_columns + [c for c in df.columns if c not in first_columns]]
+    return 
 
 def add_alice_hits_to_clusters(clusters, alice_hits_df, check_samples=True):
     nt_seq_colname = "CDR3.nucleotide.sequence"
