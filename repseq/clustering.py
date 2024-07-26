@@ -498,7 +498,7 @@ def clusters_to_df(clusters):
     df = pd.DataFrame(nodes, columns=properties_names)
     first_columns = ["cluster_no", "node_id"]
     df = df[first_columns + [c for c in df.columns if c not in first_columns]]
-    return 
+    return df
 
 def add_alice_hits_to_clusters(clusters, alice_hits_df, check_samples=True):
     nt_seq_colname = "CDR3.nucleotide.sequence"
