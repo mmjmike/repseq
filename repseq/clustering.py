@@ -212,7 +212,7 @@ def find_nodes_and_edges_tcrdist_no_gaps(clonoset_input, radius=16, count_by_fre
                                    "TRAV23/DV6": "TRAV23DV6",
                                    "TRAV29/DV5": "TRAV29DV5",
                                    "TRAV36/DV7": "TRAV36DV7",
-                                   "TRAV38-1/DV8": "TRAV38-1DV8"}
+                                   "TRAV38-2/DV8": "TRAV38-2DV8"}
     
     if isinstance(clonoset_input, str):
         clonoset=pd.read_csv(clonoset_input,sep="\t")
