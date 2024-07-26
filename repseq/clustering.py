@@ -484,6 +484,19 @@ def save_clusters_for_cytoscape(clusters, output_prefix, sample_metadata=None):
     properties_df.to_csv(properties_metadata_filename, index=False, sep="\t")
     print("Saved node properties and metadata to: {}".format(properties_metadata_filename))
 
+def clusters_to_df(clusters):
+    additional_properties=[]
+    for node in clusters[0]:
+        additional_properties = list(node.additional_properties.keys())
+        break
+    nodes = []
+    for cluster in clusters:
+        for node in cluster:
+            add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
+            nodes.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.size, *add_properties_values))
+    properties_names = ["node_id", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "size"] + additional_properties
+    return pd.DataFrame(nodes, columns=properties_names)
+
 def add_alice_hits_to_clusters(clusters, alice_hits_df, check_samples=True):
     nt_seq_colname = "CDR3.nucleotide.sequence"
     if nt_seq_colname not in alice_hits_df.columns:
