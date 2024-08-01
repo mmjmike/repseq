@@ -403,7 +403,7 @@ def create_clusters(clonoset_df, cl_filter=None, mismatches=1, overlap_type="aaV
     cluster_num = len(filter_one_node_clusters(clusters))
     singletons = total_clusters - cluster_num
     print(f"Found {cluster_num} clusters (2 or more nodes) and {singletons} single nodes. Total: {total_clusters}")
-    clusters.sort(key=lambda x: len(x), reverse=True)
+    clusters.sort(key=lambda x: (-len(x), calc_cluster_consensus(x, seq_type="prot", weighed=False)))
     write_cluster_no_to_nodes(clusters)
     return clusters
 
