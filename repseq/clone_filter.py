@@ -44,7 +44,7 @@ class Filter:
     def __init__(self, name="default_filter", functionality="a", downsample=None,
                  top=None, by_umi=False, mix_tails=False, count_threshold=None, 
                  unweight=False, seed=None, recount_fractions=True,
-                 white_list=[], black_list=[], pool_clonoset_by=""):
+                 white_list=[], black_list=[], pool_clonoset_by="", convert=True):
         self.name = name
         self.functionality = functionality
         self.downsample_size = downsample
@@ -58,6 +58,7 @@ class Filter:
         self.white_list = white_list
         self.black_list = black_list
         self.pool_by = pool_clonoset_by
+        self.convert = convert
         self._check_input()
         
     def spawn(self):
@@ -97,9 +98,14 @@ class Filter:
         if colnames is None:
             colnames = get_column_names_from_clonoset(clonoset)
 
-        # converting to common VDJtools-like format and obtaining new colnames
-        clonoset = self._convert_clonoset(clonoset, colnames)
+        # create common columns: vdj-refPoints and VDJC-segments in common state
+        clonoset = self._make_common_columns(clonoset, colnames)
         colnames = get_column_names_from_clonoset(clonoset)
+
+        # converting to common VDJtools-like format and obtaining new colnames
+        if self.convert:
+            clonoset = self._convert_clonoset(clonoset, colnames)
+            colnames = get_column_names_from_clonoset(clonoset)
 
         # application of main filters
         if self.functionality != "a":
@@ -182,7 +188,51 @@ class Filter:
             result_columns.append("sample_id")
         c_clonoset = c_clonoset.sort_values(by="count", ascending=False).reset_index(drop=True)
         return c_clonoset[result_columns]
+    
+    def _make_common_columns(self, clonoset_in, colnames):
+        clonoset = clonoset_in.copy()
+
+        # treat refPoints
+        refpoints_columns = ["VEnd", "DStart", "DEnd", "JStart"]
+        if len(set(clonoset.columns).intersection(set(refpoints_columns))) < 4: # check if not all the columns present
+            if "refPoints" in clonoset.columns: # if refPoints is present, create new columns
+                clonoset["VEnd"] = clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 11, minus=True))
+                clonoset["DStart"] = clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 12, minus=False))
+                clonoset["DEnd"] = clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 15, minus=True))
+                clonoset["JStart"] = clonoset["refPoints"].apply(lambda x: extract_refpoint_position(x, 16, minus=False))
         
+        # treat v,d,j segments
+
+        # V
+        if "v" not in clonoset.columns:
+            if colnames["v_column"] is not None:
+                clonoset["v"] = clonoset[colnames["v_column"]]
+        if "v" in clonoset.columns:
+            clonoset["v"] = clonoset["v"].apply(lambda x: extract_segment(x))
+        
+        # D
+        if "d" not in clonoset.columns:
+            if colnames["d_column"] is not None:
+                clonoset["d"] = clonoset[colnames["d_column"]]
+        if "d" in clonoset.columns:
+            clonoset["d"] = clonoset["d"].apply(lambda x: extract_segment(x))
+
+        # J
+        if "j" not in clonoset.columns:
+            if colnames["j_column"] is not None:
+                clonoset["j"] = clonoset[colnames["j_column"]]
+        if "j" in clonoset.columns:
+            clonoset["j"] = clonoset["j"].apply(lambda x: extract_segment(x))
+        
+        # C
+        if "c" not in clonoset.columns:
+            if colnames["c_column"] is not None:
+                clonoset["c"] = clonoset[colnames["c_column"]]
+        if "j" in clonoset.columns:
+            clonoset["c"] = clonoset["c"].apply(lambda x: extract_segment(x))
+
+
+
     def _unweight(self, clonoset_in, colnames):
         clonoset = clonoset_in.copy()
         clonoset[colnames["count_column"]] = 1

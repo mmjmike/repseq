@@ -236,10 +236,6 @@ def get_column_names_from_clonoset(clonoset):
     if "cloneCount" in clonoset.columns:
         colnames["count_column"] = "cloneCount"
         colnames["fraction_column"] = "cloneFraction"
-    if "count" in clonoset.columns:
-        colnames["count_column"] = "count"
-    if "freq" in clonoset.columns:
-        colnames["fraction_column"] = "freq"
     if "frequency" in clonoset.columns:
         colnames["fraction_column"] = "frequency"
     if "readCount" in clonoset.columns:
@@ -247,6 +243,10 @@ def get_column_names_from_clonoset(clonoset):
         colnames["fraction_column"] = "readFraction"
     if "Read.count" in clonoset.columns:
         colnames["count_column"] = "Read.count"
+    if "count" in clonoset.columns:
+        colnames["count_column"] = "count"
+    if "freq" in clonoset.columns:
+        colnames["fraction_column"] = "freq"
 
     if "aaSeqCDR3" in clonoset.columns:
         colnames["cdr3aa_column"] = "aaSeqCDR3"
@@ -269,35 +269,35 @@ def get_column_names_from_clonoset(clonoset):
 
     if "allVHitsWithScore" in clonoset.columns:
         colnames["v_column"] = "allVHitsWithScore"
-    if "v" in clonoset.columns:
-        colnames["v_column"] = "v"
     if "V" in clonoset.columns:
         colnames["v_column"] = "V"
     if "bestVGene" in clonoset.columns:
         colnames["v_column"] = "bestVGene"
+    if "v" in clonoset.columns:
+        colnames["v_column"] = "v"
 
     if "allDHitsWithScore" in clonoset.columns:
         colnames["d_column"] = "allDHitsWithScore"
-    if "d" in clonoset.columns:
-        colnames["d_column"] = "d"
     if "D" in clonoset.columns:
         colnames["d_column"] = "D"
+    if "d" in clonoset.columns:
+        colnames["d_column"] = "d"
 
     if "allJHitsWithScore" in clonoset.columns:
         colnames["j_column"] = "allJHitsWithScore"
-    if "j" in clonoset.columns:
-        colnames["j_column"] = "j"
     if "J" in clonoset.columns:
         colnames["j_column"] = "J"
     if "bestJGene" in clonoset.columns:
         colnames["j_column"] = "bestJGene"
+    if "j" in clonoset.columns:
+        colnames["j_column"] = "j"
 
     if "allCHitsWithScore" in clonoset.columns:
         colnames["c_column"] = "allCHitsWithScore"
-    if "c" in clonoset.columns:
-        colnames["c_column"] = "c"
     if "C" in clonoset.columns:
         colnames["c_column"] = "C"
+    if "c" in clonoset.columns:
+        colnames["c_column"] = "c"
 
     return colnames
 
