@@ -230,6 +230,14 @@ class Filter:
                 clonoset["c"] = clonoset[colnames["c_column"]]
         if "j" in clonoset.columns:
             clonoset["c"] = clonoset["c"].apply(lambda x: extract_segment(x))
+
+        if "cdr3aa" not in clonoset.columns:
+            if colnames["cdr3aa_column"] is not None:
+                clonoset["cdr3aa"] = clonoset[colnames["cdr3aa_column"]]
+        if "cdr3nt" not in clonoset.columns:
+            if colnames["cdr3nt_column"] is not None:
+                clonoset["cdr3nt"] = clonoset[colnames["cdr3nt_column"]]
+
         return clonoset
 
 
