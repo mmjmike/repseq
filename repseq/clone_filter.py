@@ -230,6 +230,7 @@ class Filter:
                 clonoset["c"] = clonoset[colnames["c_column"]]
         if "j" in clonoset.columns:
             clonoset["c"] = clonoset["c"].apply(lambda x: extract_segment(x))
+        return clonoset
 
 
 
