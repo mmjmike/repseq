@@ -14,7 +14,7 @@ def create_motif_dict(seq, seq_type="dna", weight=1):
         return 
     motif_dict = {var: [weight if seq[i]==var else 0 for i in range(len(seq))] for var in variants}
     return motif_dict    
-        
+
 def sum_motif_dicts(list_of_dicts):
     variants = list(list_of_dicts[0].keys())
     seq_len = len(list_of_dicts[0][list(list_of_dicts[0].keys())[0]])
@@ -81,7 +81,11 @@ def get_logo_for_clonoset(clonoset_df, weight_freq=False, seq_type="dna", plot=T
 
     get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=plot)
 
-def get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=True):
+def get_consensus_for_list_of_clonotypes(list_of_clonotypes, seq_type):
+    motif_dict_sum = make_motif_dict_for_list_of_clonotypes(list_of_clonotypes, seq_type)
+    return get_consensus_from_motif_dict(motif_dict_sum)
+
+def make_motif_dict_for_list_of_clonotypes(list_of_clonotypes, seq_type):
     motif_dicts = []
     for clone in list_of_clonotypes:
         weight = 1
@@ -93,6 +97,10 @@ def get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=True):
     #print(len(motif_dicts))
     motif_dict_sum = sum_motif_dicts(motif_dicts)
     motif_dict_sum = normalize_motif_dict(motif_dict_sum)
+    return motif_dict_sum
+
+def get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=True):
+    motif_dict_sum = make_motif_dict_for_list_of_clonotypes(list_of_clonotypes, seq_type)
     info_matrix = logomaker.transform_matrix(pd.DataFrame(motif_dict_sum), 
                                   from_type='probability', 
                                   to_type='information')
