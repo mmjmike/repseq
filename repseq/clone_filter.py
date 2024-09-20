@@ -44,7 +44,8 @@ class Filter:
     def __init__(self, name="default_filter", functionality="a", downsample=None,
                  top=None, by_umi=False, mix_tails=False, count_threshold=None, 
                  unweight=False, seed=None, recount_fractions=True,
-                 white_list=[], black_list=[], pool_clonoset_by="", convert=True):
+                 white_list=[], black_list=[], pool_clonoset_by="", convert=True, 
+                 ignore_small_clonosets=False):
         self.name = name
         self.functionality = functionality
         self.downsample_size = downsample
@@ -59,6 +60,7 @@ class Filter:
         self.black_list = black_list
         self.pool_by = pool_clonoset_by
         self.convert = convert
+        self.ignore_small_clonosets = ignore_small_clonosets
         self._check_input()
         
     def spawn(self):
@@ -323,8 +325,12 @@ class Filter:
         total_count = int(clonoset[count_column].sum())
 
         # raise ValueError if UMI/read count is less then downsample_size
+        
         if total_count < self.downsample_size:
-            raise ValueError(f"total count {total_count} is less than downsample size {self.downsample_size}")
+            if self.ignore_small_clonosets:
+                return clonoset
+            else:
+                raise ValueError(f"total count {total_count} is less than downsample size {self.downsample_size}")
         elif total_count == self.downsample_size:
             return clonoset
         
@@ -386,7 +392,10 @@ class Filter:
             clonoset = clonoset.sort_values(by=count_column, ascending=False)
 
         if self.top > len(clonoset):
-            raise ValueError(f"Warning! Clonoset size - {len(clonoset)} - is less than required top - {self.top}")
+            if self.ignore_small_clonosets:
+                return clonoset
+            else:
+                raise ValueError(f"Warning! Clonoset size - {len(clonoset)} - is less than required top - {self.top}")
         
         # take top
         if self.top > 0:
