@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import os
 from .slurm import create_slurm_batch_file, run_slurm_command_from_jupyter
-from .io import read_json_report, read_mixcr_clonoset
+from .io import read_json_report, read_clonoset
 from .clonosets import find_all_exported_clonosets_in_folder, filter_nonfunctional_clones
 from subprocess import Popen, PIPE
 from IPython.display import Image, display, SVG
@@ -287,7 +287,7 @@ def get_processing_table(folder, show_offtarget=False, off_target_chain_threshol
         assemble_report = read_json_report(sample_id, folder, "assemble")
 
         # print(sample_id, chain)
-        clonoset = read_mixcr_clonoset(r.filename)
+        clonoset = read_clonoset(r.filename)
         clonoset_f = filter_nonfunctional_clones(clonoset)
 
         # align report
