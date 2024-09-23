@@ -192,10 +192,10 @@ def filter_by_functionality(clonoset_in, colnames=None, functional=True):
         colnames = get_column_names_from_clonoset(clonoset)
     cdr3aa_column = colnames["cdr3aa_column"]
     if functional:
-        clonoset = clonoset.loc[~clonoset[cdr3aa_column].str.contains("\*|_")]
+        clonoset = clonoset.loc[~clonoset[cdr3aa_column].str.contains("\*|_", na=False)]
         clonoset = clonoset.loc[clonoset[cdr3aa_column] != ""]
     else:
-        clonoset = clonoset.loc[(clonoset[cdr3aa_column].str.contains("\*|_")) | (clonoset[cdr3aa_column] == "")]
+        clonoset = clonoset.loc[(clonoset[cdr3aa_column].str.contains("\*|_", na=False)) | (clonoset[cdr3aa_column] == "")]
 
     return clonoset
 
