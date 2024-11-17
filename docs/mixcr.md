@@ -1,7 +1,7 @@
 
-# MiXCR4 functions for batch analysis in Jupyter. Uses SLURM on Aldan3 server
+# MiXCR4 functions for batch analysis in Jupyter. Uses SLURM on Aldan3 server <!-- {docsify-ignore-all} -->
 
-## mixcr4_analyze_batch <!-- {docsify-ignore-all} -->
+## mixcr4_analyze_batch
 ::: mixcr.mixcr4_analyze_batch
 
 ## mixcr4_reports
