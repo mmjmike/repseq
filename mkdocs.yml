@@ -71,7 +71,6 @@ plugins:
   #     nav_file: SUMMARY.md
   # - section-index
   - mkdocstrings:
-        auto_toc: false      
         handlers:
           python:
             paths: [./repseq]
