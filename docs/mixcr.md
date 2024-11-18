@@ -3,6 +3,8 @@
 
 ## mixcr4_analyze_batch 
 ::: mixcr.mixcr4_analyze_batch
+options:
+  show_root_toc_entry: false
 
 ## mixcr4_reports
 ::: mixcr.mixcr4_reports
