@@ -111,7 +111,18 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
 
 def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=32, time_estimate=1.5):
     '''
-    
+    Function for batch runs of MiXCR software using SLURM using "Human 7GENES DNA Multiplex" MiXCR built-in preset. 
+    Args:
+        sample_df (pd.DataFrame): DataFrame, containing 'sample_id' column and 
+            'R1' and 'R2' columns, containing paths (recommended full paths) to raw read files
+        output_folder (str): path to output folder
+        mixcr_path (str): path to MiXCR binary
+        memory (int): required OOM in GB
+        time_estimate (numeric): time estimate in hours for the calculation. It
+            is the limit for SLURM task
+
+    Returns:
+        None
     '''
     # default mixcr analyze slurm parameters. They are quite excessive, works fine.
     max_memory = 1500
