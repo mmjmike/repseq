@@ -110,7 +110,9 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
 
 
 def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=32, time_estimate=1.5):
+    '''
     
+    '''
     # default mixcr analyze slurm parameters. They are quite excessive, works fine.
     max_memory = 1500
     min_memory = 16
