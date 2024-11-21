@@ -111,7 +111,8 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
 
 def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=32, time_estimate=1.5):
     '''
-    Function for batch runs of MiXCR software using SLURM using "Human 7GENES DNA Multiplex" MiXCR built-in preset. 
+    Function for batch runs of MiXCR software using SLURM using "Human 7GENES DNA Multiplex" MiXCR built-in preset.
+    
     Args:
         sample_df (pd.DataFrame): DataFrame, containing 'sample_id' column and 
             'R1' and 'R2' columns, containing paths (recommended full paths) to raw read files

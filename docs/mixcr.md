@@ -7,7 +7,7 @@
       show_root_toc_entry: false
 
 ## mixcr_7genes_run_batch 
-::: mixcr_7genes_run_batch
+::: mixcr.mixcr_7genes_run_batch
     options:
           show_root_toc_entry: false
 
