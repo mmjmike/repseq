@@ -110,21 +110,25 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
 
 
 def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=32, time_estimate=1.5):
-    '''
-    Function for batch runs of MiXCR software using SLURM using "Human 7GENES DNA Multiplex" MiXCR built-in preset.
-    
+    """
+    Function for batch runs of the MiXCR software using the SLURM `mixcr analyze` command and the `Human 7GENES DNA Multiplex` MiXCR built-in preset. 
+    Incomplete rearrangements obtained by this kit are also included. For each incomplete rearrangement, unaligned reads from the previous 
+    step are iteratively processed. Each output is stored in a subdirectory named after the corresponding rearrangement.
+    For each record in the given `sample_df`, this function creates a SLURM script in the `~/temp/slurm` folder and adds it to the SLURM queue. 
+    All `stdout` logs are also saved to the `~/temp/slurm` folder. In case of troubles, check the latest logs in this folder. 
+
     Args:
-        sample_df (pd.DataFrame): DataFrame, containing 'sample_id' column and 
-            'R1' and 'R2' columns, containing paths (recommended full paths) to raw read files
-        output_folder (str): path to output folder
-        mixcr_path (str): path to MiXCR binary
-        memory (int): required OOM in GB
-        time_estimate (numeric): time estimate in hours for the calculation. It
-            is the limit for SLURM task
+        sample_df (pd.DataFrame): DataFrame containing a 'sample_id' column and 
+            'R1' and 'R2' columns containing paths (recommended full paths) to raw read files.
+        output_folder (str): Path to the output folder.
+        mixcr_path (str): Path to the MiXCR binary.
+        memory (int): Required OOM in GB.
+        time_estimate (numeric): Time estimate in hours for the calculation; it 
+            is the limit for the SLURM task.
 
     Returns:
         None
-    '''
+    """
     # default mixcr analyze slurm parameters. They are quite excessive, works fine.
     max_memory = 1500
     min_memory = 16
