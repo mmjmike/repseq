@@ -35,8 +35,11 @@ def wilcox_diff_expression(count_table, sample_metadata, min_samples=2, count_th
         df = calc_mann_whitney_for_group_pair(count_table, pair, group1_samples, group2_samples, count_threshold, min_samples)
         
         result_df = df
-        result_df = result_df.sort_values(by="p_adj").reset_index(drop=True)
-        return result_df
+        result_df = result_df.sort_values(by="p_adj")
+
+        # cut the table by pval_cutoff
+        result_df = result_df[result_df.p_adj <= pval_cutoff] 
+        return result_df.reset_index(drop=True)
     
     # more than two groups
     else:
