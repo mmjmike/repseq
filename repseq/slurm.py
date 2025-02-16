@@ -19,10 +19,11 @@ def partition_by_time(t):
     return partition
 
 
-def run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory, log_filename=None):
+def run_slurm_command_from_jupyter(command, jobname=None, cpus=40, time_estimate=1.5, memory=32, log_filename=None):
     # prepare task parameters and script name
     os.makedirs(ALDAN_TEMP_SLURM_DIR, exist_ok=True)
-    
+    if not isinstance(jobname, str) or jobname == "":
+        raise ValueError("Please set a short meaningful jobname")
     h=int(time_estimate)
     m=int((time_estimate-h)*60)
     datetime = strftime("%Y_%m_%d__%H_%M_%S", gmtime())
