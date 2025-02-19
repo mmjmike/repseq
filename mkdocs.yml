@@ -4,6 +4,7 @@ theme:
   features:
     - navigation.tabs
     - navigation.sections
+    - navigation.path
     - toc.integrate
     - navigation.top
     - search.suggest
@@ -28,12 +29,16 @@ theme:
 
 nav:
   - Home: index.md
-  - MiXCR module: mixcr.md
-  - Postanalysis: postanalysis.md
-  - Clone filter: filter.md
-  - Supporting modules: supporting_modules.md
+  - Installation: installation.md
+  - Modules: modules.md
+  - Functions: functions.md
+  - Usage:
+      - MiXCR: usage_mixcr.md
+      - Stats: usage_stats.md
+      - Intersections: usage_intersections.md
+      - Clustering: usage_clustering.md
+      - Differential expression: usage_diffexp.md
   - Test page: page2.md
-  - Examples: examples.md
   # - Code Reference: reference/
 
 
@@ -45,6 +50,8 @@ extra:
 
 
 markdown_extensions:
+  - toc:
+      toc_depth: 2
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
@@ -63,13 +70,13 @@ markdown_extensions:
 
 
 plugins:
-  # - search
-  # - gen-files:
-  #     scripts:
-  #       - docs/gen_ref_pages.py
-  # - literate-nav:
-  #     nav_file: SUMMARY.md
-  # - section-index
+  - search
+  - gen-files:
+      scripts:
+        - docs/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
   - mkdocstrings:
         handlers:
           python:

@@ -25,3 +25,8 @@
 ::: mixcr.show_report_images
     options:
           show_root_toc_entry: false
+          
+## show_report_images
+::: mixcr.show_report_images
+    options:
+          show_root_toc_entry: false
