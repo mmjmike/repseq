@@ -81,6 +81,33 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
 
 
 def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, strict_presense=False, by_freq=False):
+    """
+    Creates a table that shows how many times each unique clonotype appears across different clonosets. It processes a given dataset of clonotypes (clonosets_df) 
+    and generates a frequency/count table based on a specified overlap type.
+    
+    Args:
+        clonosets_df (pd.DataFrame): contains three columns - `sample_id` and `filename` columns,
+            `filename` - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
+            sample_id's should be all unique in this DF
+        overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence
+            to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
+            to decide if clonotypes are equal
+        mismatches (int): The permissible number of single-letter mismatches in clonotypes sequences 
+            for them to be treated similar, i.e. hamming distance.
+        only_functional (bool): use only functional clonotypes (do not contain stop codons or
+            frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
+            1 after filtering of non-functional clonotypes
+        strict_presence (bool, default:): if set to `True` and the clonotype is not found in the clonoset, it will not be counted, even when the `mismatches` option is not set to 0.
+            If `False`, mismatched sequences are counted even if the exact match does not exist.
+                by_freq (bool): default is `True` - this means that the intersect metric is frequency of clonotype, 
+            but not its count
+        by_freq (bool): default is `True` - this means that the intersect metric is frequency of clonotype, 
+            but not its count
+    
+    Returns:
+        df (pd.DataFrame): dataframe containing clonotype counts with sample names as columns and all possible clonotypes (given the overlap_type) as rows. 
+    """
+
     
     print("Creating clonotypes count table\n"+"-"*50)
     print(f"Overlap type: {overlap_type}")
@@ -133,6 +160,30 @@ def count_table_mp(args):
 
 
 def count_table_by_cluster(clonosets_df, clusters_list, cl_filter=None, overlap_type="aaV", mismatches=0, by_freq=True):
+    
+    """
+    This function creates a table that shows the presence of clonotypes grouped into user-provided clusters across different clonosets. Instead of counting individual clonotypes, it 
+    calculates how many clonotypes from each cluster appear in each clonoset.
+    
+    Args:
+        clonosets_df (pd.DataFrame): contains three columns - `sample_id` and `filename` columns,
+            filename - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
+            sample_id's should be all unique in this DF
+        cluster_list (?): description
+        overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence
+            to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
+            to decide if clonotypes are equal
+        mismatches (int): The permissible number of single-letter mismatches in clonotypes sequences 
+            for them to be treated similar, i.e. hamming distance.
+        only_functional (bool): use only functional clonotypes (do not contain stop codons or
+            frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
+            1 after filtering of non-functional clonotypes
+    
+    Returns:
+        df (pd.DataFrame): dataframe with following columns: description
+    """
+    
+    
     
     print("Creating clonotypes count table\n"+"-"*50)
     print(f"Overlap type: {overlap_type}")

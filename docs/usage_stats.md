@@ -33,8 +33,10 @@ v_usage = stats.calc_segment_usage(clonosets, segment="v", cl_filter=func_filter
 
 ??? info "Convergence visualization"
     Calculated stats can be visualized in Jupyter notebook using %%R cell magic. 
-    ![convergence]("../images_docs/convergence.png")
+    ![convergence](images_docs/convergence.png)
+    
     ```py
+    %load_ext rpy2.ipython
     %%R -i convergence,metadata -w 400 -h 300
 
     params_order <- c("convergence")
@@ -56,9 +58,10 @@ v_usage = stats.calc_segment_usage(clonosets, segment="v", cl_filter=func_filter
 
 ??? info "Diversity visualization"
     Calculated stats can be visualized in Jupyter notebook using %%R cell magic. 
-    ![diversity]("../images_docs/diversity.png")
+    ![diversity](images_docs/diversity.png)
     
     ```py
+    %load_ext rpy2.ipython
     %%R -i diversity_stats,metadata -w 900 -h 300
 
     params_order <- c("diversity", "norm_shannon_wiener", "chao1")
@@ -80,9 +83,10 @@ v_usage = stats.calc_segment_usage(clonosets, segment="v", cl_filter=func_filter
 
 ??? info "CDR3 properties visualization"
     Calculated stats can be visualized in Jupyter notebook using %%R cell magic. 
-    ![cdr3_properties]("../images_docs/cdr3_properties.png")
+    ![cdr3_properties](images_docs/cdr3_properties.png)
     
     ```py
+    %load_ext rpy2.ipython
     %%R -i cdr3_properties,metadata -w 900 -h 500
 
     params_order <- c("mean_cdr3nt_len", "mean_insert_size", "zero_insert_freq", "cdr3_5_charge", "cdr3_5_kf4")
@@ -104,9 +108,10 @@ v_usage = stats.calc_segment_usage(clonosets, segment="v", cl_filter=func_filter
 
 ??? info "V-segment usage visualization"
     Calculated stats can be visualized in Jupyter notebook using %%R cell magic. 
-    ![v_segment]("../images_docs/v_usage.png")
+    ![v_segment](images_docs/v_usage.png)
     
-    ```p
+    ```py
+    %load_ext rpy2.ipython
     %%R -i v_usage,metadata -w 1200 -h 600
 
     v_usage_order <- v_usage %>% select(v) %>% distinct() %>%
@@ -132,4 +137,4 @@ v_usage = stats.calc_segment_usage(clonosets, segment="v", cl_filter=func_filter
             )+
             ggtitle("nCD4 V-usage")+
             scale_fill_manual(values = colors_6_groups)
-        ```
+    ```
