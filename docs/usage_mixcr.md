@@ -43,7 +43,8 @@ proc_table = mx.get_processing_table(output_dir).merge(metadata)
 
 ??? info "Visualization"
     Properties from proc_table can be visualized in Jupyter notebook using %%R cell magic. 
-    ![proc_table]("../images_docs/proc_table.png")
+    ![proc_table](images_docs/proc_table.png)
+    
     ```py
     %load_ext rpy2.ipython
     %%R -i proc_table -w 900 -h 500
