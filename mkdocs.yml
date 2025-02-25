@@ -74,8 +74,8 @@ plugins:
   # - gen-files:
   #     scripts:
   #       - docs/gen_ref_pages.py
-  - literate-nav:
-      nav_file: SUMMARY.md
+  # - literate-nav:
+  #     nav_file: SUMMARY.md
   - section-index
   - mkdocstrings:
         handlers:
