@@ -5,7 +5,7 @@ import numpy as np
 from .common_functions import run_parallel_calculation
 
 
-def wilcox_diff_expression(count_table, sample_metadata, min_samples=2, count_threshold=0.00005, pval_cutoff=0.05):
+def wilcox_diff_expression(count_table, sample_metadata, min_samples=2, count_threshold=0.00005, pval_cutoff=0.05, cpu=None):
     
     # sample_metadata must contain column 'group' and 'sample_id'
     # sample_id's in sample_metadata must pair with count table column_names
@@ -72,7 +72,7 @@ def wilcox_diff_expression(count_table, sample_metadata, min_samples=2, count_th
             task = (count_table, pair, group1_samples, group2_samples, count_threshold, min_samples)
             tasks.append(task)
             
-        result_dfs = run_parallel_calculation(calc_mann_whitney_for_group_pair_mp, tasks, "Calc Mann-Whitney For Pairs", object_name="pairs")
+        result_dfs = run_parallel_calculation(calc_mann_whitney_for_group_pair_mp, tasks, "Calc Mann-Whitney For Pairs", object_name="pairs", cpu=cpu)
         
         result_df = pd.concat(result_dfs).reset_index(drop=True).merge(count_table)
         
