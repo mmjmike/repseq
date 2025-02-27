@@ -36,6 +36,7 @@ def run_parallel_calculation(function, tasks, program_name, object_name="tasks",
     if verbose:
         print_progress_bar(tasks_done, tasks_total, program_name, object_name=object_name)
     if cpu == 1:
+        print(f"Using {cpu} cores")
         for task in tasks:
             result = function(task)
             result_list.append(result)
@@ -43,6 +44,7 @@ def run_parallel_calculation(function, tasks, program_name, object_name="tasks",
             if verbose:
                 print_progress_bar(tasks_done, tasks_total, program_name, object_name=object_name)
     else:
+        print(f"Using {cpu} cores")
         with concurrent.futures.ProcessPoolExecutor(max_workers=cpu) as executor:
             for result in executor.map(function, tasks):
                 result_list.append(result)
