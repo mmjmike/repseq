@@ -12,7 +12,7 @@ from repseq import mixcr as mx
 from repseq import slurm
 from repseq import io as repseqio
 
-sample_df = repseqio.repseqio.read_yaml_metadata(RAW_DATA_DIR, METADATA_FILENAME)
+sample_df = repseqio.read_yaml_metadata(RAW_DATA_DIR, METADATA_FILENAME)
 metadata = sample_df.prop(columns=['R1', 'R2'])
 output_dir = ...
 path_to_mixcr_binary = ...
