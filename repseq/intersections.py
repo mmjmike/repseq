@@ -92,7 +92,7 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
         overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence
             to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
             to decide if clonotypes are equal
-        mismatches (int): The permissible number of single-letter mismatches in clonotypes sequences 
+        mismatches (int): Max number of single-letter mismatches in clonotypes sequences 
             for them to be treated similar, i.e. hamming distance.
         only_functional (bool): use only functional clonotypes (do not contain stop codons or
             frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
@@ -173,17 +173,15 @@ def count_table_by_cluster(clonosets_df, clusters_list, cl_filter=None, overlap_
         overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence
             to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
             to decide if clonotypes are equal
-        mismatches (int): The permissible number of single-letter mismatches in clonotypes sequences 
+        mismatches (int): Max number of single-letter mismatches in clonotypes sequences 
             for them to be treated similar, i.e. hamming distance.
         only_functional (bool): use only functional clonotypes (do not contain stop codons or
             frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
             1 after filtering of non-functional clonotypes
     
     Returns:
-        df (pd.DataFrame): dataframe with following columns: description
+        df (pd.DataFrame): dataframe with the following columns: description
     """
-    
-    
     
     print("Creating clonotypes count table\n"+"-"*50)
     print(f"Overlap type: {overlap_type}")
@@ -270,6 +268,27 @@ def count_table_by_cluster_mp(args):
 
 
 def tcrnet(clonosets_df_exp, clonosets_df_control, cl_filter=None, cl_filter_c=None, overlap_type="aaVJ", mismatches=1):
+    
+    """
+    This is an implementation of TCRnet (TCR neighbour enrichment test) algorithm.  It identifies similar clonotypes for the experimental dataset and the control one based on sequence 
+    similarity (allowing up to `mismatches` differences).    
+    Args:
+        clonosets_df_exp (pd.DataFrame): a DataFrame with experimental clonosets containing three columns - `sample_id` and `filename` columns,
+            filename - full path to a clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
+        clonosets_df_control (pd.DataFrame): a DataFrame with control clonosets containing three columns - `sample_id` and `filename` columns,
+            filename - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
+        cl_filter (repseq.clone_filter.Filter): A filter applied to the experimental dataset before processing
+        cl_filter_c (repseq.clone_filter.Filter): A filter applied to the control dataset before processing
+        overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence
+            to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
+            to decide if clonotypes are equal
+        mismatches (int): Max number of single-letter mismatches in clonotype sequences 
+            for them to be treated similar, i.e. hamming distance.
+    
+    Returns:
+        df (pd.DataFrame): dataframe with following columns: `fold`, `p_value_b`, `p_value_p`, `p_value_b_adj`, `p_value_p_adj`, `log10_b_adj`, `log10_p_adj`, `log2_fc`. `p` in `p_value` 
+        stands for `poisson`, `b` for `binomial`, `adj` for multiple testing correction, and `log2_fc`for log2 fold change 
+    """
     
     print("Running TCRnet neighbour count\n"+"-"*50)
     print(f"Overlap type: {overlap_type}")
@@ -393,7 +412,7 @@ def overlap_distances(clonosets_df, cl_filter=None, overlap_type="aaV", mismatch
         overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence
             to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
             to decide if clonotypes are equal
-        mismatches (int): The permissible number of single-letter mismatches in clonotypes sequences 
+        mismatches (int): Max number of single-letter mismatches in clonotypes sequences 
             for them to be treated similar, i.e. hamming distance.
         by_umi (bool): set =True for MiXCR4 clonosets to select count/frequency of clonotypes 
             in UMI's if they exist in implemented protocol
@@ -485,7 +504,7 @@ def find_intersecting_clonotypes(clonosets_df, cl_filter=None, overlap_type="aaV
         overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence
             to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
             to decide if clonotypes are equal
-        mismatches (int): The permissible number of single-letter mismatches in clonotypes sequences 
+        mismatches (int): Max number of single-letter mismatches in clonotypes sequences 
             for them to be treated similar, i.e. hamming distance.
         by_umi (bool): set =True for MiXCR4 clonosets to select count/frequency of clonotypes 
             in UMI's if they exist in implemented protocol

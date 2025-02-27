@@ -5,39 +5,51 @@ MiXCR is the leading software for generating clonoset tables from raw FastQ file
 !!! note "Setting up the environment"
     Before getting started, make sure that main_repseq environment is chosen. Otherwise, check the [installation guide](installation.md)
 
+1) Create sample_df from dataset metadata in .yaml format (if it's in a tabular format, use external libraries such as Pandas). Remove unnesessary columns if needed. If METADATA_FILENAME is absent, it is set to `metadata.yaml` by default. If your dataset does not have metadata, create the dataframe manually. The neccessary columns are: R1, R2, sample_id, where R1 and R2 contain paths (using full paths is advised) to respective raw files, and sample_id are arbitrary unique identificators.
+
 ``` py
 from repseq import mixcr as mx
 from repseq import slurm
 from repseq import io as repseqio
 
-# 1) Create sample_df from dataset metadata in .yaml format (if it's in a tabular format, use external libraries such as Pandas). 
-# Remove unnesessary columns if needed.
-# If METADATA_FILENAME is absent, it is set to `metadata.yaml` by default. If your dataset does not have metadata, create the dataframe manually. 
-# The neccessary columns are: R1, R2, sample_id, where R1 and R2 contain paths (using full paths is advised) to respective raw files, 
-# and sample_id are arbitrary unique identificators
-sample_df = repseqio.repseqio.read_yaml_metadata(RAW_DATA_DIR, METADATA_FILENAME)
+sample_df = repseqio.read_yaml_metadata(RAW_DATA_DIR, METADATA_FILENAME)
 metadata = sample_df.prop(columns=['R1', 'R2'])
 output_dir = ...
 path_to_mixcr_binary = ...
+```
 
-# 2) Create a command template for mixcr analyze. The default template is `mixcr analyze milab-human-rna-tcr-umi-multiplex -f r1 r2 output_prefix`. 
-# In case of Human 7GENES DNA Multiplex MiXCR built-in preset, no template is needed.
+2) Create a command template for mixcr analyze. The default template is `mixcr analyze milab-human-rna-tcr-umi-multiplex -f r1 r2 output_prefix`. In case of Human 7GENES DNA Multiplex MiXCR built-in preset, no template is needed.
+
+```py
 mixcr_race_command_template = "mixcr analyze milab-human-rna-tcr-umi-race -f r1 r2 output_prefix"
+```
 
-# 3) Run mixcr analyze in batches
+3) Run mixcr analyze in batches:
+
+```py
 mx.mixcr4_analyze_batch(sample_df, output_dir, command_template=mixcr_race_command_template,
                         path_to_mixcr_binary, memory=32, time_estimate=1.5)
 # OR 
 # mx.mixcr_7genes_run_batch(sample_df, output_dir, path_to_mixcr_binary, memory=32, time_estimate=1.5)
-# to check the progress, use
-slurm.check_slurm_progress(os.path.join(output_dir, "mixcr_analyze_slurm_batch.log"), loop=True)
+```
 
-# 4) make reports (combines mixcr exportQc align, chainUsage and tags) and get report images
+To check the progress, use
+
+```py
+slurm.check_slurm_progress(os.path.join(output_dir, "mixcr_analyze_slurm_batch.log"), loop=True)
+```
+
+4) make reports (combines mixcr exportQc align, chainUsage and tags) and get report images
+
+```py
 mx.mixcr4_reports(output_dir, mixcr_path=path_to_mixcr_binary)
 slurm.check_slurm_progress(os.path.join(output_dir, "mixcr_reports_slurm_batch.log"), loop=True
 mx.show_report_images(output_dir)
+```
 
-# 5) get a tabular report
+5) get a tabular report
+
+```py
 proc_table = mx.get_processing_table(output_dir).merge(metadata)
 ```
 
