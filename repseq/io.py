@@ -101,6 +101,8 @@ def read_clonoset(filename):
     d_types_bioadaptive = {'nucleotide': str, 'aminoAcid': str,
                             'count (templates/reads)': int,
                             'frequencyCount (%)': float,
+                            'count': int,
+                            'frequencyCount': float,
                             'vGeneName': str, 'dGeneName': str,
                             'jGeneName': str, 'cdr3Length': int,
                             'n1Index': int,'dIndex': int,
@@ -114,7 +116,7 @@ def read_clonoset(filename):
         inner_filename = zipfile.ZipFile.namelist(archive)[0]
         filename = archive.open(inner_filename)
     clonoset = pd.read_csv(filename, sep="\t", dtype=datatypes)
-    if 'count (templates/reads)' in clonoset.columns:
+    if "nucleotide" in clonoset.columns and "aminoAcid" in clonoset.columns:
         clonoset = convert_bioadaptive_clonoset(clonoset)
     return clonoset
 
@@ -160,11 +162,14 @@ def open_json_report(filename):
 
 def convert_bioadaptive_clonoset(clonoset):
     # clonoset = clonoset.loc[clonoset.sequenceStatus == "In"]
-    clonoset = clonoset[["count (templates/reads)", "frequencyCount (%)", "nucleotide", "aminoAcid",
-                         "vMaxResolved", "dMaxResolved", "jMaxResolved", "n1Index", "dIndex", "n2Index", "jIndex"]]
+    putative_colnames = ["count (templates/reads)", "count", "frequencyCount", "frequencyCount (%)", "nucleotide", "aminoAcid",
+                         "vMaxResolved", "dMaxResolved", "jMaxResolved", "n1Index", "dIndex", "n2Index", "jIndex"]
+
+    clonoset = clonoset[[c for c in putative_colnames if c in clonoset.columns]]
     clonoset = clonoset.rename(columns={
         "count (templates/reads)": "count",
         "frequencyCount (%)": "freq",
+        "frequencyCount": "freq",
         "nucleotide": "cdr3nt",
         "aminoAcid": "cdr3aa",
         "vMaxResolved": "v",
