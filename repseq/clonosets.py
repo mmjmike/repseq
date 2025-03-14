@@ -251,6 +251,8 @@ def get_column_names_from_clonoset(clonoset):
 
     if "aaSeqCDR3" in clonoset.columns:
         colnames["cdr3aa_column"] = "aaSeqCDR3"
+    if "aaSeqImputedCDR3" in clonoset.columns:
+        colnames["cdr3aa_column"] = "aaSeqImputedCDR3"
     if "cdr3aa" in clonoset.columns:
         colnames["cdr3aa_column"] = "cdr3aa"
     if "CDR3aa" in clonoset.columns:
@@ -260,6 +262,8 @@ def get_column_names_from_clonoset(clonoset):
 
     if "nSeqCDR3" in clonoset.columns:
         colnames["cdr3nt_column"] = "nSeqCDR3"
+    if "nSeqImputedCDR3" in clonoset.columns:
+        colnames["cdr3nt_column"] = "nSeqImputedCDR3"
     if "cdr3nt" in clonoset.columns:
         colnames["cdr3nt_column"] = "cdr3nt"
     if "CDR3nt" in clonoset.columns:
