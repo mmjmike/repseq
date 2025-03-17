@@ -2,6 +2,8 @@ conda create -n main python=3.9
 conda activate main
 conda install rpy2
 conda install r-tidyverse
+conda install r-pheatmap
+conda install r-ggpubr
 conda install notebook ipykernel
 ipython kernel install --user
 conda install pandas
@@ -11,4 +13,5 @@ conda install networkx
 conda install scipy
 conda install dill
 conda install matplotlib
+conda install seaborn
 conda install -c bioconda logomaker
