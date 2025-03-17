@@ -69,12 +69,14 @@ class Node:
 
 class Clusters:
 
-    def __init__(self, clonosets, overlap_type="aaV"):
+    def __init__(self, clonosets, cl_filter=None, overlap_type="aaV", mismatches=1):
         self.clonosets = clonosets
         self.overlap_type = overlap_type
+        self.filter = cl_filter
+        self.mismatches = mismatches
         self.cluster_list = None
         
-    def calculate(self):
+    def create(self):
         pass
 
     def properties(self):
@@ -90,7 +92,9 @@ class Clusters:
 class Cluster:
 
     def __init__(self, nx_graph):
-        self.graph = nx_graph 
+        self.graph = nx_graph
+
+    
 
 
 
