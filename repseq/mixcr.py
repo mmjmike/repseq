@@ -182,7 +182,7 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
             R1na = f"{output_prefix}_R1_not_aligned.fastq.gz"
             R2na = f"{output_prefix}_R2_not_aligned.fastq.gz"
             
-            i_r_command = f'{mixcr_path} -Xmx{memory}g analyze generic-amplicon -f --species hs --library {rearrangement} --dna --floating-left-alignment-boundary --floating-right-alignment-boundary J -MexportClones.splitFilesBy=[] --not-aligned-R1 {R1na} --not-aligned-R2 {R2na} {r1} {r2} {output_prefix}'
+            i_r_command = f'{mixcr_path} -Xmx{memory}g analyze generic-amplicon -f --species hs --library {rearrangement} --assemble-clonotypes-by CDR3 --dna --floating-left-alignment-boundary --floating-right-alignment-boundary J -MexportClones.splitFilesBy=[] --not-aligned-R1 {R1na} --not-aligned-R2 {R2na} {r1} {r2} {output_prefix}'
             commands.append(i_r_command)
         
         jobname = f"mixcr_analyze_{sample_id}"
