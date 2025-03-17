@@ -20,7 +20,12 @@ path_to_mixcr_binary = ...
 ```
 
 sample_df example:
-|    | sample_id     | R1                                                         | R2                                                         |\n|---:|:--------------|:-----------------------------------------------------------|:-----------------------------------------------------------|\n|  0 | sample_1_nCD4 | /home/user/samples/sample1_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample1_nCD4_1_TRB_L001_R2_001.fastq.gz |\n|  1 | sample_2_nCD4 | /home/user/samples/sample2_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample2_nCD4_1_TRB_L001_R2_001.fastq.gz |\n|  2 | sample_3_nCD4 | /home/user/samples/sample3_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample3_nCD4_1_TRB_L001_R2_001.fastq.gz |
+|    | sample_id     | R1                                                         | R2                                                         |
+|---:|:--------------|:-----------------------------------------------------------|:-----------------------------------------------------------|
+|  0 | sample_1_nCD4 | /home/user/samples/sample1_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample1_nCD4_1_TRB_L001_R2_001.fastq.gz |
+|  1 | sample_2_nCD4 | /home/user/samples/sample2_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample2_nCD4_1_TRB_L001_R2_001.fastq.gz |
+|  2 | sample_3_nCD4 | /home/user/samples/sample3_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample3_nCD4_1_TRB_L001_R2_001.fastq.gz |
+
 
 2) Create a command template for mixcr analyze. The default template is `mixcr analyze milab-human-rna-tcr-umi-multiplex -f r1 r2 output_prefix` for Milab Hum TCR RNA multiplex kit. The default values are 32 GB for `memory` (required OOM in GB),  1.5 hours for `time_estimate` and 40 for '`cpus` (in case of Aldan3 server, it is the size of a smallest node). Note that `mixcr analyze` and `r1 r2 output_prefix` are "magical" parts of the template that should be kept as-is in the template, so change only the part in-between these parts.
 <br>For more detailed information on MiXCR presets, visit the [MiXCR website]("https://mixcr.com/mixcr/reference/overview-built-in-presets/").
@@ -56,7 +61,7 @@ slurm.check_slurm_progress(os.path.join(output_dir, "mixcr_reports_slurm_batch.l
 mx.show_report_images(output_dir)
 ```
 
-5) get a tabular report using `get_processing_table` function. It searches for clonosets in the the folder, extracts their sample_id's and shows main
+5) Get a tabular report using `get_processing_table` function. It searches for clonosets in the the folder, extracts their sample_id's and shows main
     processing stats in a table format. By default does not show "off-target" clonosets - 
     those having less than 1% (default, may be overriden) of reads for the sample_id.
     For example, you have sequenced TRB sample, but there is found 0.5% (by read count) 
@@ -67,13 +72,47 @@ mx.show_report_images(output_dir)
 ```py
 proc_table = mx.get_processing_table(output_dir).merge(metadata)
 ```
-Processing table example:
+Full processing table example:
 
-|    | sample_id         | extracted_chain   |   reads_total |   reads_with_umi_pc |   reads_aligned_pc |   reads_overlapped_aln_pc |   total_umi |   umi_after_correction |   overseq_threshold |   reads_after_filter |   umi_after_filter |   reads_per_umi |   clones_total |   reads_in_clones_total |   clones |   reads_in_clones |   clones_func |   reads_in_func_clones |   umi_in_clones |   umi_in_func_clones | R1                                                                   | R2                                                                   |\n|---:|:------------------|:------------------|--------------:|--------------------:|-------------------:|--------------------------:|------------:|-----------------------:|--------------------:|---------------------:|-------------------:|----------------:|---------------:|------------------------:|---------:|------------------:|--------------:|-----------------------:|----------------:|---------------------:|:---------------------------------------------------------------------|:---------------------------------------------------------------------|\n|  0 | UCB10_nCD4_1_TRB  | TRB               |       2120957 |               98.63 |              86.38 |                      4.97 |      597401 |                 564176 |                   2 |              1612478 |             344972 |            4.67 |         145019 |                 1566962 |   145012 |           1566949 |        135644 |                1509856 |          349587 |               337223 | /home/user/samples/sample1_nCD4_1_TRB_L001_R1_001.fastq.gz  | /home/user/samples/sample2_nCD4_1_TRB_L001_R2_001.fastq.gz  |\n|  1 | UCB10_nCD8_1_TRB  | TRB               |        958315 |               98.74 |              84.48 |                      4.14 |      361636 |                 351229 |                   1 |               809359 |             351229 |            2.3  |         134161 |                  772232 |   134150 |            772217 |        126556 |                 746989 |          312575 |               302754 | /home/user/samples/sample2_nCD4_1_TRB_L001_R1_001.fastq.gz  | /home/user/samples/sample2_nCD4_1_TRB_L001_R2_001.fastq.gz  |\n|  2 | UCB10_nTreg_1_TRB | TRB               |       1030572 |               98.64 |              86.85 |                      4.74 |      265084 |                 251649 |                   2 |               808044 |             164880 |            4.9  |          68971 |                  793351 |    68965 |            793340 |         64585 |                 766721 |          163789 |               158403 | /home/user/samples/sample3_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample2_nCD4_1_TRB_L001_R2_001.fastq.gz |
+|    | sample_id         | extracted_chain   |   reads_total |   reads_with_umi_pc |   reads_aligned_pc |   reads_overlapped_aln_pc |   total_umi |   umi_after_correction |   overseq_threshold |   reads_after_filter |   umi_after_filter |   reads_per_umi |   clones_total |   reads_in_clones_total |   clones |   reads_in_clones |   clones_func |   reads_in_func_clones |   umi_in_clones |   umi_in_func_clones | R1                                                                   | R2                                                                   |
+|---:|:------------------|:------------------|--------------:|--------------------:|-------------------:|--------------------------:|------------:|-----------------------:|--------------------:|---------------------:|-------------------:|----------------:|---------------:|------------------------:|---------:|------------------:|--------------:|-----------------------:|----------------:|---------------------:|:---------------------------------------------------------------------|:---------------------------------------------------------------------|
+|  0 | UCB10_nCD4_1_TRB  | TRB               |       2120957 |               98.63 |              86.38 |                      4.97 |      597401 |                 564176 |                   2 |              1612478 |             344972 |            4.67 |         145019 |                 1566962 |   145012 |           1566949 |        135644 |                1509856 |          349587 |               337223 | home/user/samples/sample1_nCD4_1_TRB_L001_R1_001.fastq.gz  | home/user/samples/sample1_nCD4_1_TRB_L001_R2_001.fastq.gz  |
+|  1 | UCB10_nCD8_1_TRB  | TRB               |        958315 |               98.74 |              84.48 |                      4.14 |      361636 |                 351229 |                   1 |               809359 |             351229 |            2.3  |         134161 |                  772232 |   134150 |            772217 |        126556 |                 746989 |          312575 |               302754 | home/user/samples/sample2_nCD4_1_TRB_L001_R1_001.fastq.gz  | home/user/samples/sample2_nCD4_1_TRB_L001_R2_001.fastq.gz  |
+|  2 | UCB10_nTreg_1_TRB | TRB               |       1030572 |               98.64 |              86.85 |                      4.74 |      265084 |                 251649 |                   2 |               808044 |             164880 |            4.9  |          68971 |                  793351 |    68965 |            793340 |         64585 |                 766721 |          163789 |               158403 | /home/user/samples/sample3_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample3_nCD4_1_TRB_L001_R2_001.fastq.gz |
+
+Some columns may be omitted for the sake of readability:
+
+```py
+small_proc_table = proc_table[["sample_id", "extracted_chain","reads_total", "reads_with_umi_pc", "reads_aligned_pc", "reads_per_umi", "overseq_threshold","clones_func", "umi_in_func_clones"]]
+small_proc_table
+```
 
 Columns:
 
-|Column                 | Description   |\n|:------------------------|:--------------|\n| sample_id               |               |\n| extracted_chain         |               |\n| reads_total             |               |\n| reads_with_umi_pc       |               |\n| reads_aligned_pc        |               |\n| reads_overlapped_aln_pc |               |\n| total_umi               |               |\n| umi_after_correction    |               |\n| overseq_threshold       |               |\n| reads_after_filter      |               |\n| umi_after_filter        |               |\n| reads_per_umi           |               |\n| clones_total            |               |\n| reads_in_clones_total   |               |\n| clones                  |               |\n| reads_in_clones         |               |\n| clones_func             |               |\n| reads_in_func_clones    |               |\n| umi_in_clones           |               |\n| umi_in_func_clones      |               |\n| R1                      |               |\n| R2                      |               |
+|Parameters               | Description   |
+|:------------------------|:--------------|
+| sample_id               |from sample_df |
+| extracted_chain         |               |
+| reads_total             |               |
+| reads_with_umi_pc       |               |
+| reads_aligned_pc        |               |
+| reads_overlapped_aln_pc |               |
+| total_umi               |               |
+| umi_after_correction    |               |
+| overseq_threshold       |               |
+| reads_after_filter      |               |
+| umi_after_filter        |               |
+| reads_per_umi           |               |
+| clones_total            |               |
+| reads_in_clones_total   |               |
+| clones                  |               |
+| reads_in_clones         |               |
+| clones_func             |               |
+| reads_in_func_clones    |               |
+| umi_in_clones           |               |
+| umi_in_func_clones      |               |
+| R1                      |from sample_df |
+| R2                      |from sample_df |
 
 ??? info "Visualization"
     Properties from proc_table can be visualized in Jupyter notebook using %%R cell magic. 
