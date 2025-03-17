@@ -31,14 +31,13 @@ nav:
   - Home: index.md
   - Installation: installation.md
   - Modules: modules.md
-  - Functions: functions.md
   - Usage:
       - MiXCR: usage_mixcr.md
       - Stats: usage_stats.md
       - Intersections: usage_intersections.md
       - Clustering: usage_clustering.md
       - Differential expression: usage_diffexp.md
-  - Test page: page2.md
+  - Functions: functions.md
   # - Code Reference: reference/
 
 
