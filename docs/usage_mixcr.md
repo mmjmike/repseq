@@ -20,6 +20,7 @@ path_to_mixcr_binary = ...
 ```
 
 sample_df example:
+
 |    | sample_id     | R1                                                         | R2                                                         |
 |---:|:--------------|:-----------------------------------------------------------|:-----------------------------------------------------------|
 |  0 | sample_1_nCD4 | /home/user/samples/sample1_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample1_nCD4_1_TRB_L001_R2_001.fastq.gz |
@@ -72,13 +73,13 @@ mx.show_report_images(output_dir)
 ```py
 proc_table = mx.get_processing_table(output_dir).merge(metadata)
 ```
-Full processing table example:
+A full processing table example:
 
 |    | sample_id         | extracted_chain   |   reads_total |   reads_with_umi_pc |   reads_aligned_pc |   reads_overlapped_aln_pc |   total_umi |   umi_after_correction |   overseq_threshold |   reads_after_filter |   umi_after_filter |   reads_per_umi |   clones_total |   reads_in_clones_total |   clones |   reads_in_clones |   clones_func |   reads_in_func_clones |   umi_in_clones |   umi_in_func_clones | R1                                                                   | R2                                                                   |
 |---:|:------------------|:------------------|--------------:|--------------------:|-------------------:|--------------------------:|------------:|-----------------------:|--------------------:|---------------------:|-------------------:|----------------:|---------------:|------------------------:|---------:|------------------:|--------------:|-----------------------:|----------------:|---------------------:|:---------------------------------------------------------------------|:---------------------------------------------------------------------|
-|  0 | UCB10_nCD4_1_TRB  | TRB               |       2120957 |               98.63 |              86.38 |                      4.97 |      597401 |                 564176 |                   2 |              1612478 |             344972 |            4.67 |         145019 |                 1566962 |   145012 |           1566949 |        135644 |                1509856 |          349587 |               337223 | home/user/samples/sample1_nCD4_1_TRB_L001_R1_001.fastq.gz  | home/user/samples/sample1_nCD4_1_TRB_L001_R2_001.fastq.gz  |
-|  1 | UCB10_nCD8_1_TRB  | TRB               |        958315 |               98.74 |              84.48 |                      4.14 |      361636 |                 351229 |                   1 |               809359 |             351229 |            2.3  |         134161 |                  772232 |   134150 |            772217 |        126556 |                 746989 |          312575 |               302754 | home/user/samples/sample2_nCD4_1_TRB_L001_R1_001.fastq.gz  | home/user/samples/sample2_nCD4_1_TRB_L001_R2_001.fastq.gz  |
-|  2 | UCB10_nTreg_1_TRB | TRB               |       1030572 |               98.64 |              86.85 |                      4.74 |      265084 |                 251649 |                   2 |               808044 |             164880 |            4.9  |          68971 |                  793351 |    68965 |            793340 |         64585 |                 766721 |          163789 |               158403 | /home/user/samples/sample3_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample3_nCD4_1_TRB_L001_R2_001.fastq.gz |
+|  0 | sample_1_nCD4  | TRB               |       2120957 |               98.63 |              86.38 |                      4.97 |      597401 |                 564176 |                   2 |              1612478 |             344972 |            4.67 |         145019 |                 1566962 |   145012 |           1566949 |        135644 |                1509856 |          349587 |               337223 | home/user/samples/sample1_nCD4_1_TRB_L001_R1_001.fastq.gz  | home/user/samples/sample1_nCD4_1_TRB_L001_R2_001.fastq.gz  |
+|  1 | sample_2_nCD4  | TRB               |        958315 |               98.74 |              84.48 |                      4.14 |      361636 |                 351229 |                   1 |               809359 |             351229 |            2.3  |         134161 |                  772232 |   134150 |            772217 |        126556 |                 746989 |          312575 |               302754 | home/user/samples/sample2_nCD4_1_TRB_L001_R1_001.fastq.gz  | home/user/samples/sample2_nCD4_1_TRB_L001_R2_001.fastq.gz  |
+|  2 | sample_3_nCD4 | TRB               |       1030572 |               98.64 |              86.85 |                      4.74 |      265084 |                 251649 |                   2 |               808044 |             164880 |            4.9  |          68971 |                  793351 |    68965 |            793340 |         64585 |                 766721 |          163789 |               158403 | /home/user/samples/sample3_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample3_nCD4_1_TRB_L001_R2_001.fastq.gz |
 
 Some columns may be omitted for the sake of readability:
 
