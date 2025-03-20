@@ -16,7 +16,7 @@ from repseq import mixcr as mx
 from repseq import slurm
 from repseq import io as repseqio
 
-sample_df = repseqio.read_yaml_metadata(RAW_DATA_DIR, METADATA_FILENAME)
+sample_df = repseqio.read_yaml_metadata(RAW_DATA_DIR,filename=METADATA_FILENAME)
 metadata = sample_df.prop(columns=['R1', 'R2'])
 output_dir = ...
 path_to_mixcr_binary = ...
@@ -47,7 +47,7 @@ mixcr_race_command_template = "mixcr analyze milab-mouse-rna-tcr-umi-race -f r1 
 
 ## Running `mixcr analyze` in batches using SLURM
 
-Run mixcr analyze in batches (Relevant only for servers using <b>SLURM</b>). This function generates a set of commands for each sample by creating a SLURM script for each command and submitting them to the SLURM queue.
+Run mixcr analyze in batches (Relevant only for servers using <b>SLURM</b>). This function generates a set of commands for each sample by creating a SLURM script for each command and submitting them to the SLURM queue. Note that .log files will be saved in ~/temp/SLURM. 
 
 <br>
 
@@ -69,25 +69,24 @@ slurm.check_slurm_progress(os.path.join(output_dir, "mixcr_analyze_slurm_batch.l
 
 ## Making report images
 
-Make reports (combines mixcr exportQc align, chainUsage and tags) and get report images (both .pdf and .svg for `align` and `chainUsage`, only .pdf for `tags`). To see report images examples, visit the [MiXCR website](https://mixcr.com/mixcr/reference/qc-overview/).
-
-<br>
+Make reports (combines `mixcr exportQc align`, `chainUsage` and `tags`) and get report images (both .pdf and .svg for `align` and `chainUsage`, only .pdf for `tags`). To see report images examples, visit the [MiXCR website](https://mixcr.com/mixcr/reference/qc-overview/).
 
 * align — exports various quality control metrics
 * chainUsage — calculates chain usage across all clonotypes
 * tags — for samples with barcodes, provides barcode coverage statistics for every sample
 
-<br>
-
 To see progress, use `check_slurm_progress` as shown below
-
-<br>
 
 ```py
 mx.mixcr4_reports(output_dir, mixcr_path=path_to_mixcr_binary)
 slurm.check_slurm_progress(os.path.join(output_dir, "mixcr_reports_slurm_batch.log"), loop=True)
 mx.show_report_images(output_dir)
 ```
+
+[alignQc](images/alignQc.svg)
+
+[chainsQc](images/chainsQc.svg)
+
 <br>
 
 ## Creating a table containing clonosets stats
@@ -132,28 +131,27 @@ Columns:
 
 |Parameters               | Description   |
 |:------------------------|:--------------|
-| sample_id               |from sample_df |
-| extracted_chain         |сhains used for calculating stats (e.g., TRBA, TRBB, TRBG). A clonotype might include multiple chains depending on the values of the `show_offtarget` and the `off_target_chain_threshold` parameters|
-| reads_total             |a total number of reads|
-| reads_with_umi_pc       |Percentage of reads with barcodes|
-| reads_aligned_pc        |Percentage of successfully aligned reads for this clonotype|
-| reads_overlapped_aln_pc |Percentage of overlapping aligned reads|
-| total_umi               |Total number of UMIs|
+| sample_id               |sample_id specified in the clonoset filename|
+| extracted_chain         |clonoset сhain specified in the clonoset filename (e.g., TRA, TRA, TRG). One sample (particular `sample_id`) might include multiple chains depending on the protocol used and the values of the `show_offtarget` and the `off_target_chain_threshold` parameters|
+| reads_total             |a total number of raw reads for the whole sample|
+| reads_with_umi_pc       |Percentage of reads with barcodes if tag-pattern was used|
+| reads_aligned_pc        |Percentage of successfully aligned reads for the whole sample|
+| reads_overlapped_aln_pc |Percentage of overlapping reads of all aligned reads|
+| total_umi               |Total number of UMIs before any filtering|
 | umi_after_correction    |Number of UMIs after PCR and sequencing error correction|
-| overseq_threshold       |Reads per group threshold used for filtering|
+| overseq_threshold       |Reads per group threshold used for filtering and selected by MiXCR|
 | reads_after_filter      |Number of reads after filtering|
 | umi_after_filter        |Number of UMIs after filtering|
 | reads_per_umi           |Average number of reads per UMI|
 | clones_total            |Total number of clonotypes according to MiXCR assemble report|
-| reads_in_clones_total   |Number of reads assigned to clonotypes|
-| clones                  |Number of clonotypes in a clonotype|
-| reads_in_clones         |Number of reads for such clonotypes|
+| reads_in_clones_total   |Number of reads assigned to clonotypes for the whole sample|
+| clones                  |Number of clonotypes in a clonoset for a given chain|
+| reads_in_clones         |Number of reads in a clonoset for a given chain|
 | clones_func             |Number of functional clonotypes (no frameshifts and stops)|
-| reads_in_func_clones    |Number of reads for functional clonotypes|
-| umi_in_clones           |UMIs in a clonotype|
+| reads_in_func_clones    |Number of reads in functional clonotypes|
+| umi_in_clones           |Number of UMIs in a clonoset for a given chain|
 | umi_in_func_clones      |Number of UMIs in functional clonotypes|
-| R1                      |from sample_df |
-| R2                      |from sample_df |
+
 
 <br>
 

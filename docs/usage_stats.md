@@ -4,9 +4,6 @@
 ## Working with clonosets
 
 To read all clonosets (.tsv format, MiXCR3/4 typical output names, VDJtools or Bioadaptive formats) in a directory or several directories, use `find_all_exported_clonosets`. 
-* If `remove_non_target` is set to True, contaminant chains will be removed from clonosets based on their percentage. 
-* The threshold is set with `non_target_threshold`, the default value is 0.01.
-* With `chain` parameter defined (default is  `None`), clonoset files with chain other than specified will be ignored. 
 
 ```py
 from repseq import clonosets as cl
@@ -16,44 +13,51 @@ from repseq import io as repseqio
 from repseq import vdjtools
 
 clonosets_dir_or_dirs = '/home/user/sample/mixcr'
-clonosets = cl.find_all_exported_clonosets(clonosets_dir_or_dirs, chain="TRB", remove_non_target=True, non_target_threshold=0.01).sort_values(by="sample_id").reset_index(drop=True)
+clonosets = cl.find_all_exported_clonosets(clonosets_dir_or_dirs).sort_values(by="sample_id").reset_index(drop=True)
 ```
+
+Output table example:
+|    | sample_id           | chain   | filename                                                                   |
+|---:|:------------------  |:--------|:---------------------------------------------------------------------------|
+|  0 | sample_1_nCD4_1_TRB | TRB     | /home/user/samples/mixcr/sample_1_nCD4_1_TRB.clones_TRB.tsv                |
+|  1 | sample_2_nCD4_1_TRB | TRB     | /home/user/samples/mixcr/sample_2_nCD4_1_TRB.clones_TRB.tsv                |
+|  2 | sample_3_nCD4_1_TRB | TRB     | /home/user/samples/mixcr/sample_3_nCD4_1_TRB.clones_TRB.tsv                |
+
 
 <br>To read a single dataset in .csv, .tsv, .txt, .gz or .zip (reads the first file) format, use `read_clonoset` function from `io` module:
 ```py
 clonoset_df = repseqio.read_clonoset(path_to_clonoset)
 ```
 
-Output table example:
-|    | sample_id         | chain   | filename                                                                   |
-|---:|:------------------|:--------|:---------------------------------------------------------------------------|
-|  0 | sample_1_nCD4_1_TRB | TRB     | /home/user/samples/mixcr/sample_1_nCD4_1_TRB.clones_TRB.tsv  |
-|  1 | sample_2_nCD4_1_TRB | TRB     | /home/user/samples/mixcr/sample_2_nCD4_1_TRB.clones_TRB.tsv  |
-|  2 | sample_3_nCD4_1_TRB | TRB     | /home/user/samples/mixcr/sample_3_nCD4_1_TRB.clones_TRB.tsv |
-
+## VDJtools
 
 <br>To convert clonosets (in a form of a dataframe) to VDJtools format, use:
 
 ```py
-vdjtools.save_to_vdjtools(clonosets, "/home/user/samples/outputs/your_filename")
+vdjtools.save_to_vdjtools(clonosets, "/home/user/samples/outputs/vdjtools_folder")
 ```
 
 ## Filtering clonosets
-Filter is a special object, that may be used as a setup for Postanalysis. You can easily create or change it and put as an argument to other functions for individual clonoset or multi-clonoset metrics. To see all possible parameters and their description, visit clone_filter [module description](functions.md#clone_filter). For `functionality`, possible values are: - `"a"` - any (default). No clones are filtered out - `"f"` - only functional. Those, not having stop codons and frame shifts in CDR3 regions, or having non-empty values in CDR3 amino-acid sequence - `"n"` - only-nonfunctional - opposite to `"f"` - functional.
+Filter is a special object, that may be used as a setup for Postanalysis. You can easily create or change it and put as an argument to other functions for individual clonoset or multi-clonoset metrics. To see all possible parameters and their description, visit clone_filter [module description](functions.md#clone_filter). For `functionality`, possible values are: 
 
-<br>Examples:
+* `"a"` - any (default). No clones are filtered out - `"f"` - only functional. Those, not having stop codons and frame shifts in CDR3 regions, or having non-empty values in CDR3 amino-acid sequence 
+* `"n"` - only-nonfunctional - opposite to `"f"` - functional.
+
+<br>Using `seed` is highly advised when using top and downsample filters.
+
+<br>Most commonly used filters:
 
 * by functionality: only functional clones (no frameshifts and stops), count by UMI
 ```py
 func_filter = clf.Filter(functionality="f", by_umi=True)
 ```
 
-* by finctionality, takes top clonotypes by UMI count
+* by functionality, takes top clonotypes by UMI count. `Seed` parameter is used for reproducibility
 ```py
 top_filter = clf.Filter(functionality="f", top=4000, by_umi=True, mix_tails=True, seed=100)
 ```
 
-*  by functionality, count by UMI, randomly samples a clonoset down to 15000 clonotypes 
+*  by functionality, count by UMI, randomly samples a clonoset down to 15000 UMI 
 ```py 
 downsample_filter = clf.Filter(functionality="f", downsample=15000, by_umi=True, seed=100)
 ```
