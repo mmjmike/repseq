@@ -39,6 +39,18 @@ class Filter:
             be filtered out
         seed (any hashable type): better to use int - seed for reproducibility of random events 
             (downsampling or top with mix-tails). Default=None.
+        unweight (bool): each clonotype counts (either reads or UMIs) are set to 1
+        recount_fractions (bool): if `True`, clonotype fractions are recalculated after filtration
+        white_list (list of tuples): If specified, only clonotypes matching those listed will be retained. Either `aa`, `aaV` or `aaVJ` 
+            formats can be used to list clonotypes, e.g. [(“CASSS..”)], [(“CASSS..”, “TRBV2”)] or [(“CASSS..”, “TRBV2”, “TRBJ1”)]. 
+            It is applied before `black_list`
+        black_list (list of tuples): If specified, only clonotypes not listed will be retained. Either `aa`, `aaV` or `aaVJ` 
+            formats can be used to list clonotypes, e.g. [(“CASSS..”)], [(“CASSS..”, “TRBV2”)] or [(“CASSS..”, “TRBV2”, “TRBJ1”)]
+        pool_clonoset_by (str): possible values are ["", "aa", "aaV", "aaVj", "nt", "ntV", "ntVJ"]. Clones with identical parameters are merged, 
+            keeping the largest one, while their counts are summed.
+        convert (bool): By default, columns are added to the clonotype set to convert 
+            it to the VDJtools format, and the original columns are removed. If set to  `False`, all original columns are preserved.
+        ignore_small_clonosets (bool): If the top or downsample threshold exceeds the counts for a clonoset, the set is kept intact
     """
 
     def __init__(self, name="default_filter", functionality="a", downsample=None,
