@@ -371,13 +371,31 @@ def create_clusters_old(clonoset_input, mismatches=1, overlap_type="aaV", igh=Fa
     return clusters
 
 
-def create_clusters(clonoset_df, cl_filter=None, mismatches=1, overlap_type="aaV", igh=False, tcrdist_radius=None, count_by_freq=True):
+
+
+def create_clusters_from_pooled_df(pooled_df, mismatches=1, overlap_type="aaV", igh=False, tcrdist_radius=None,
+                                   count_by_freq=True, _run_from_create_clusters=False):
     
-    if cl_filter is None:
-        cl_filter = Filter()
+    def check_compulsory_columns(clonoset, compulsory_columns):
+        
+        for c in compulsory_columns:
+            if c not in clonoset.columns:
+                return False
+        return True
+    
+    compulsory_columns = ["freq", "count", "v", "j", "cdr3aa", "cdr3nt", "sample_id"]
 
-    clonoset_input = pool_clonotypes_from_clonosets_df(clonoset_df, cl_filter=cl_filter)
+    if not _run_from_create_clusters:
+        if not check_compulsory_columns(pooled_df):
+            print("Trying to convert pooled clonoset...")
+            pooled_df = Filter(by_umi=True, convert=False, recount_fractions=False).apply(pooled_df)
+            if not check_compulsory_columns(pooled_df):
+                print("Failed")
+                error_message = "Couldn't find at least one of compulsory columns in pooled_df: " +", ".join(compulsory_columns)
+                raise ValueError(error_message)    
 
+    clonoset_input=pooled_df
+    
     tcr_dist=False
 
     if isinstance(tcrdist_radius, int):
@@ -410,6 +428,22 @@ def create_clusters(clonoset_df, cl_filter=None, mismatches=1, overlap_type="aaV
     clusters.sort(key=lambda x: (-len(x), calc_cluster_consensus(x, seq_type="prot", weighed=False)))
     write_cluster_no_to_nodes(clusters)
     return clusters
+
+
+def create_clusters(clonoset_df, cl_filter=None, mismatches=1, overlap_type="aaV", igh=False, tcrdist_radius=None, count_by_freq=True):
+    
+    if cl_filter is None:
+        cl_filter = Filter()
+
+    clonoset_input = pool_clonotypes_from_clonosets_df(clonoset_df, cl_filter=cl_filter)
+
+    clusters = create_clusters_from_pooled_df(clonoset_input, mismatches=mismatches,
+                                              overlap_type=overlap_type,
+                                              igh=igh, tcrdist_radius=tcrdist_radius,
+                                              count_by_freq=count_by_freq,
+                                              _run_from_create_clusters=True)
+    return clusters
+
 
 def write_cluster_no_to_nodes(clusters):
     cluster_no = 0
