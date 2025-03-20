@@ -5,8 +5,11 @@ MiXCR is the leading software for generating clonoset tables from raw FastQ file
 !!! note "Setting up the environment"
     Before getting started, make sure that main_repseq environment is chosen. Otherwise, check the [installation guide](installation.md)
 
-1) Create sample_df from dataset metadata in .yaml format (if it's in a tabular format, use external libraries such as Pandas). Remove unnesessary columns if needed. Note If METADATA_FILENAME is absent, it is set to `metadata.yaml` by default. Note that this is relevant only for metadata created with NGSiK in CDR3.net group. 
+## Working with metadata and creating a dataframe with samples 
+
+Create `sample_df` from dataset metadata in `.yaml` format (if it's in a tabular format, use external libraries such as Pandas). Remove unnesessary columns if needed. Note If METADATA_FILENAME is absent, it is set to `metadata.yaml` by default. Note that this is relevant only for metadata created with NGSiK in CDR3.net group. 
 <br>If your dataset does not have metadata, create the dataframe manually. <b>The neccessary columns are: R1, R2, sample_id</b>, where R1 and R2 contain paths (using full paths is strongly advised) to respective raw files, and sample_id are arbitrary unique identificators.
+<br>
 
 ``` py
 from repseq import mixcr as mx
@@ -18,8 +21,9 @@ metadata = sample_df.prop(columns=['R1', 'R2'])
 output_dir = ...
 path_to_mixcr_binary = ...
 ```
+<br>
 
-sample_df example:
+`sample_df example`:
 
 |    | sample_id     | R1                                                         | R2                                                         |
 |---:|:--------------|:-----------------------------------------------------------|:-----------------------------------------------------------|
@@ -27,52 +31,81 @@ sample_df example:
 |  1 | sample_2_nCD4 | /home/user/samples/sample2_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample2_nCD4_1_TRB_L001_R2_001.fastq.gz |
 |  2 | sample_3_nCD4 | /home/user/samples/sample3_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample3_nCD4_1_TRB_L001_R2_001.fastq.gz |
 
+<br>
 
-2) Create a command template for mixcr analyze. The default template is `mixcr analyze milab-human-rna-tcr-umi-multiplex -f r1 r2 output_prefix` for Milab Hum TCR RNA multiplex kit. The default values are 32 GB for `memory` (required OOM in GB),  1.5 hours for `time_estimate` and 40 for '`cpus` (in case of Aldan3 server, it is the size of a smallest node). Note that `mixcr analyze` and `r1 r2 output_prefix` are "magical" parts of the template that should be kept as-is in the template, so change only the part in-between these parts.
+## Command template for `mixcr analyze`
+
+Create a command template for mixcr analyze. The default template is `mixcr analyze milab-human-rna-tcr-umi-multiplex -f r1 r2 output_prefix` for Milab Hum TCR RNA multiplex kit. The default values are 32 GB for `memory` (required OOM in GB),  1.5 hours for `time_estimate` and 40 for `cpus` (in case of Aldan3 server, it is the size of a smallest node). Note that `mixcr analyze` and `r1 r2 output_prefix` are "magical" parts of the template that should be kept as-is in the template, so change only the part in-between these parts.
 <br>For more detailed information on MiXCR presets, visit the [MiXCR website]("https://mixcr.com/mixcr/reference/overview-built-in-presets/").
+
+<br>
 
 ```py
 mixcr_race_command_template = "mixcr analyze milab-mouse-rna-tcr-umi-race -f r1 r2 output_prefix"
 ```
+<br>
 
-3) Run mixcr analyze in batches (Relevant only for servers using <b>SLURM</b>). This function generates a set of commands for each sample by creating a SLURM script for each command and submitting them to the SLURM queue."
+## Running `mixcr analyze` in batches using SLURM
+
+Run mixcr analyze in batches (Relevant only for servers using <b>SLURM</b>). This function generates a set of commands for each sample by creating a SLURM script for each command and submitting them to the SLURM queue.
+
+<br>
 
 ```py
 mx.mixcr4_analyze_batch(sample_df, output_dir, command_template=mixcr_race_command_template,
                         path_to_mixcr_binary)
 ```
 
+<br>
+
 To check the progress, use `check_slurm_progress`. `loop` set to `True` gives real-time updates while `loop`=`False` shows current progress and runs in the background without blocking other cells.
+
+<br>
 
 ```py
 slurm.check_slurm_progress(os.path.join(output_dir, "mixcr_analyze_slurm_batch.log"), loop=True)
 ```
+<br>
 
-4) Make reports (combines mixcr exportQc align, chainUsage and tags) and get report images (both .pdf and .svg for `align` and `chainUsage`, only .pdf for `tags`). To see report images examples, visit the [MiXCR website](https://mixcr.com/mixcr/reference/qc-overview/).
+## Making report images
+
+Make reports (combines mixcr exportQc align, chainUsage and tags) and get report images (both .pdf and .svg for `align` and `chainUsage`, only .pdf for `tags`). To see report images examples, visit the [MiXCR website](https://mixcr.com/mixcr/reference/qc-overview/).
+
+<br>
 
 * align — exports various quality control metrics
 * chainUsage — calculates chain usage across all clonotypes
 * tags — for samples with barcodes, provides barcode coverage statistics for every sample
 
+<br>
+
 To see progress, use `check_slurm_progress` as shown below
+
+<br>
 
 ```py
 mx.mixcr4_reports(output_dir, mixcr_path=path_to_mixcr_binary)
 slurm.check_slurm_progress(os.path.join(output_dir, "mixcr_reports_slurm_batch.log"), loop=True)
 mx.show_report_images(output_dir)
 ```
+<br>
 
-5) Get a tabular report using `get_processing_table` function. It searches for clonosets in the the folder, extracts their sample_id's and shows main
-    processing stats in a table format. By default does not show "off-target" clonosets - 
-    those having less than 1% (default, may be overriden) of reads for the sample_id.
-    For example, you have sequenced TRB sample, but there is found 0.5% (by read count) 
-    of TRA chains for the same sample_id, then the clonoset will not be shown in the table.
-    You can specify `show_offtarget=True` to display all found chains in the table or 
-    outherwise set a higher value for `off_target_chain_threshold` (`0.01` by default).
+## Creating a table containing clonosets stats
+
+Get a tabular report using `get_processing_table` function. It searches for clonosets in the the folder, extracts their sample_id's and shows main
+processing stats in a table format. By default does not show "off-target" clonosets - 
+those having less than 1% (default, may be overriden) of reads for the sample_id.
+For example, you have sequenced TRB sample, but there is found 0.5% (by read count) 
+of TRA chains for the same sample_id, then the clonoset will not be shown in the table.
+You can specify `show_offtarget=True` to display all found chains in the table or 
+outherwise set a higher value for `off_target_chain_threshold` (`0.01` by default).
 
 ```py
 proc_table = mx.get_processing_table(output_dir).merge(metadata)
 ```
+
+<br>
+
 A full processing table example:
 
 |    | sample_id         | extracted_chain   |   reads_total |   reads_with_umi_pc |   reads_aligned_pc |   reads_overlapped_aln_pc |   total_umi |   umi_after_correction |   overseq_threshold |   reads_after_filter |   umi_after_filter |   reads_per_umi |   clones_total |   reads_in_clones_total |   clones |   reads_in_clones |   clones_func |   reads_in_func_clones |   umi_in_clones |   umi_in_func_clones | R1                                                                   | R2                                                                   |
@@ -81,39 +114,48 @@ A full processing table example:
 |  1 | sample_2_nCD4  | TRB               |        958315 |               98.74 |              84.48 |                      4.14 |      361636 |                 351229 |                   1 |               809359 |             351229 |            2.3  |         134161 |                  772232 |   134150 |            772217 |        126556 |                 746989 |          312575 |               302754 | home/user/samples/sample2_nCD4_1_TRB_L001_R1_001.fastq.gz  | home/user/samples/sample2_nCD4_1_TRB_L001_R2_001.fastq.gz  |
 |  2 | sample_3_nCD4 | TRB               |       1030572 |               98.64 |              86.85 |                      4.74 |      265084 |                 251649 |                   2 |               808044 |             164880 |            4.9  |          68971 |                  793351 |    68965 |            793340 |         64585 |                 766721 |          163789 |               158403 | /home/user/samples/sample3_nCD4_1_TRB_L001_R1_001.fastq.gz | /home/user/samples/sample3_nCD4_1_TRB_L001_R2_001.fastq.gz |
 
+<br>
+
 Some columns may be omitted for the sake of readability:
+
+<br>
 
 ```py
 small_proc_table = proc_table[["sample_id", "extracted_chain","reads_total", "reads_with_umi_pc", "reads_aligned_pc", "reads_per_umi", "overseq_threshold","clones_func", "umi_in_func_clones"]]
 small_proc_table
 ```
+<br>
 
 Columns:
+
+<br>
 
 |Parameters               | Description   |
 |:------------------------|:--------------|
 | sample_id               |from sample_df |
-| extracted_chain         |               |
-| reads_total             |               |
-| reads_with_umi_pc       |               |
-| reads_aligned_pc        |               |
-| reads_overlapped_aln_pc |               |
-| total_umi               |               |
-| umi_after_correction    |               |
-| overseq_threshold       |               |
-| reads_after_filter      |               |
-| umi_after_filter        |               |
-| reads_per_umi           |               |
-| clones_total            |               |
-| reads_in_clones_total   |               |
-| clones                  |               |
-| reads_in_clones         |               |
-| clones_func             |               |
-| reads_in_func_clones    |               |
-| umi_in_clones           |               |
-| umi_in_func_clones      |               |
+| extracted_chain         |сhains used for calculating stats (e.g., TRBA, TRBB, TRBG). A clonotype might include multiple chains depending on the values of the `show_offtarget` and the `off_target_chain_threshold` parameters|
+| reads_total             |a total number of reads|
+| reads_with_umi_pc       |Percentage of reads with barcodes|
+| reads_aligned_pc        |Percentage of successfully aligned reads for this clonotype|
+| reads_overlapped_aln_pc |Percentage of overlapping aligned reads|
+| total_umi               |Total number of UMIs|
+| umi_after_correction    |Number of UMIs after PCR and sequencing error correction|
+| overseq_threshold       |Reads per group threshold used for filtering|
+| reads_after_filter      |Number of reads after filtering|
+| umi_after_filter        |Number of UMIs after filtering|
+| reads_per_umi           |Average number of reads per UMI|
+| clones_total            |Total number of clonotypes according to MiXCR assemble report|
+| reads_in_clones_total   |Number of reads assigned to clonotypes|
+| clones                  |Number of clonotypes in a clonotype|
+| reads_in_clones         |Number of reads for such clonotypes|
+| clones_func             |Number of functional clonotypes (no frameshifts and stops)|
+| reads_in_func_clones    |Number of reads for functional clonotypes|
+| umi_in_clones           |UMIs in a clonotype|
+| umi_in_func_clones      |Number of UMIs in functional clonotypes|
 | R1                      |from sample_df |
 | R2                      |from sample_df |
+
+<br>
 
 ??? info "Visualization"
     Properties from proc_table can be visualized in Jupyter notebook using %%R cell magic. 
