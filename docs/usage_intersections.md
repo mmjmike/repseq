@@ -1,12 +1,17 @@
 # Usage: intersections between clonosets
 
-To see the details on all possible parameters in functions, check the [Intersections](functions.md#intersections) module.
-    
+To see further details, check the [Intersections](functions.md#intersections) module.
 
+## Clonoset intersection
 
 `intersect_clones_in_samples_batch` function performs pairwise clonotype overlapping for all clonosets.
 <br>Possible overlap types are [aa, aaV, aaVJ, nt, ntV, ntVJ], aa/nt stands for an amino acid or nucleotide sequence, and V/J/VJ denote a segment type. 
 An output table contains clonotype sequence and V/J segments if required, overlapping clonotypes for each pair, and clonosets they belong to.    
+
+!!! tip "clonosets_df and clonosets_df2"
+    If `clonosets_df2` is None (default), `clonosets_df` is compared with itself, otherwise samples within `clonosets_df` are compared with each other; otherwise, the comparison is performed exclusively between samples from `clonosets_df` and `clonosets_df2`. 
+    <br>If `cl_filter` is specified (default is None), it's applied to clonosets in `clonosets_df2`. If there are samples with non-unique `sample_id`s between the two dataframes, both filters will be applied to those samples.
+
 
 ```py
 from repseq import intersections
@@ -25,23 +30,35 @@ intersect_df = intersections.intersect_clones_in_samples_batch(clonosets_df, cl_
 |  3 | CASSWNPTGGTEAFF  | TRBV5-6  |     0           |     6.66667e-05 | sample1_nCD4_1_TRB | sample2_nCD4_1_TRB | sample1_nCD4_1_TRB_vs_sample2_nCD4_1_TRB |
 |  4 | CASSLLAGGTDTQYF  | TRBV7-2  |     0           |     6.66667e-05 | sample1_nCD4_1_TRB | sample2_nCD4_1_TRB | sample1_nCD4_1_TRB_vs_sample2_nCD4_1_TRB |
 
+<br>
 
-Calculate overlap distances between clonosets. F, F2 or C metric can be used. The mismatches option specifies the maximum number of mismatches allowed for clonotypes to be considered similar.
+## Overlap distances between clonosets
 
-* F2 - sum of sqrt of product of similar clonotype frequencies in two clonosets. 
-* F - sqrt of the sum of frequency products. 
+Calculate overlap distances between clonosets. F, F2, C, J, BC or JCD [metric](https://mixcr.com/mixcr/reference/mixcr-postanalysis/?h=pairwise#pairwise-distance-metrics) can be used. The mismatches option specifies the maximum number of mismatches allowed for clonotypes to be considered similar. 
+
+* F2 - clonotype-wise sum of geometric mean frequencies
+* F -  geometric mean of relative overlap frequencies
 * C - total frequency of clonotypes in sample1 that are similar to clonotypes in sample2
+* BC ([Bray-Curtis dissimilarity](https://en.wikipedia.org/wiki/Bray%E2%80%93Curtis_dissimilarity)) - sum of differences between clonotype frequencies or counts (`by_freq`=False) in sample1 and sample2 divided by the total counts in sample1 and sample2  
+* J ([Jaccard index](https://en.wikipedia.org/wiki/Jaccard_index)) - size of sample1 and sample2 intersection divided by the size of their union
+* JCD ([Jensen-Shannon divergence](https://en.wikipedia.org/wiki/Jensen%E2%80%93Shannon_divergence))
 
 ```py
 f2_ntVJ = intersections.overlap_distances(clonosets, cl_filter=downsample_filter, overlap_type="ntVJ", mismatches=0, metric="F2")
 f_cd4_aaV = intersections.overlap_distances(clonosets_df.query("subset=='nCD4'"), cl_filter=downsample_filter, overlap_type="aaV", mismatches=0, metric="F")
 ```
 
-Create a table containing the number of times each clonotype appears in each clonoset in clonosets_df.
+<br>
+
+## `count_table`
+
+Create a table containing the number of times each clonotype appears in each clonoset in `clonosets_df`. 
+<br>For `overlap_type`, possible overlap types are [aa, aaV, aaVJ, nt, ntV, ntVJ], aa/nt stands for an amino acid or nucleotide sequence, and V/J/VJ denote a segment type. 
 
 ```py
 count_table = intersections.count_table(clonosets, cl_filter=downsample_filter, overlap_type="aaV", mismatches=0)
 ```
+
 |                                |   sample1_nCD4_1_TRB |   sample1_nCD8_1_TRB |   sample1_nTreg_1_TRB |   sample2_nCD4_1_TRB |   sample2_nCD8_1_TRB |   sample2_nTreg_1_TRB |
 |:-------------------------------|---------------------:|---------------------:|----------------------:|---------------------:|---------------------:|----------------------:|
 | ('CASSLGQVNTEAFF', 'TRBV12-3') |                    1 |                    0 |                     0 |                    0 |                    0 |                     0 |
@@ -50,12 +67,31 @@ count_table = intersections.count_table(clonosets, cl_filter=downsample_filter, 
 | ('CASSHGEGTQYF', 'TRBV3-1')    |                    2 |                    0 |                     0 |                    0 |                    0 |                     0 |
 | ('CASSDREGYTEAFF', 'TRBV6-5')  |                    0 |                    1 |                     0 |                    0 |                    0 |                     0 |
 
-Create a counnt table for clusters (are provided by the user). Clusters can be created with `create_clusters` function from clustering module. 
+
+## `count_table_by_cluster`
+
+Create a count table for clusters (are provided by the user). Clusters can be created with `create_clusters` function from clustering module. 
 
 ```py
-# cluster_list = clustering.create_clusters(clonosets, cl_filter=top_filter, mismatches=1, overlap_type="aaV", igh=False, tcrdist_radius=None, count_by_freq=True)
+cluster_list = clustering.create_clusters(clonosets, cl_filter=top_filter, mismatches=1, overlap_type="aaV", igh=False, tcrdist_radius=None, count_by_freq=True)
+clusters_filtered = clustering.filter_one_node_clusters(clusters)
+```
+
+```py
 count_table_by_cluster = intersections.count_table_by_cluster(clonosets_df, clusters_list, cl_filter=downsample_filter, overlap_type="aaV", mismatches=1)
 ```
+
+|    | feature_id   |   sample1_nCD4_1_TRB |   sample1_nCD8_1_TRB |   sample2_nCD4_1_TRB |   sample2_nCD8_1_TRB |
+|---:|:-------------|---------------------:|---------------------:|---------------------:|---------------------:|
+|  0 | cluster_0    |          0.000133333 |          0.0008      |          0.000866667 |          0.0014      |
+|  1 | cluster_1    |          0.000333333 |          0.000333333 |          0.000666667 |          0.000866667 |
+|  2 | cluster_2    |          0.000133333 |          0.000333333 |          0.000666667 |          0.000666667 |
+|  3 | cluster_3    |          6.66667e-05 |          0.000333333 |          0.0008      |          0.0008      |
+|  4 | cluster_4    |          0.000333333 |          0.000133333 |          0.00106667  |          6.66667e-05 |
+
+<br>
+
+## TCRnet
 
 TCRnet compares two datasets with their respective clonosets, typically an experimental dataset and a control one. 
 

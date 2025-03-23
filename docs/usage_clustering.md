@@ -1,14 +1,27 @@
 # Usage: clustering
 
-[Clustering](functions.md#clustering) find clusters in given clonosets
+[Clustering](functions.md#clustering) finds clusters in given clonosets
+
+`create_clusters` function args:
+
+* `cl_filter`: see [the previous page](usage_stats.md#filtering-clonosets) and [Filter](functions.md#-clone_filter) for further explanation
+* `mismatches`: 
+* 
 
 ```py
 from repseq import clustering
 
 clusters = clustering.create_clusters(clonosets_df, cl_filter=top_filter, mismatches=1, overlap_type="aaV", igh=False, tcrdist_radius=None, count_by_freq=True)
 ```
+Metadata could also be added to node properties prior to saving to Cytoscape. The info will be added to `node.additional_properties` dictionary.
 
-Save clusters in Cytoscape format. Filter for clusters of size > 1 (does not include single nodes). Metadata is merged to the node metadata by sample_id column. To read metadata, one could use `read_yaml_metadata` function from [io module](functions.md#io).
+```py
+clustering.add_metadata(clusters, metadata)
+```
+
+## Save clusters in Cytoscape format
+
+Filter for clusters of size > 1 (does not include single nodes). Metadata is merged to the node metadata by sample_id column. To read metadata, one could use `read_yaml_metadata` function from [io module](functions.md#io).
 
 ```py
 clusters_output_prefix = os.path.join(output_dir, "clusters")
@@ -17,10 +30,7 @@ clusters_filtered = clustering.filter_one_node_clusters(clusters)
 clustering.save_clusters_for_cytoscape(clusters_filtered, clusters_output_prefix, sample_metadata=metadata)
 ```
 
-Metadata could also be added to node properties prior to saving to Cytoscape. The info will be added to `node.additional_properties` dictionary.
-```py
-clustering.add_metadata(clusters, metadata)
-```
+output files etc 
 
 `cluster_properties` outputs a DataFrame with the following columns: ["cluster_id", "nodes", "edges", "diameter", "density", "eccentricity", "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j"]. To get cluster properties and save the output, use:
 
@@ -39,4 +49,12 @@ To visualize cluster's CDR3 consensus sequence, use:
 
 ```py
 clustering.plot_cluster_logo(clusters[0])
+```
+
+## ALICE
+
+Currently, it is implemented for <i>H.sapiens</i> only.
+
+```py
+alice(clusters, overlap_type='aaVJ', mismatches=1, species="hs", olga_warnings=False)
 ```
