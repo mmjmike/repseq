@@ -5,7 +5,7 @@
 
 ```py
 import sys
-REPSEQ_PATH = '/home/epepeliaeva/soft/repseq'
+REPSEQ_PATH = 'your_path_to_repseq'
 sys.path.append(REPSEQ_PATH)
 from repseq import io as repseqio
 from repseq import common_functions as cf
