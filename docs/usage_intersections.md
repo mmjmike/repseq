@@ -70,7 +70,7 @@ count_table = intersections.count_table(clonosets, cl_filter=downsample_filter, 
 
 ## `count_table_by_cluster`
 
-Create a count table for clusters (are provided by the user). Clusters can be created with `create_clusters` function from clustering module. 
+Create a count table for clusters as opposed to single clonotypes (clusters are provided by the user). They can be created with `create_clusters` function from [clustering](functions.md#clustering) module. 
 
 ```py
 cluster_list = clustering.create_clusters(clonosets, cl_filter=top_filter, mismatches=1, overlap_type="aaV", igh=False, tcrdist_radius=None, count_by_freq=True)
@@ -100,6 +100,14 @@ clonoset_df_exp = ...
 clonosets_df_control = ...
 tcrnet_compared_clns = intersections.tcrnet(clonosets_df_exp, clonosets_df_control, cl_filter=downsampling, overlap_type="aaVJ", mismatches=1)
 ``` 
+
+|    | clone                                      |   count_exp |   count_control |   group_count_exp |   group_count_control |    fold |   p_value_b |   p_value_p |   p_value_b_adj |   p_value_p_adj |   log10_b_adj |   log10_p_adj |   log2_fc |
+|---:|:-------------------------------------------|------------:|----------------:|------------------:|----------------------:|--------:|------------:|------------:|----------------:|----------------:|--------------:|--------------:|----------:|
+|  0 | ('CASSPGVGFVEKLFF', 'TRBV11-2', 'TRBJ1-4') |           1 |               1 |                 7 |                    29 | 4.14286 |    0.211254 |     0.20811 |        0.250473 |        0.247205 |      0.601239 |      0.606943 |   2.05063 |
+|  1 | ('CASSLMKTENEKLFF', 'TRBV11-2', 'TRBJ1-4') |           1 |               0 |                 7 |                    29 | 8.28571 |    0        |     0       |        0        |        0        |    inf        |    inf        |   3.05063 |
+|  2 | ('CASSLGGHPNEKLFF', 'TRBV11-2', 'TRBJ1-4') |           1 |               0 |                 7 |                    29 | 8.28571 |    0        |     0       |        0        |        0        |    inf        |    inf        |   3.05063 |
+
+
 
 ??? info "Visualization"
     Properties from proc_table can be visualized in Jupyter notebook using %%R cell magic. 
