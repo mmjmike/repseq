@@ -163,6 +163,7 @@ count_table_by_clonotypes_aaV_cd8 = intersections.count_table(cd8_clonosets, cl_
 ```py
 diff_expression_by_clonotypes_aaV = diffexp.wilcox_diff_expression(count_table_by_clonotypes_aaV_cd8, sample_metadata, min_samples=2, count_threshold=2)
 ```
+
 |     | feature_id                     |     logFC |   U |           p |     p_adj | pair                  |   Luk_TRB_AdV_CD8_1 |   Luk_TRB_AdV_CD8_2 |   Luk_TRB_AdV_CD8_3 |   Luk_TRB_CMV_CD8_1 |   Luk_TRB_CMV_CD8_2 |   Luk_TRB_CMV_CD8_3 |   Luk_TRB_EBV_CD8_1 |   Luk_TRB_EBV_CD8_2 |   Luk_TRB_EBV_CD8_3 |
 |----:|:-------------------------------|----------:|----:|------------:|----------:|:----------------------|--------------------:|--------------------:|--------------------:|--------------------:|--------------------:|--------------------:|--------------------:|--------------------:|--------------------:|
 |   2 | ('CASSSGLLGEQFF', 'TRBV6-5')   |   9.62006 |  36 | 0.00118822  | 0.0481036 | PepTivator_EBV_vs_all |                   0 |                   1 |                   0 |                   0 |                   0 |                   0 |                 421 |                 204 |                3141 |
