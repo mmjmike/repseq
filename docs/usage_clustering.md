@@ -9,7 +9,7 @@
 
 * `cl_filter`: see [the previous page](usage_stats.md#filtering-clonosets) and [Filter](functions.md#-clone_filter) for further explanations.
 * `mismatches`: specifies the maximum number of mismatches allowed for clonotypes to qualify as neighbours (adjacent).
-* `overlap_type`: Possible overlap types are [aa, aaV, aaVJ, nt, ntV, ntVJ], aa/nt stands for an amino acid or nucleotide sequence, and V/J/VJ denote a segment type.
+* `overlap_type`: Possible overlap types are [`aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`], `aa`/`nt` stands for an amino acid or nucleotide sequence, and `V`/`J`/`VJ` denote a segment type.
 * If `igh`=True, the constant (C) segment is kept.
 * If `tcrdist_radius` is not None, only edges between clones with a tsrdist metric less than or equal to the specified radius are built. It overrides `overlap_type` and `mismatches`. A TCRdist modification is introduced: no gaps are allowed in CDR3, weights are in 3:1 ratio for CDR3 compared to other regions. Also, V-segment distances are pre-calculated and currently are available only for <i>Homo sapiens</i>.
 * If `by_freq`=True (default), clonotype frequencies are used instead of counts.
@@ -36,7 +36,7 @@ clusters[:3]
 
 Alternatively, one can create clusters from a dataframe with clonotypes. Mandatory columns are [`freq`, `count`, `v`, `j`, `cdr3aa`, `cdr3nt`, `sample_id`].
 
-<br>`pooled_df` example:
+`pooled_df` example:
 
 |    |   count |        freq | cdr3nt                                           | cdr3aa           | v        | d     | j       | c     |   VEnd |   DStart |   DEnd |   JStart | sample_id          |
 |---:|--------:|------------:|:-------------------------------------------------|:-----------------|:---------|:------|:--------|:------|-------:|---------:|-------:|---------:|:-------------------|
@@ -54,7 +54,7 @@ create_clusters_from_pooled_df(pooled_df, mismatches=1, overlap_type="aaV", igh=
 
 Metadata, if present, could also be added to node properties prior to saving to Cytoscape. The info will be added to `node.additional_properties` dictionary. Note that the metadata should contain the same `sample_id`s that were used in the `clonosets_df` when creating the clusters. 
 
-<br>Metadata example:
+Metadata example:
 
 |    | sample_id          |   group | type   |
 |---:|:-------------------|--------:|:-------|
@@ -62,6 +62,7 @@ Metadata, if present, could also be added to node properties prior to saving to 
 |  1 | sample1_nCD8_1_TRB |       1 | nCD8   |
 |  3 | sample2_nCD4_1_TRB |       2 | nCD4   |
 |  4 | sample2_nCD8_1_TRB |       2 | nCD8   |
+
 
 ```py
 clustering.add_metadata(clusters, metadata)
@@ -120,12 +121,12 @@ To visualize cluster's CDR3 consensus sequence, use `plot_cluster_logo`. Possibl
 clustering.plot_cluster_logo(clusters[0])
 ```
 
-![logo](images/logo.png)
+![logo](images_docs/logo.png)
 
 ```py
 clustering.plot_cluster_logo(clusters[0], seq_type='dna', weighed=True)
 ```
-![logo](images/logo_dna.png)
+![logo](images_docs/logo_dna.png)
 
 <br>
 

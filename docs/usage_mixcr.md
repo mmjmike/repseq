@@ -8,7 +8,7 @@ MiXCR is the leading software for generating clonoset tables from raw FastQ file
 ## Working with metadata and creating a dataframe with samples 
 
 Create `sample_df` from dataset metadata in `.yaml` format (if it's in a tabular format, use external libraries such as Pandas). Remove unnesessary columns if needed. Note If METADATA_FILENAME is absent, it is set to `metadata.yaml` by default. Note that this is relevant only for metadata created with NGSiK in CDR3.net group. 
-<br>If your dataset does not have metadata, create the dataframe manually. <b>The neccessary columns are: R1, R2, sample_id</b>, where R1 and R2 contain paths (using full paths is strongly advised) to respective raw files, and sample_id are arbitrary unique identificators.
+<br>If your dataset does not have metadata, create the dataframe manually. <b>The neccessary columns are: `R1`, `R2`, `sample_id`</b>, where `R1` and `R2` contain paths (using full paths is strongly advised) to respective raw files, and sample_id are arbitrary unique identificators.
 
 ``` py
 from repseq import mixcr as mx
