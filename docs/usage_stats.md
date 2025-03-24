@@ -17,6 +17,7 @@ clonosets = cl.find_all_exported_clonosets(clonosets_dir_or_dirs).sort_values(by
 ```
 
 Output table example:
+
 |    | sample_id           | chain   | filename                                                                   |
 |---:|:------------------  |:--------|:---------------------------------------------------------------------------|
 |  0 | sample_1_nCD4_1_TRB | TRB     | /home/user/samples/mixcr/sample_1_nCD4_1_TRB.clones_TRB.tsv                |
@@ -24,30 +25,39 @@ Output table example:
 |  2 | sample_3_nCD4_1_TRB | TRB     | /home/user/samples/mixcr/sample_3_nCD4_1_TRB.clones_TRB.tsv                |
 
 
-<br>To read a single dataset in .csv, .tsv, .txt, .gz or .zip (reads the first file) format, use `read_clonoset` function from `io` module:
-```py
-clonoset_df = repseqio.read_clonoset(path_to_clonoset)
-```
-
 ## VDJtools
 
 <br>To convert clonosets (in a form of a dataframe) to VDJtools format, use:
 
 ```py
-vdjtools.save_to_vdjtools(clonosets, "/home/user/samples/outputs/vdjtools_folder")
+vdjtools.save_to_vdjtools(clonosets, "/home/user/samples/vdjtools_folder/")
+```
+
+## Reading a single clonoset into pd.DataFrame
+
+<br>To read a single clonoset in a tab-separated format (.tsv, .txt, .tsv.gz or .zip (reads the first file)) format, use `read_clonoset` function from `io` module:
+```py
+clonoset_df = repseqio.read_clonoset(path_to_clonoset)
 ```
 
 ## Filtering clonosets
-Filter is a special object, that may be used as a setup for Postanalysis. You can easily create or change it and put as an argument to other functions for individual clonoset or multi-clonoset metrics. To see all possible parameters and their description, visit clone_filter [module description](functions.md#clone_filter). For `functionality`, possible values are: 
+Filter is a special object, that may be used as a setup for Postanalysis. You can easily create or change it and put as an argument to other functions for individual clonoset or multi-clonoset metrics.  For `functionality`, possible values are: 
 
-* `"a"` - any (default). No clones are filtered out - `"f"` - only functional. Those, not having stop codons and frame shifts in CDR3 regions, or having non-empty values in CDR3 amino-acid sequence 
-* `"n"` - only-nonfunctional - opposite to `"f"` - functional.
+* `a` - any (default). No clones are filtered out.
+* `f` - only functional. Those not having stop codons and frameshifts in CDR3 regions, or having non-empty values in CDR3 amino-acid sequence.
+* `n` - only-nonfunctional - opposite to `f` - functional.
 
-<br>Using `seed` is highly advised when using top and downsample filters.
+<br> Other commonly used parameters:
+
+* Using `seed` is highly advised when using top and downsample filters. Setting a specific value ensures the reproducibility as these filters use [pseudorandom number generation](https://en.wikipedia.org/wiki/Pseudorandom_number_generator).
+* With `by_umi` = True, Filter() uses counts based on UMI if the corresponding columns are present; otherwise, counts are based on reads.
+* `mix_tails` = True is recommended for top filter, as sorting with identical counts may not be random.
+
+<br>To see all possible parameters and their description, visit clone_filter [module description](functions.md#clone_filter).
 
 <br>Most commonly used filters:
 
-* by functionality: only functional clones (no frameshifts and stops), count by UMI
+* by functionality: only functional clones (no frameshifts and stops), counts by UMI
 ```py
 func_filter = clf.Filter(functionality="f", by_umi=True)
 ```
@@ -74,6 +84,8 @@ filtered_clonoset_df = top_filter.apply(clonoset_df)
 
 ## Clonoset stats
 
+Calc stats for clonoset size in clones, reads and UMIs
+
 ```py
 clonoset_stats = stats.calc_clonoset_stats(clonosets)
 ```
@@ -86,6 +98,8 @@ clonoset_stats = stats.calc_clonoset_stats(clonosets)
 
 <br>Calculating CDR3 properties. In this example, only functional clonotypes (=no frameshifts or stops) are used.
 
+basic stats for CDR3 regions. CDR3 amino acid sequence properties (both full sequence and central 5-residue sequence (closer to N-term in case of even length))
+
 ```py
 func_filter = clf.Filter(functionality="f", by_umi=True)
 cdr3_properties = stats.calc_cdr3_properties(clonosets, cl_filter=func_filter)
@@ -97,7 +111,7 @@ cdr3_properties = stats.calc_cdr3_properties(clonosets, cl_filter=func_filter)
 |  1 | sample2_nCD4_1_TRB | TRB     |           42.6894 |            5.45495 |          0.0937428 |      7.90164e-06 |            -3.63854 |               -3.7497  |       -0.070658 |           -0.65764 |           2.52354 |              7.43611 |         453.382 |            1376.69 |          0.954769 |              4.53017 |          -14.1263 |             -43.5042 |      1.95697 |         1.73002 |     -2.96411 |        -5.37987 |   -0.189644  |       -1.12346  |     0.76061  |       -0.362696 |    -0.959487 |        -2.87697 |     -1.19542 |        -1.66914 |     0.654523 |        0.440107 |      1.30386 |        0.341753 |     -1.90955 |      -0.0793168 |      0.297878 |         -1.35161 |     0.306715 |        0.760597 |         0.310945 |            0.791057 |       5.87189 |          14.8052 |        4.49732 |           14.0927 |       4.81489 |          13.9093 |      0.289834 |         0.766072 |           2.2879  |              2.64048 |
 |  2 | sample3_nCD4_1_TRB | TRB     |           43.1306 |            5.53264 |          0.109455  |      1.54835e-05 |            -3.5389  |               -3.36705 |        0.226643 |           -0.13198 |           2.45753 |              7.38413 |         463.875 |            1401.24 |          1.01215  |              4.64907 |          -14.3082 |             -44.2336 |      1.88087 |         1.95313 |     -2.68089 |        -5.22143 |    0.141751  |       -0.455098 |     0.772542 |       -0.446082 |    -1.0089   |        -2.85593 |     -1.24996 |        -1.84142 |     0.968762 |        0.771571 |      1.23777 |        0.206734 |     -1.78501 |       0.0142436 |      0.431144 |         -1.00567 |     0.302192 |        0.761093 |         0.305975 |            0.791293 |       5.76219 |          14.8705 |        4.50163 |           14.148  |       4.8573  |          14.1363 |      0.29094  |         0.777235 |           2.11711 |              2.3694  |
 
-<br>Calculating [diversity]("https://www.sciencedirect.com/science/article/pii/S0958166920301051") stats. It includes observed diversity, Shannon-Wiener, normalized Shannon-Wiener and chao1 index for each clonoset in clonosets_df. Here, a top_n filter is applied.
+<br>Calculating [diversity](https://mixcr.com/mixcr/reference/mixcr-postanalysis/#diversity-measures) stats. It includes observed diversity, Shannon-Wiener, normalized Shannon-Wiener and chao1 index for each clonoset in clonosets_df. Here, a top_n filter is applied.
 
 ```py
 diversity_stats = stats.calc_diversity_stats(clonosets, cl_filter=downsample_filter, seed=123)
@@ -114,13 +128,19 @@ diversity_stats = stats.calc_diversity_stats(clonosets, cl_filter=downsample_fil
 ```py
 convergence = stats.calc_convergence(clonosets, cl_filter=top_filter)
 ```
+
 |    | sample_id          | chain   |   convergence |
 |---:|:-------------------|:--------|--------------:|
 |  0 | sample1_nCD4_1_TRB | TRB     |       1.01114 |
 |  1 | sample2_nCD4_1_TRB | TRB     |       1.03426 |
 |  2 | sample3_nCD4_1_TRB | TRB     |       1.02362 |
 
-<br>Also, segment usage can be calculated for V/J/C-segments. All possible options are ["v", "j", "c", "vj", "vlen", "vjlen"]. "vlen" and "vjlen" options only take the length of a j- or c-segments into account, respectively.
+<br>Segment usage (combined frequency of segments) can be calculated for V/J/C-segments. All possible options are ["v", "j", "c", "vj", "vlen", "vjlen"]. `vj` - usage of combinations of `v` and `j` segments. `vlen` and `vjlen` options also take the length of amimo acid CDR3 length into account and calculate usage for particular combination.
+
+The result can be outputted in `long` or `wide` format:
+
+- `long` - four columns: `sample_id`, `chain`, `<segment_type>`, `usage`
+- `wide` - num of rows equals to the number of input clonosets, and all segments are the columns and usage is in each cell.https://www.sciencedirect.com/science/article/pii/S0958166920301051
 
 ```py
 v_usage = stats.calc_segment_usage(clonosets, segment="v", cl_filter=func_filter, table="long")
