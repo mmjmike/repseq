@@ -77,9 +77,9 @@ slurm.check_slurm_progress(os.path.join(output_dir, "mixcr_reports_slurm_batch.l
 mx.show_report_images(output_dir)
 ```
 
-![alignQc](images/alignQc.svg)
+![alignQc](images_docs/alignQc.svg)
 
-![chainsQc](images/chainsQc.svg)
+![chainsQc](images_docs/chainsQc.svg)
 
 <br>
 

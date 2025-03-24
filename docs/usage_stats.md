@@ -137,10 +137,10 @@ convergence = stats.calc_convergence(clonosets, cl_filter=top_filter)
 
 <br>Segment usage (combined frequency of segments) can be calculated for V/J/C-segments. All possible options are ["v", "j", "c", "vj", "vlen", "vjlen"]. `vj` - usage of combinations of `v` and `j` segments. `vlen` and `vjlen` options also take the length of amimo acid CDR3 length into account and calculate usage for particular combination.
 
-The result can be outputted in `long` or `wide` format:
+The resulting dataframe can be in either `long` or `wide` format:
 
 - `long` - four columns: `sample_id`, `chain`, `<segment_type>`, `usage`
-- `wide` - num of rows equals to the number of input clonosets, and all segments are the columns and usage is in each cell.https://www.sciencedirect.com/science/article/pii/S0958166920301051
+- `wide` - num of rows equals to the number of input clonosets, and all segments are the columns and usage is in each cell.
 
 ```py
 v_usage = stats.calc_segment_usage(clonosets, segment="v", cl_filter=func_filter, table="long")
