@@ -51,7 +51,7 @@ CHAIN_VARIANTS = {"TRA": {"TRAD", "TRA"},
                   "BCR": {"IGH", "IGK", "IGL", "IGKL"},
                   "IR": {"IR"}}
 
-def find_all_exported_clonosets(folders, chain=None, remove_non_target=False, non_target_threshold=0.01):
+def find_all_exported_clonosets(folders, chain=None, show_offtarget=True, offtarget_threshold=0.01):
     """
     Main method of the Filter object - application of it to a clonoset
 
@@ -70,10 +70,10 @@ def find_all_exported_clonosets(folders, chain=None, remove_non_target=False, no
         folders = [folders]
     clonosets_dfs = []
     for folder in folders:
-        clonosets_dfs.append(find_all_exported_clonosets_in_folder(folder, chain=chain, remove_non_target=remove_non_target, non_target_threshold=non_target_threshold))
+        clonosets_dfs.append(find_all_exported_clonosets_in_folder(folder, chain=chain, show_offtarget=show_offtarget, offtarget_threshold=offtarget_threshold))
     return pd.concat(clonosets_dfs)
    
-def find_all_exported_clonosets_in_folder(folder, chain=None, remove_non_target=False, non_target_threshold=0.01):
+def find_all_exported_clonosets_in_folder(folder, chain=None, show_offtarget=True, offtarget_threshold=0.01):
     result_columns = ["sample_id", "chain", "filename"]
     if chain is not None:
         if chain.upper() not in CHAIN_VARIANTS:
@@ -109,8 +109,8 @@ def find_all_exported_clonosets_in_folder(folder, chain=None, remove_non_target=
             files.append([sample_id, sample_chain, os.path.join(folder, f)])
         
     files_df = pd.DataFrame(files, columns=result_columns)
-    if remove_non_target:
-        files_df = remove_non_target_clonosets_from_files_df(files_df, threshold=non_target_threshold)
+    if show_offtarget:
+        files_df = remove_non_target_clonosets_from_files_df(files_df, threshold=offtarget_threshold)
 
     return files_df
 

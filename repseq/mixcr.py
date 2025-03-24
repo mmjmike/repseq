@@ -259,7 +259,7 @@ def mixcr4_reports(folder, mixcr_path="mixcr"):
         print(stdout, stderr)
 
 
-def get_processing_table(folder, show_offtarget=False, off_target_chain_threshold=0.01):
+def get_processing_table(folder, show_offtarget=False, offtarget_chain_threshold=0.01):
     """
     Searches for clonosets in the the folder, extracts their sample_id's and shows main
     processing stats in a table format. By default does not show "off-target" clonosets - 
@@ -267,13 +267,13 @@ def get_processing_table(folder, show_offtarget=False, off_target_chain_threshol
     For example, you have sequenced TRB sample, but there is found 0.5% (by read count) 
     of TRA chains for the same sample_id, then the clonoset will not be shown in the table.
     You can specify `show_offtarget=True` to display all found chains in the table or 
-    outherwise set a higher value for `off_target_chain_threshold` (`0.01` by default).
+    outherwise set a higher value for `offtarget_chain_threshold` (`0.01` by default).
 
     Args:
         folder (str or list): folder or list of folders in which to look for clonosets and
             processing stats
         show_offtarget (bool): add offtarget chains to the stats
-        off_target_chain_threshold (float): threshold for off-target chains
+        offtarget_chain_threshold (float): threshold for off-target chains
     
     Returns:
         df (pd.DataFrame): dataframe, containing `sample_id`, `extracted_chain` and 
@@ -362,7 +362,7 @@ def get_processing_table(folder, show_offtarget=False, off_target_chain_threshol
                                                "total_umi", "umi_after_correction", "overseq_threshold", "reads_after_filter", "umi_after_filter",
                                                "reads_per_umi", "clones_total", "reads_in_clones_total", "clones", "reads_in_clones", "clones_func", "reads_in_func_clones", "umi_in_clones", "umi_in_func_clones"])
     if not show_offtarget:
-        result_df = result_df.loc[result_df.reads_in_clones/result_df.reads_in_clones_total > off_target_chain_threshold]
+        result_df = result_df.loc[result_df.reads_in_clones/result_df.reads_in_clones_total > offtarget_chain_threshold]
     return result_df.sort_values(by="sample_id").reset_index(drop=True)
 
 
