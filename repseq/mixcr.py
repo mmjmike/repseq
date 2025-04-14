@@ -11,7 +11,7 @@ from IPython.display import Image, display, SVG
 
 
 def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
-                         mixcr_path="mixcr", memory=32, time_estimate=1.5, custom_tag_pattern_column=None):
+                         mixcr_path="mixcr", memory=32, cpus=40, time_estimate=1.5, custom_tag_pattern_column=None):
     
     """
     Function for batch runs of MiXCR software using SLURM.
@@ -32,6 +32,7 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
             only the part in-between these parts.
         mixcr_path (str): path to MiXCR binary
         memory (int): required OOM in GB
+        cpus (int): required number of cores
         time_estimate (numeric): time estimate in hours for the calculation. It
             is the limit for SLURM task
 
@@ -67,7 +68,7 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
 
     # default mixcr analyze slurm parameters. They are quite excessive, works fine.
     # time_estimate=1.5
-    cpus=40
+    # cpus=40
     if not isinstance(memory, int):
         raise TypeError("memory parameter must be an integer")
     if memory < min_memory:
@@ -218,7 +219,7 @@ def mixcr4_reports(folder, mixcr_path="mixcr"):
     """
 
 
-    program_name="MIXCR4.3 Reports"
+    program_name="MIXCR4 Reports"
     time_estimate=1
     cpus=40
     memory=32
