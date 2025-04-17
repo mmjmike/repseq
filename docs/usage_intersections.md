@@ -73,7 +73,7 @@ count_table = intersections.count_table(clonosets, cl_filter=downsample_filter, 
 Create a count table for clusters as opposed to single clonotypes (clusters are provided by the user). They can be created with `create_clusters` function from [clustering](functions.md#clustering) module. 
 
 ```py
-cluster_list = clustering.create_clusters(clonosets, cl_filter=top_filter, mismatches=1, overlap_type="aaV", igh=False, tcrdist_radius=None, count_by_freq=True)
+clusters = clustering.create_clusters(clonosets, cl_filter=top_filter, mismatches=1, overlap_type="aaV", igh=False, tcrdist_radius=None, count_by_freq=True)
 clusters_filtered = clustering.filter_one_node_clusters(clusters)
 ```
 
@@ -97,8 +97,8 @@ TCRnet compares two datasets with their respective clonosets, typically an exper
 
 ```py
 clonoset_df_exp = ...
-clonosets_df_control = ...
-tcrnet_compared_clns = intersections.tcrnet(clonosets_df_exp, clonosets_df_control, cl_filter=downsampling, overlap_type="aaVJ", mismatches=1)
+clonoset_df_control = ...
+tcrnet_compared_clns = intersections.tcrnet(clonosets_df_exp, clonoset_df_control, cl_filter=downsampling, overlap_type="aaVJ", mismatches=1)
 ``` 
 
 |    | clone                                      |   count_exp |   count_control |   group_count_exp |   group_count_control |    fold |   p_value_b |   p_value_p |   p_value_b_adj |   p_value_p_adj |   log10_b_adj |   log10_p_adj |   log2_fc |
@@ -120,6 +120,6 @@ tcrnet_compared_clns = intersections.tcrnet(clonosets_df_exp, clonosets_df_contr
             geom_point()+
             theme_bw()+
             facet_wrap(vars(pair)) +
-            scale_x_log10() +
-            scale_y_log10()
+            scale_x_log10(limits = c(1e-5, 3.5e-03)) +
+            scale_y_log10(limits = c(1e-5, 3.5e-03))
     ```
