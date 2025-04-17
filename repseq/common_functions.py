@@ -165,7 +165,7 @@ def bray_curtis_dissimilarity(list1, list2):
 def kl_divergence(p, q):
     p = np.asarray(p, dtype=np.float64)
     q = np.asarray(q, dtype=np.float64)
-    return np.sum(np.where(p != 0, p * np.log(p / q), 0))
+    return np.sum(np.where(p != 0 and q != 0, p * np.log(p / q), 0))
 
 def jensen_shannon_divergence(p, q):
     p = np.asarray(p, dtype=np.float64)
