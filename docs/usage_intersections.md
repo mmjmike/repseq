@@ -9,8 +9,9 @@ To see further details, check the [Intersections](functions.md#intersections) mo
 An output table contains clonotype sequence and V/J segments if required, overlapping clonotypes for each pair, and clonosets they belong to.    
 
 !!! tip "clonosets_df and clonosets_df2"
-    If `clonosets_df2` is None (default), `clonosets_df` is compared with itself, otherwise samples within `clonosets_df` are compared with each other; otherwise, the comparison is performed exclusively between samples from `clonosets_df` and `clonosets_df2`. 
-    <br>If `cl_filter` is specified (default is None), it's applied to clonosets in `clonosets_df2`. If there are samples with non-unique `sample_id`s between the two dataframes, both filters will be applied to those samples.
+    If `clonosets_df2` is None (default), samples within `clonosets_df` are compared with each other; 
+    Otherwise, the comparison is performed exclusively between samples from `clonosets_df` and `clonosets_df2`. 
+    <br>If `cl_filter2` is set, it is applied to clonosets in `clonosets_df2`. If there are samples with non-unique sample_ids between the two dataframes, both filters will be applied to those samples.
 
 
 ```py
