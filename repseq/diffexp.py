@@ -5,7 +5,7 @@ import numpy as np
 from .common_functions import run_parallel_calculation
 
 
-def wilcox_diff_expression(count_table, sample_metadata, min_samples=2, count_threshold=0.00005, pval_cutoff=0.05, cpu=None):
+def wilcox_diff_expression(count_table, sample_metadata, min_samples=2, count_threshold=0.00005, pval_cutoff=None, cpu=None):
     
     # sample_metadata must contain column 'group' and 'sample_id'
     # sample_id's in sample_metadata must pair with count table column_names
@@ -77,14 +77,25 @@ def wilcox_diff_expression(count_table, sample_metadata, min_samples=2, count_th
         result_df = pd.concat(result_dfs).reset_index(drop=True).merge(count_table)
         
         result_df_main = result_df[result_df.pair.str.contains("_vs_all")].copy()
+        
+        # implement only one-sided test, as the group which in vs_all is supposed to be
+        # overexpressed
+        result_df_main = result_df_main.query("logFC > 0")
+
+        # perform FDR muliple test correction
         result_df_main["p_adj"] = multipletests(result_df_main["p"], alpha=0.05, method='fdr_bh', is_sorted=False, returnsorted=False)[1]
-        result_df_main = result_df_main[result_df_main["p_adj"] <= pval_cutoff]
+
+        # cut the table by pval_cutoff
+        if pval_cutoff is not None:
+            if pval_cutoff <= 0 or pval_cutoff > 1:
+                raise ValueError("pval_cutoff must be in range (0,1]")
+            result_df_main = result_df_main[result_df_main["p_adj"] <= pval_cutoff]
+        
         if len(result_df_main) > 0:
             pairs_compare_results = []
             pairs_compare_columns = ["i"]
             for group in group_list:
                 pairs_compare_columns += [f"{group}_p", f"{group}_logFC"]
-            
             
             for i,r in result_df_main.iterrows():
                 curr_group = r["pair"].split("_vs_all")[0]
@@ -95,7 +106,6 @@ def wilcox_diff_expression(count_table, sample_metadata, min_samples=2, count_th
                     # print(feature_id, curr_group, group2)
                 pairs_compare_results.append(row)
                 
-            
             pairs_compare_results_df = pd.DataFrame(pairs_compare_results, columns=pairs_compare_columns).set_index("i")
             result_df_main = result_df_main.merge(pairs_compare_results_df, left_index=True, right_index=True)
             
