@@ -34,7 +34,8 @@ def wilcox_diff_expression(count_table, sample_metadata, min_samples=2, count_th
         
         df = calc_mann_whitney_for_group_pair(count_table, pair, group1_samples, group2_samples, count_threshold, min_samples)
         
-        result_df_main = df.sort_values(by="p_adj")
+        # count_table_subset = count_table[["feature_id"] + group1_samples + group2_samples]
+        result_df_main = df.sort_values(by="p_adj").merge(count_table)
     
     # more than two groups
     else:
