@@ -1,0 +1,28 @@
+name: main_repseq
+channels:
+    - jmcmurray
+    - bioconda
+    - defaults
+    - conda-forge
+dependencies:
+    - python=3.11
+    - rpy2
+    - r-tidyverse
+    - notebook
+    - ipykernel
+    - json
+    - pandas
+    - pip
+    - statsmodels
+    - networkx
+    - scipy
+    - dill
+    - matplotlib
+    - seaborn
+    - pyyaml
+    - logomaker
+    - r-pheatmap
+    - r-ggpubr
+    - bioconda::olga
+    - pip:
+        - tcrdist3
