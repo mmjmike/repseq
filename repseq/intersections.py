@@ -80,7 +80,7 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
     return df
 
 
-def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, strict_presense=False, by_freq=False):
+def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, strict_presence=False, by_freq=False):
     """
     Creates a table that shows how many times each unique clonotype appears across different clonosets. It processes a given dataset of clonotypes (clonosets_df) 
     and generates a frequency/count table based on a specified overlap type.
@@ -118,7 +118,7 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
     
     tasks = []
     for sample_id in clonoset_dicts:
-        task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], mismatches, strict_presense]
+        task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], mismatches, strict_presence]
         tasks.append(task)
     
     results = run_parallel_calculation(count_table_mp, tasks, "Counting features", object_name="clonosets")
@@ -132,7 +132,7 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
 
 
 def count_table_mp(args):
-    (features, sample_id, clonoset_dict, mismatches, strict_presense) = args
+    (features, sample_id, clonoset_dict, mismatches, strict_presence) = args
     result = []
     for feature in features:
         count = 0
@@ -147,7 +147,7 @@ def count_table_mp(args):
                         clonotype_present = True
                     if sum([a != b for a,b in zip(feature[0],clonotype[0])]) <= mismatches:
                         count += clonotype[-1]
-                if strict_presense and not clonotype_present:
+                if strict_presence and not clonotype_present:
                     result.append(0)
                     continue
         else:
@@ -501,6 +501,7 @@ def find_intersecting_clonotypes(clonosets_df, cl_filter=None, overlap_type="aaV
         clonosets_df (pd.DataFrame): contains three columns - `sample_id` and `filename` columns,
             filename - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
             sample_id's should be all unique in this DF
+        cl_filter (Filter): clonoset filter - object from `clone_filter.py` module. It is applied to clonosets in `clonosets_df`.
         overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence
             to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
             to decide if clonotypes are equal
@@ -511,10 +512,12 @@ def find_intersecting_clonotypes(clonosets_df, cl_filter=None, overlap_type="aaV
         metric (str): possible values - `F`, `F2` or `C`. Default `F2`. `F2` - sum of sqrt of product of 
             similar clonotype frequencies in two clonosets. `F` - sqrt of the sum of frequency products.
             `C` - total frequency of clonotypes in `sample1`, that are similar to clonotypes in `sample2`
-        only_functional (bool): use only functional clonotypes (do not contain stop codons or
-            frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
-            1 after filtering of non-functional clonotypes
-    
+        clonosets_df2 (pd.DataFrame): If `clonosets_df2` is None (default), samples within `clonosets_df` are compared with each other; 
+            Otherwise, the comparison is performed exclusively between samples from `clonosets_df` and `clonosets_df2`. 
+        cl_filter2 (Filter): clonoset filter - object from `clone_filter.py` module. It is applied to clonosets in `clonosets_df2`. 
+            If there are samples with non-unique sample_ids between the two dataframes, both filters will be applied to those samples.
+
+
     Important: similar clonotypes by `overlap_type` in one particular clonoset are NOT combined into one
     and are treated as different clonotypes.
 
@@ -555,6 +558,81 @@ def find_intersecting_clonotypes(clonosets_df, cl_filter=None, overlap_type="aaV
     result_list = run_parallel_calculation(find_overlapping_clones_in_two_clone_dicts, tasks, "Intersecting clonosets", object_name="pairs")
     
     return pd.concat(result_list).reset_index(drop=True)
+
+
+#
+#
+#
+# In development
+#
+# 
+# 
+
+def intersect_clonosets_with_clonotype_list(clonosets_df, clones_df, cl_filter=None, overlap_type="aaV", mismatches=0, mode='counts', strict_presence=False, by_freq=False):
+    if mode == 'counts':
+        return count_table_with_custom_clonotypes(clonosets_df, 
+                                           clones_df, 
+                                           cl_filter=cl_filter, 
+                                           overlap_type=overlap_type, 
+                                           mismatches=mismatches, 
+                                           strict_presence=strict_presence, 
+                                           by_freq=by_freq)
+    elif mode == 'clonotypes':
+        return find_intersecting_clonotypes_with_custom_clonotypes(clonosets_df, 
+                                                  clones_df, 
+                                                  cl_filter=cl_filter, 
+                                                  overlap_type=overlap_type, 
+                                                  mismatches=mismatches, 
+                                                  strict_presence=strict_presence)
+      
+
+def find_intersecting_clonotypes_with_custom_clonotypes(clonosets_df, clones_df, cl_filter=None, 
+                                                        clonosets_df2=None, cl_filter2=None, overlap_type="aaV", 
+                                                        mismatches=0, mode="clonotypes", strict_presence=True):
+    
+    print("Intersecting clones in clonosets\n"+"-"*50)
+    aa, check_v, check_j = overlap_type_to_flags(overlap_type)
+    print(f"Overlap type: {overlap_type}")
+
+    # generating a set of tasks
+    tasks = []
+
+    clonoset_lists, samples_total, two_dataframes, sample_list, sample_list2 = prepare_clonotypes_dfs_for_intersections(clonosets_df, clonosets_df2=clonosets_df2,
+                                                                                                                    cl_filter=cl_filter, cl_filter2=cl_filter2,
+                                                                                                                    overlap_type=overlap_type, strict=not bool(mismatches))
+    # removing clonosets not present in clonoset_lists
+    
+    # ! intersection between clones_df and clonosets_df
+    if mode == 'clonotypes':
+        # creating dummy counts
+        clones_df_copy = clones_df.copy()
+        clones_df_copy['count'] = [0 for _ in range(clones_df.shape[0])]
+        clones_df_copy['freq'] = [0 for _ in range(clones_df.shape[0])]
+        clonoset_lists_with_custom_clonotypes = clonoset_lists
+
+        clonoset_lists_with_custom_clonotypes['clonotype_list'] = prepare_clonoset_for_intersection(clones_df_copy, 
+                                                                                                    overlap_type=overlap_type,
+                                                                                               len_vj_format=bool(mismatches))        
+
+        sample_list2 = ['clonotype_list']
+        for sample1 in sample_list:
+            for sample2 in sample_list2:
+                tasks.append((sample2, sample1, clonoset_lists_with_custom_clonotypes, check_v, check_j, mismatches))    
+    
+    # run calculation in parallel
+    result_list = run_parallel_calculation(find_overlapping_clones_in_two_clone_dicts, tasks, "Intersecting clonosets", object_name="pairs")
+    
+    # mismatches for the final dataframe
+    result_df = pd.concat([df for df in result_list if not df.empty]).reset_index(drop=True)
+    result_df["mismatches"] = [sum(a != b for a, b in zip(cl1[0], cl2[0]))
+                                for cl1, cl2 in zip(result_df["clone1"], result_df["clone2"])]
+    
+    # removing extra columns
+    result_df = result_df.rename(columns={'clone1': 'clonotype',
+                      'sample2_count': 'count', # or freq depending on parameter
+                      'sample2': 'sample_id',
+                      'clone2': 'sample_clonotype'}).drop(columns=['pair', 'sample1', 'sample1_count'])
+    return result_df
 
 
 ### Supporting functions
@@ -641,6 +719,66 @@ def convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=None, overlap_typ
         print_progress_bar(samples_read, samples_total, "Reading clonosets")
         clonoset_dicts[sample_id] = cl_dict
     return clonoset_dicts
+
+
+#
+#
+# in development
+#
+#
+
+
+def count_table_with_custom_clonotypes(clonosets_df, clones_df=None, cl_filter=None, overlap_type="aaV", mismatches=0, strict_presence=False, by_freq=False):
+    """
+    Args:
+        clones_df (pd.DataFrame): a dataframe with clonotypes to look for in `clonosets_df`. Should have the following columns:
+        `cdr3aa`, `cdr3nt` (at least one of these two), `v`, `j` (could be none of those). For instance, your input might have only `cdr3aa` column.
+        If `overlap_type` isn't specified, it is determined individually for each clonotype in `clones_df`. In this case, if a row corresponding to
+        a particular clonotype has non-empty values in both `cdr3aa` and `cdr3nt` columns, `cdr3aa` is chosen.
+    """
+
+    print("Creating clonotypes count table\n"+"-"*50)
+    print(f"Overlap type: {overlap_type}")
+    aa, check_v, check_j = overlap_type_to_flags(overlap_type)
+    clonoset_dicts = convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=cl_filter,
+                                                        overlap_type=overlap_type, by_freq=by_freq, strict=not bool(mismatches))
+
+    if clones_df is not None:
+        # creating dummy counts
+        clones_df_copy = clones_df.copy()
+        clones_df_copy['count'] = [0 for _ in range(clones_df.shape[0])]
+        clones_df_copy['freq'] = [0 for _ in range(clones_df.shape[0])]
+        clonotype_list_dict = {'clonotype_list': None}
+
+        clonotype_list_dict['clonotype_list'] = prepare_clonoset_for_intersection(clones_df_copy, 
+                                                                                overlap_type=overlap_type,
+                                                                                len_vj_format=bool(mismatches))  
+                           
+        unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonotype_list_dict)
+    else: 
+        unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts)
+
+    tasks = []
+    for sample_id in clonoset_dicts:
+        task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], mismatches, strict_presence]
+        tasks.append(task)
+    
+    results = run_parallel_calculation(count_table_mp, tasks, "Counting features", object_name="clonosets")
+    result_dict = dict()
+    for result in results:
+        result_dict.update(result)
+    count_table = pd.DataFrame(result_dict)
+    if aa:
+        count_table.insert(0, 'cdr3aa', [ct[0] for ct in unique_clonotypes])
+    else:
+        count_table.insert(0, 'cdr3nt', [ct[0] for ct in unique_clonotypes])
+    if check_v:
+        count_table.insert(1, 'v', [ct[1] for ct in unique_clonotypes])
+    if check_j:
+        count_table.insert(1, 'j', [ct[2] for ct in unique_clonotypes])
+    count_table.index = unique_clonotypes
+    return count_table
+
 
 
 def overlap_metric_two_clone_dicts(args):
@@ -854,8 +992,16 @@ def find_overlapping_clones_in_two_clone_dicts(args):
             if c1_len_vj in cl2_dict:
                 for c1 in c1_clone_list:
                     clone_1 = (c1[0], *c1_len_vj[1:])
+                    # feature_to_check = (c1_len_vj, *c1[1:])
                     for c2 in cl2_dict[c1_len_vj]:
+                        # check if present in cl2_dict (corresponds to those extracted from clonosets_df)
+                        # cl1_dict clonotypes are from clones_df
+                        # if c1[0] == c2[0]:
+                        # clonotype_present = True
                         if sum([a != b for a,b in zip(c1[0],c2[0])]) <= mismatches:
+                            # if strict_presence and not clonotype_present:
+                                 # continue
+                            # else
                             clone_2 = (c2[0], *c1_len_vj[1:])
                             results.append([clone_1, clone_2, c1[-1], c2[-1]])    
     else:
