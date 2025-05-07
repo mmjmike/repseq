@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 import re
-from .io import read_mixcr_clonoset, read_clonoset
+from .io import read_mixcr_clonoset, read_clonoset, vdjdb
 from .common_functions import print_progress_bar
 import random
 
@@ -515,3 +515,26 @@ def pool_clonosets(folders, samples_list=None, only_functional=False):
 #     metadata_filename = os.path.join(output_folder, "metadata.txt")
 #     metadata = pd.DataFrame(metadata_list, columns=["#file.name", "sample.id"])
 #     metadata.to_csv(metadata_filename, index=False, sep="\t")
+
+
+def annotate_clonotypes_with_vdjdb(clonotypes_df, drop_method=True, drop_meta=True, drop_cdr3fix=True):
+    """
+    Uses entries from VDJdb database to annotate the clonotypes with the same V, J, and CDR3. In case of several matches,
+    the one with the highest vdjdb score is used.
+
+    Args:
+        clonotypes_df (pd.DataFrame): A dataframe containing clonotypes. For instance, it can be made with 
+            `pool_clonotypes_from_clonosets_df` function from the Clustering module. 
+        drop_method (bool): if `True`, `Method` column is excluded from the annotation
+        drop_meta (bool): if `True`, `Meta` column is excluded from the annotation
+        drop_cdr3fix (bool): if `True`, `CDR3fix` column is excluded from the annotation
+    
+    Returns:
+        annotated_clonotypes (pd.DataFrame): annotated clonotypes_df
+    """
+    clonotypes_df_copy = clonotypes_df.copy()
+    vdjdb_whole = vdjdb(vdjdb_dataset=None, drop_method=drop_method, drop_meta=drop_meta, drop_cdr3fix=drop_cdr3fix)
+    vdjdb_whole = vdjdb_whole.sort_values(by='score', ascending=False).drop_duplicates(subset=['v', 'j', 'cdr3aa', 'epitope', 'epitope_gene', 'epitope_species'])
+    annotated_clonotypes = pd.merge(clonotypes_df_copy, vdjdb_whole, on=['cdr3aa', 'v', 'j'], how='left')
+    return annotated_clonotypes
+
