@@ -11,6 +11,7 @@ from IPython.display import Image, display, SVG
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import seaborn as sns
+import re
 
 def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
                          mixcr_path="mixcr", memory=32, time_estimate=1.5, custom_tag_pattern_column=None):
