@@ -8,7 +8,9 @@ from .io import read_json_report, read_clonoset
 from .clonosets import find_all_exported_clonosets_in_folder, filter_nonfunctional_clones
 from subprocess import Popen, PIPE
 from IPython.display import Image, display, SVG
-
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+import seaborn as sns
 
 def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
                          mixcr_path="mixcr", memory=32, time_estimate=1.5, custom_tag_pattern_column=None):
@@ -402,3 +404,110 @@ def show_report_images(folder):
         display(Image(filename=png_chain_filename))
     else:
         print("No chainQc image found (svg or png)")
+
+
+def show_report_images_new(folder, chart_type='summary', count_type='percent', colormap='mixcr', output_file=None):
+    """
+    Shows quality control reports in MiXCR-like style
+
+    Args:
+        folder (str): folder in which to look for QC images.
+        chart_type (str): Possible values are `summary` (corresponds to `mixcr exportQc align`, 
+            `chains` (`mixcr exportQc chainUsage`)
+        count_type (str): possible values are: `percent`, `abs`
+        colormap (str): Default value is '`mixcr`, but any colormap accepted by Matplotlib can be used instead.
+        output_file (str): filename ending with '.png' to save an output plot to
+
+    Returns:
+        None
+
+    """
+    CHAIN_VARIANTS = ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRD', 'TRL']
+    if os.path.isdir(folder):
+        all_files = os.listdir(folder)
+        files = []
+        for f in all_files:
+            match = re.match(r"(\S+)_([A-Z]+)\.(\S+)\.report\.json", f)
+            if match is not None:
+                sample_id = match.group(1)
+                sample_chain = match.group(2)
+                report_type = match.group(3)
+            else:
+                continue
+            if sample_chain in CHAIN_VARIANTS:
+                filename = sample_id + '_' + sample_chain
+                files.append([filename, report_type])
+            else:
+                continue
+    df_list = []
+    for file in files:
+        report_type = file[1]
+        if report_type == 'align':
+            json_report_contents = read_json_report(file[0], folder, report_type=report_type)
+            align_data = json_report_contents['notAlignedReasons']
+            chain_usage_data = json_report_contents['chainUsage']['chains']
+            
+            if chart_type == 'summary':
+                renaming_dict = {'NoHits': 'No hits (not TCR/IG?)',
+                                'NoCDR3Parts': 'No CDR3 parts',
+                                'NoVHits': 'No V hits',
+                                'NoJHits': 'No J hits',
+                                'VAndJOnDifferentTargets': 'No target with both V and J',
+                                'LowTotalScore': 'Low total score',
+                                'NoBarcode': 'Absent barcode',
+                                'SampleNotMatched': 'Sample not matched',
+                                }
+                align_df = {}
+                for old, new in renaming_dict.items():
+                    align_df[new] = [align_data.get(old, 0)]
+                align_df['Successfully aligned'] = json_report_contents['aligned']
+                df_list.append(pd.DataFrame(align_df, index=[file[0]])) 
+                
+            elif chart_type == 'chains':
+                align_df = {}
+                for chain, data in chain_usage_data.items(): 
+                    align_df.update({chain: data['total'] - data['nonFunctional'],
+                                f'{chain} (stops)': data['hasStops'],
+                                f'{chain} (OOF)': data['isOOF']})
+                df_list.append(pd.DataFrame(align_df, index=[file[0]]))
+    results = pd.concat(df_list)
+    if count_type == 'percent':
+        results =  results.div(results.sum(axis=1), axis=0) * 100
+    if chart_type == 'summary':
+        order = ['Successfully aligned', 
+                 'No hits (not TCR/IG?)', 
+                 'No CDR3 parts', 
+                 'No V hits', 
+                 'No J hits', 
+                 'No target with both V and J', 
+                 'Low total score', 
+                 'Absent barcode'] 
+        if colormap == 'mixcr':
+            colormap = ListedColormap(colors=['#3ecd8d', '#fed470', '#fda163', '#f36c5a', '#d64470', '#a03080', '#702084', '#451777'],
+                                     name='mixcr')
+    elif chart_type == 'chains':
+        order = sorted(results.columns)
+        if colormap == 'mixcr':
+            colors = ['#c26a27', '#ff9429', '#ffcb8f', '#a324b2', '#e553e5', '#faaafa', '#ad3757', '#f05670', '#ffadba', 
+                                  '#105bcc', '#2d93fa', '#99ccff', '#198020', '#42b842', '#99e099', '#068a94', '#27c2c2', '#90e0e0', 
+                                  '#5f31cc', '#845cff', '#c1adff']
+            all_variants = ['IGH', 'IGH (stops)', 'IGH (OOF)', 'IGK', 'IGK (stops)', 'IGK (OOF)', 'IGL', 'IGL (stops)', 'IGL (OOF)', 'TRA', 'TRA (stops)', 'TRA (OOF)', 'TRB', 'TRB (stops)', 'TRB (OOF)', 'TRD', 'TRD (stops)', 'TRD (OOF)', 'TRG', 'TRG (stops)', 'TRG (OOF)']
+            colormap = ListedColormap(colors=[colors[i] for i in range(len(colors)) if all_variants[i] in results.columns],
+                                          name='mixcr')                              
+    size = results.shape[0]
+    results = results[order]
+    ax = results.plot.barh(width=0.85, figsize=(9, size * 0.5),  stacked=True, colormap=colormap)
+    if count_type == 'percent':
+        ax.set_xlabel('%')
+    else:
+        ax.set_xlabel('read count')
+    if chart_type == 'summary':
+        ax.set_title('Alignments rate')
+    elif chart_type == 'chains':
+        ax.set_title('Clonal chain usage')
+    ax.legend(loc='upper left', bbox_to_anchor=(1, 1), ncol=1, frameon=False)
+    sns.despine(left=True, bottom=True)
+    plt.show()
+    if output_file is not None:
+        ax.get_figure().savefig(output_file, bbox_inches='tight')
+    return
