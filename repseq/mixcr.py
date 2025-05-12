@@ -424,6 +424,7 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', c
 
     """
     CHAIN_VARIANTS = ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRD', 'TRL']
+    all_variants = ['IGH', 'IGH (stops)', 'IGH (OOF)', 'IGK', 'IGK (stops)', 'IGK (OOF)', 'IGL', 'IGL (stops)', 'IGL (OOF)', 'TRA', 'TRA (stops)', 'TRA (OOF)', 'TRB', 'TRB (stops)', 'TRB (OOF)', 'TRD', 'TRD (stops)', 'TRD (OOF)', 'TRG', 'TRG (stops)', 'TRG (OOF)']
     if os.path.isdir(folder):
         all_files = os.listdir(folder)
         files = []
@@ -471,7 +472,7 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', c
                                 f'{chain} (stops)': data['hasStops'],
                                 f'{chain} (OOF)': data['isOOF']})
                 df_list.append(pd.DataFrame(align_df, index=[file[0]]))
-    results = pd.concat(df_list)
+    results = pd.concat(df_list).fillna(value=0)
     if count_type == 'percent':
         results =  results.div(results.sum(axis=1), axis=0) * 100
     if chart_type == 'summary':
@@ -487,16 +488,16 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', c
             colormap = ListedColormap(colors=['#3ecd8d', '#fed470', '#fda163', '#f36c5a', '#d64470', '#a03080', '#702084', '#451777'],
                                      name='mixcr')
     elif chart_type == 'chains':
-        order = sorted(results.columns)
+        order = [cat for cat in all_variants if cat in results.columns]
         if colormap == 'mixcr':
             colors = ['#c26a27', '#ff9429', '#ffcb8f', '#a324b2', '#e553e5', '#faaafa', '#ad3757', '#f05670', '#ffadba', 
                                   '#105bcc', '#2d93fa', '#99ccff', '#198020', '#42b842', '#99e099', '#068a94', '#27c2c2', '#90e0e0', 
                                   '#5f31cc', '#845cff', '#c1adff']
-            all_variants = ['IGH', 'IGH (stops)', 'IGH (OOF)', 'IGK', 'IGK (stops)', 'IGK (OOF)', 'IGL', 'IGL (stops)', 'IGL (OOF)', 'TRA', 'TRA (stops)', 'TRA (OOF)', 'TRB', 'TRB (stops)', 'TRB (OOF)', 'TRD', 'TRD (stops)', 'TRD (OOF)', 'TRG', 'TRG (stops)', 'TRG (OOF)']
             colormap = ListedColormap(colors=[colors[i] for i in range(len(colors)) if all_variants[i] in results.columns],
                                           name='mixcr')                              
     size = results.shape[0]
     results = results[order]
+    results.sort_index(inplace=True)
     ax = results.plot.barh(width=0.85, figsize=(9, size * 0.5),  stacked=True, colormap=colormap)
     if count_type == 'percent':
         ax.set_xlabel('%')
