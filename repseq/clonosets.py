@@ -109,7 +109,7 @@ def find_all_exported_clonosets_in_folder(folder, chain=None, show_offtarget=Tru
             files.append([sample_id, sample_chain, os.path.join(folder, f)])
         
     files_df = pd.DataFrame(files, columns=result_columns)
-    if show_offtarget:
+    if not show_offtarget:
         files_df = remove_non_target_clonosets_from_files_df(files_df, threshold=offtarget_threshold)
 
     return files_df
