@@ -407,7 +407,7 @@ def show_report_images(folder):
         print("No chainQc image found (svg or png)")
 
 
-def show_report_images_new(folder, chart_type='summary', count_type='percent', colormap='mixcr', output_file=None):
+def show_report_images_new(folder, chart_type='summary', count_type='percent', output_file=None):
     """
     Shows quality control reports in MiXCR-like style
 
@@ -416,7 +416,6 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', c
         chart_type (str): Possible values are `summary` (corresponds to `mixcr exportQc align`, 
             `chains` (`mixcr exportQc chainUsage`)
         count_type (str): possible values are: `percent`, `abs`
-        colormap (str): Default value is '`mixcr`, but any colormap accepted by Matplotlib can be used instead.
         output_file (str): filename ending with '.png' to save an output plot to
 
     Returns:
@@ -424,23 +423,20 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', c
 
     """
     CHAIN_VARIANTS = ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRD', 'TRL']
-    all_variants = ['IGH', 'IGH (stops)', 'IGH (OOF)', 'IGK', 'IGK (stops)', 'IGK (OOF)', 'IGL', 'IGL (stops)', 'IGL (OOF)', 'TRA', 'TRA (stops)', 'TRA (OOF)', 'TRB', 'TRB (stops)', 'TRB (OOF)', 'TRD', 'TRD (stops)', 'TRD (OOF)', 'TRG', 'TRG (stops)', 'TRG (OOF)']
-    if os.path.isdir(folder):
+    files = []
+    try:
         all_files = os.listdir(folder)
         files = []
         for f in all_files:
-            match = re.match(r"(\S+)_([A-Z]+)\.(\S+)\.report\.json", f)
+            match = re.match(r"(.+)\.([a-zA-Z0-9_]+)\.report\.json", f)
             if match is not None:
                 sample_id = match.group(1)
-                sample_chain = match.group(2)
-                report_type = match.group(3)
+                report_type = match.group(2)
+                files.append([sample_id, report_type])
             else:
                 continue
-            if sample_chain in CHAIN_VARIANTS:
-                filename = sample_id + '_' + sample_chain
-                files.append([filename, report_type])
-            else:
-                continue
+    except FileNotFoundError:
+        print('No such file or directory')
     df_list = []
     for file in files:
         report_type = file[1]
@@ -472,7 +468,8 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', c
                                 f'{chain} (stops)': data['hasStops'],
                                 f'{chain} (OOF)': data['isOOF']})
                 df_list.append(pd.DataFrame(align_df, index=[file[0]]))
-    results = pd.concat(df_list).fillna(value=0)
+    results = pd.concat(df_list)
+    results = results.sort_index(ascending=False)
     if count_type == 'percent':
         results =  results.div(results.sum(axis=1), axis=0) * 100
     if chart_type == 'summary':
@@ -484,30 +481,50 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', c
                  'No target with both V and J', 
                  'Low total score', 
                  'Absent barcode'] 
-        if colormap == 'mixcr':
-            colormap = ListedColormap(colors=['#3ecd8d', '#fed470', '#fda163', '#f36c5a', '#d64470', '#a03080', '#702084', '#451777'],
-                                     name='mixcr')
+        colors = ['#3ecd8d', '#fed470', '#fda163', '#f36c5a', '#d64470', '#a03080', '#702084', '#451777']
+        colormap = ListedColormap(colors=colors,
+                                    name='mixcr')
     elif chart_type == 'chains':
-        order = [cat for cat in all_variants if cat in results.columns]
-        if colormap == 'mixcr':
-            colors = ['#c26a27', '#ff9429', '#ffcb8f', '#a324b2', '#e553e5', '#faaafa', '#ad3757', '#f05670', '#ffadba', 
+        order = sorted(results.columns)
+        colors = ['#c26a27', '#ff9429', '#ffcb8f', '#a324b2', '#e553e5', '#faaafa', '#ad3757', '#f05670', '#ffadba', 
                                   '#105bcc', '#2d93fa', '#99ccff', '#198020', '#42b842', '#99e099', '#068a94', '#27c2c2', '#90e0e0', 
-                                  '#5f31cc', '#845cff', '#c1adff']
-            colormap = ListedColormap(colors=[colors[i] for i in range(len(colors)) if all_variants[i] in results.columns],
-                                          name='mixcr')                              
-    size = results.shape[0]
+                                '#5f31cc', '#845cff', '#c1adff']
+        all_variants = ['IGH', 'IGH (stops)', 'IGH (OOF)', 'IGK', 'IGK (stops)', 'IGK (OOF)', 'IGL', 'IGL (stops)', 'IGL (OOF)', 'TRA', 'TRA (stops)', 'TRA (OOF)', 'TRB', 'TRB (stops)', 'TRB (OOF)', 'TRD', 'TRD (stops)', 'TRD (OOF)', 'TRG', 'TRG (stops)', 'TRG (OOF)']
+        # colormap = ListedColormap(colors=[colors[i] for i in range(len(colors)) if all_variants[i] in results.columns],
+                                    #   name='mixcr')        
+        colors = [colors[i] for i in range(len(colors)) if all_variants[i] in results.columns]
     results = results[order]
-    results.sort_index(inplace=True)
-    ax = results.plot.barh(width=0.85, figsize=(9, size * 0.5),  stacked=True, colormap=colormap)
+    size = results.shape[0]
+    # ax = results.plot.barh(width=0.85, figsize=(9, size * 0.5),  stacked=True, colormap=colormap)
+    bar_height = 0.85
+    min_size = 7
+    min_size_2 = 10
+    plot_rows = max(size, min_size)
+    if size > min_size:
+            plot_rows = max(size, min_size_2)
+    fig, ax = plt.subplots(figsize=(9, plot_rows * bar_height * 0.5), dpi=100, constrained_layout=True)
+    ax.set_ylim(-0.5, results.shape[0] - 0.5)
+    bottom = np.zeros(len(results))
+    for i, column in enumerate(results.columns):
+        values = results[column].values
+        ax.barh(
+            y=results.index,
+            width=values,
+            height=bar_height,
+            left=bottom,
+            label=column,
+            color=colors[i],
+        )
+        bottom = [b + v for b, v in zip(bottom, values)]
     if count_type == 'percent':
         ax.set_xlabel('%')
     else:
         ax.set_xlabel('read count')
     if chart_type == 'summary':
-        ax.set_title('Alignments rate')
+        fig.legend(loc='outside upper center',  title='Alignments rate', ncol=3, frameon=False)
     elif chart_type == 'chains':
-        ax.set_title('Clonal chain usage')
-    ax.legend(loc='upper left', bbox_to_anchor=(1, 1), ncol=1, frameon=False)
+        fig.legend(loc='outside upper center',  title='Clonal chain usage', ncol=3, frameon=False)
+    # plt.tight_layout()
     sns.despine(left=True, bottom=True)
     plt.show()
     if output_file is not None:
