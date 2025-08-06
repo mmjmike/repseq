@@ -89,7 +89,8 @@ class Filter:
                       unweight=self.unweight,
                       recount_fractions=self.recount_fractions,
                       white_list = self.white_list,
-                      black_list = self.black_list
+                      black_list = self.black_list,
+                      ignore_small_clonosets=self.ignore_small_clonosets
                       )
         
     def apply(self, input_clonoset, colnames=None):
