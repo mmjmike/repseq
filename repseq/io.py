@@ -8,7 +8,7 @@ import requests
 import io
 from .common_functions import extract_segment
 
-def read_yaml_metadata(folder, filename="metadata.yaml"):
+def read_yaml_metadata(folder, filename="metadata.yaml", verbose=True):
     
     """
     Reads NGSiK metadata from a given folder and converts to `pd.DataFrame`. By default 
@@ -26,30 +26,36 @@ def read_yaml_metadata(folder, filename="metadata.yaml"):
     
     most_important_columns = ["sample_id", "R1", "R2","libraryPerson", "projectPerson", "projectName", "species", "miNNNPattern", "SMPL", "mix_id", "preset", "startingMaterial", "libraryType"]
     yaml_filename = os.path.join(folder, filename)
-    with open(yaml_filename, "r") as stream:
-        try:
-            metadata_dict =yaml.safe_load(stream)
-    #         pd.io.json.json_normalize(metadata_dict, "file", "samples", errors='ignore')
-        except yaml.YAMLError as exc:
-            print(exc)
+    
+    if os.path.isfile(yaml_filename):
+        with open(yaml_filename, "r") as stream:
+            try:
+                metadata_dict =yaml.safe_load(stream)
+        #         pd.io.json.json_normalize(metadata_dict, "file", "samples", errors='ignore')
+            except yaml.YAMLError as exc:
+                print(exc)
 
-    df = pd.json_normalize(metadata_dict)
-    df = df.explode("file")
-    df = pd.concat([df.drop(['file'], axis=1), df['file'].apply(pd.Series)], axis=1)
-    df = df.explode("samples")
-    df = pd.concat([df.drop(['samples'], axis=1), df['samples'].apply(pd.Series)], axis=1)
-    if 'patternGroupValues' in df.columns:
-        df = pd.concat([df.drop(['patternGroupValues'], axis=1), df['patternGroupValues'].apply(pd.Series)], axis=1)
-    df["R1"] = df["R1"].apply(lambda x: os.path.join(folder, x))
-    df["R2"] = df["R2"].apply(lambda x: os.path.join(folder, x))
-    df = df.rename(columns={"name": "sample_id"})
-    
-    for col_name in most_important_columns[::-1]:
-        if col_name in df.columns:
-            first_column = df.pop(col_name) 
-            df.insert(0, col_name, first_column)
-    
-    return df.reset_index(drop=True)
+        df = pd.json_normalize(metadata_dict)
+        df = df.explode("file")
+        df = pd.concat([df.drop(['file'], axis=1), df['file'].apply(pd.Series)], axis=1)
+        df = df.explode("samples")
+        df = pd.concat([df.drop(['samples'], axis=1), df['samples'].apply(pd.Series)], axis=1)
+        if 'patternGroupValues' in df.columns:
+            df = pd.concat([df.drop(['patternGroupValues'], axis=1), df['patternGroupValues'].apply(pd.Series)], axis=1)
+        df["R1"] = df["R1"].apply(lambda x: os.path.join(folder, x))
+        df["R2"] = df["R2"].apply(lambda x: os.path.join(folder, x))
+        df = df.rename(columns={"name": "sample_id"})
+        
+        for col_name in most_important_columns[::-1]:
+            if col_name in df.columns:
+                first_column = df.pop(col_name) 
+                df.insert(0, col_name, first_column)
+        
+        return df.reset_index(drop=True)
+    else:
+        if verbose:
+            print(f"Metadata file '{v}' not found. Nothing to return")
+        return None
 
 
 def read_clonoset(filename):
