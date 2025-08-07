@@ -17,6 +17,7 @@ def read_yaml_metadata(folder, filename="metadata.yaml", verbose=True):
     Args:
         folder (str): path to NGSiK folder
         filename (str): NGSiK metadata filename
+        verbose (bool): verbosity for 
     
     Returns:
         sample_df (pd.DataFrame): extracted DataFrame from metadata
@@ -54,8 +55,8 @@ def read_yaml_metadata(folder, filename="metadata.yaml", verbose=True):
         return df.reset_index(drop=True)
     else:
         if verbose:
-            print(f"Metadata file '{v}' not found. Nothing to return")
-        return None
+            print(f"Metadata file '{yaml_filename}' not found. Nothing to return")
+        return pd.DataFrame()
 
 
 def read_clonoset(filename):
