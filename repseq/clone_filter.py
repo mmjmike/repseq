@@ -248,10 +248,10 @@ class Filter:
 
         if "cdr3aa" not in clonoset.columns:
             if colnames["cdr3aa_column"] is not None:
-                clonoset["cdr3aa"] = clonoset[colnames["cdr3aa_column"]]
+                clonoset["cdr3aa"] = clonoset[colnames["cdr3aa_column"]].astype(str)
         if "cdr3nt" not in clonoset.columns:
             if colnames["cdr3nt_column"] is not None:
-                clonoset["cdr3nt"] = clonoset[colnames["cdr3nt_column"]]
+                clonoset["cdr3nt"] = clonoset[colnames["cdr3nt_column"]].astype(str)
 
         return clonoset
 
