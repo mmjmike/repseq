@@ -169,8 +169,8 @@ class Filter:
         segment_borders_columns = ["VEnd", "DStart", "DEnd", "JStart"]
 
 
-        clonoset["cdr3aa"] = clonoset["cdr3aa"].astype(str)
-        clonoset["cdr3nt"] = clonoset["cdr3nt"].astype(str)
+        clonoset["cdr3aa"] = clonoset["cdr3aa"].fillna("")
+        clonoset["cdr3nt"] = clonoset["cdr3nt"].fillna("")
         
         
         # In the case of MiXCR and Bioadaptive format the segment type columns
@@ -250,10 +250,10 @@ class Filter:
 
         if "cdr3aa" not in clonoset.columns:
             if colnames["cdr3aa_column"] is not None:
-                clonoset["cdr3aa"] = clonoset[colnames["cdr3aa_column"]].astype(str)
+                clonoset["cdr3aa"] = clonoset[colnames["cdr3aa_column"]].fillna("")
         if "cdr3nt" not in clonoset.columns:
             if colnames["cdr3nt_column"] is not None:
-                clonoset["cdr3nt"] = clonoset[colnames["cdr3nt_column"]].astype(str)
+                clonoset["cdr3nt"] = clonoset[colnames["cdr3nt_column"]].fillna("")
 
         return clonoset
 
