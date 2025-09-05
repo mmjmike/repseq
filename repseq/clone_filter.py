@@ -169,6 +169,8 @@ class Filter:
         segment_borders_columns = ["VEnd", "DStart", "DEnd", "JStart"]
 
 
+        clonoset["cdr3aa"] = clonoset["cdr3aa"].astype(str)
+        clonoset["cdr3nt"] = clonoset["cdr3nt"].astype(str)
         
         
         # In the case of MiXCR and Bioadaptive format the segment type columns
