@@ -12,6 +12,28 @@ import os
 import json
 
 
+def pool_clonotypes_from_clonosets_df(clonosets_df, cl_filter=None):
+
+    if cl_filter is None:
+        cl_filter = Filter()
+    
+    clonotypes_dfs = []
+    
+    for index, row in clonosets_df.iterrows():
+        sample_id = row["sample_id"]
+        filename = row["filename"]
+        clonoset = read_clonoset(filename)
+        clonoset = cl_filter.apply(clonoset)
+        clonoset["sample_id"] = sample_id
+        clonotypes_dfs.append(clonoset)
+
+    pooled_clonosets = pd.concat(clonotypes_dfs).reset_index(drop=True)
+
+    print(f"Pooled {len(pooled_clonosets)} clonotypes from {len(clonosets_df)} samples")
+
+    return pooled_clonosets
+
+
 class Node:
     
     def __init__(self, node_id, seq_nt, seq_aa, v, j, sample_id, cluster_no=None, size=1):
@@ -132,6 +154,13 @@ class Cluster(nx.Graph):
                 best_score = score
                 best_segment = segment
         return best_segment
+    
+    @property
+    def total_size(self):
+        size = 0
+        for node in self:
+            size += node.size
+        return size
 
 
 class Clusters(list):
@@ -188,9 +217,10 @@ class Clusters(list):
                 node.add_properties(metadata_dict)
 
 
+    @property
     def properties(self, weighed=False):
         properties_list = ["cluster_id", "nodes", "edges", "diameter", "density", "eccentricity",
-                       "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j"]
+                       "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j", "total_size"]
         results = []
         for cluster in self.clusters:
             for node in cluster:
@@ -202,6 +232,7 @@ class Clusters(list):
             nt_consensus = cluster.calc_cluster_consensus(seq_type="dna", weighed=weighed)
             v_consensus = cluster.calc_cluster_consensus_segment(segment_type="v", weighed=weighed)
             j_consensus = cluster.calc_cluster_consensus_segment(segment_type="j", weighed=weighed)
+            total_size = cluster.total_size
             result = (cluster_id,
                     len(cluster), 
                     nx.number_of_edges(cluster), 
@@ -211,7 +242,8 @@ class Clusters(list):
                     aa_consensus,
                     nt_consensus,
                     v_consensus,
-                    j_consensus)
+                    j_consensus,
+                    total_size)
             results.append(result)
         return pd.DataFrame(results, columns=properties_list)
 
@@ -220,26 +252,7 @@ class Clusters(list):
         pass
 
 
-    def pool_clonotypes_from_clonosets_df(self):
-    
-        if self.cl_filter is None:
-            cl_filter = Filter()
-        
-        clonotypes_dfs = []
-        
-        for index, row in self.clonosets.iterrows():
-            sample_id = row["sample_id"]
-            filename = row["filename"]
-            clonoset = read_clonoset(filename)
-            clonoset = self.cl_filter.apply(clonoset)
-            clonoset["sample_id"] = sample_id
-            clonotypes_dfs.append(clonoset)
 
-        self.pooled_clonosets = pd.concat(clonotypes_dfs).reset_index(drop=True)
-
-        print(f"Pooled {len(self.pooled_clonosets)} clonotypes from {len(self.clonosets)} samples")
-
-        return self.pooled_clonosets
 
 
     def _split_c(self, c_segm):
@@ -507,7 +520,8 @@ class Clusters(list):
                     error_message = "Couldn't find at least one of compulsory columns in pooled_df: " +", ".join(compulsory_columns)
                     raise ValueError(error_message)    
 
-        clonoset_input=pooled_df
+        clonoset_input = pooled_df
+        self.pooled_clonosets = clonoset_input
         
         tcr_dist = False
 
@@ -546,7 +560,8 @@ class Clusters(list):
 
     def create_clusters(self, igh=False, tcrdist_radius=None, count_by_freq=True):
         
-        clonoset_input = self.pool_clonotypes_from_clonosets_df()
+        clonoset_input = pool_clonotypes_from_clonosets_df()
+        self.pooled_clonosets = clonoset_input
 
         clusters = self.create_clusters_from_pooled_df(clonoset_input, 
                                                 igh=igh, tcrdist_radius=tcrdist_radius,
