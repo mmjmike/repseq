@@ -560,7 +560,7 @@ class Clusters(list):
 
     def create_clusters(self, igh=False, tcrdist_radius=None, count_by_freq=True):
         
-        clonoset_input = pool_clonotypes_from_clonosets_df()
+        clonoset_input = pool_clonotypes_from_clonosets_df(self.clonosets)
         self.pooled_clonosets = clonoset_input
 
         clusters = self.create_clusters_from_pooled_df(clonoset_input, 
