@@ -682,7 +682,7 @@ def pool_alice_hits_to_df(folders, samples_list=None, metadata_filename="vdjtool
 
 def cluster_properties(clusters, weighed=False):
     properties_list = ["cluster_id", "nodes", "edges", "diameter", "density", "eccentricity",
-                       "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j"]
+                       "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j", "total_size"]
     results = []
     for cluster in clusters:
         for node in cluster:
@@ -694,6 +694,7 @@ def cluster_properties(clusters, weighed=False):
         nt_consensus = calc_cluster_consensus(cluster, seq_type="dna", weighed=weighed)
         v_consensus = calc_cluster_consensus_segment(cluster, segment_type="v", weighed=weighed)
         j_consensus = calc_cluster_consensus_segment(cluster, segment_type="j", weighed=weighed)
+        total_size = calc_cluster_total_size(cluster)
         result = (cluster_id,
                   len(cluster), 
                   nx.number_of_edges(cluster), 
@@ -703,10 +704,17 @@ def cluster_properties(clusters, weighed=False):
                   aa_consensus,
                   nt_consensus,
                   v_consensus,
-                  j_consensus)
-        results.append(result)
+                  j_consensus,
+                  total_size)
+
     return pd.DataFrame(results, columns=properties_list)
-        
+
+def calc_cluster_total_size(cluster):
+    total_size = 0
+    for node in cluster:
+        total_size += node.size
+    return total_size
+
 def calc_cluster_consensus(cluster, seq_type="dna", weighed=False):
     motif_dicts = []
     for node in cluster:
