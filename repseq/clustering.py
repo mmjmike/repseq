@@ -706,6 +706,7 @@ def cluster_properties(clusters, weighed=False):
                   v_consensus,
                   j_consensus,
                   total_size)
+        results.append(result)
 
     return pd.DataFrame(results, columns=properties_list)
 
