@@ -682,7 +682,7 @@ def pool_alice_hits_to_df(folders, samples_list=None, metadata_filename="vdjtool
 
 def cluster_properties(clusters, weighed=False):
     properties_list = ["cluster_id", "nodes", "edges", "diameter", "density", "eccentricity",
-                       "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j", "total_size"]
+                       "consensus_cdr3aa", "consensus_cdr3nt", "consensus_v", "consensus_j", "total_size"]
     results = []
     for cluster in clusters:
         for node in cluster:
