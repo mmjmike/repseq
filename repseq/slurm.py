@@ -1,5 +1,5 @@
 import os
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, run
 from time import sleep, gmtime, strftime
 import re
 from .common_functions import print_progress_bar
@@ -99,3 +99,36 @@ def check_slurm_progress(filename, loop=False):
         finished = len(re.findall("finished", text))
         print(text)
         print_progress_bar(finished, tasks, program_name=program_name, object_name="task(s)")
+
+
+def check_slurm_progress(filename=None, loop=False):
+
+    username = os.environ.get('USER')
+    squeue_output = run(['squeue', '-u', username, '--format="%j %T %M"'],  capture_output=True, text=True, check=True).stdout
+    jobs = list(map(lambda x: x.split(), squeue_output.strip().split('\n')))[2:]
+
+    if filename:
+        with open(filename, "r") as f:
+            first_line = f.readlines()[0]
+        match = re.match('# ([^:]+): slurm run ([0-9]+) tasks',first_line)
+        program_name = match[1]
+        tasks = int(match[2])
+        unfinished = 0
+        if loop:
+            while True:
+                for job in jobs:
+                    name, status, time = job
+                    if name == program_name:
+                        unfinished += 1 
+                sleep(0.5)
+                print_progress_bar(tasks - unfinished, tasks, program_name=program_name, object_name="task(s)")
+                if unfinished == 0:
+                    break
+        else:
+            for job in jobs:
+                name, status, time = job
+                if name == program_name:
+                    unfinished += 1   
+            print_progress_bar(tasks - unfinished, tasks, program_name=program_name, object_name="task(s)")
+    else:
+        print(*['\t'.join(job) for job in jobs], sep='\n')
