@@ -164,12 +164,35 @@ def bray_curtis_dissimilarity(list1, list2):
     
     return numerator / denominator
 
-def kl_divergence(p, q):
+def kl_divergence(p, q, epsilon=1e-10):
+    """
+    Calculate the KL divergence between two probability distributions p and q.
+
+    Args:
+        p (list of float): First probability distribution.
+        q (list of float): Second probability distribution.
+        epsilon (float): Small value to avoid log(0) and division by zero.
+
+    Returns:
+        float: KL divergence D(P || Q)
+    """
+    
     p = np.asarray(p, dtype=np.float64)
     q = np.asarray(q, dtype=np.float64)
-    return np.sum(np.where(p != 0 and q != 0, p * np.log(p / q), 0))
 
-def jensen_shannon_divergence(p, q):
+    # normalize
+    p /= np.sum(p)
+    q /= np.sum(q)
+
+    # escape division by zero and log(0) with epsilon value
+    p_safe = np.where(p == 0, epsilon, p)
+    q_safe = np.where(q == 0, epsilon, q)
+
+    result = np.sum(np.where(p != 0, p_safe * np.log(p_safe / q_safe), 0))
+
+    return result
+
+def jensen_shannon_divergence(p, q, epsilon=1e-10):
     p = np.asarray(p, dtype=np.float64)
     q = np.asarray(q, dtype=np.float64)
     
@@ -181,8 +204,8 @@ def jensen_shannon_divergence(p, q):
     m = 0.5 * (p + q)
     
     # Calculate KLD for each distribution
-    kld_p_m = kl_divergence(p, m)
-    kld_q_m = kl_divergence(q, m)
+    kld_p_m = kl_divergence(p, m, epsilon=epsilon)
+    kld_q_m = kl_divergence(q, m, epsilon=epsilon)
     
     # Calculate JSD
     jsd = 0.5 * kld_p_m + 0.5 * kld_q_m
