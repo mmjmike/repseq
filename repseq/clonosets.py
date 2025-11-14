@@ -307,7 +307,6 @@ def get_column_names_from_clonoset(clonoset):
     return colnames
 
 
-
 def downsample_clonoset(clonoset, downsample_size, seed=None, by_umi=False, colnames=None):
     clonoset= clonoset.copy()
     if seed is not None:
