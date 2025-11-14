@@ -98,10 +98,10 @@ class Cluster:
 
 
 
-def pool_clonotypes_from_clonosets_df(clonosets_df, cl_filter=None):
+def pool_clonotypes_from_clonosets_df(clonosets_df, cl_filter=None, convert=False):
     
     if cl_filter is None:
-        cl_filter = Filter()
+        cl_filter = Filter(convert=convert)
     
     clonotypes_dfs = []
     

@@ -686,15 +686,16 @@ class Clusters(list):
             additional_properties = list(node.additional_properties.keys())
             break
         nodes = []
-        for cluster in self.clusters:
+        for i, cluster in enumerate(self.clusters):
             for node in cluster:
                 add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
-                nodes.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.size, *add_properties_values))
-        properties_names = ["node_id", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "size"] + additional_properties
+                nodes.append((i, str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.size, *add_properties_values))
+        properties_names = ["cluster_no", "node_id", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "size"] + additional_properties
         df = pd.DataFrame(nodes, columns=properties_names)
         first_columns = ["cluster_no", "node_id"]
         print(df.columns)
         df = df[first_columns + [c for c in df.columns if c not in first_columns]]
+        return df
 
 
     def pool_clonotypes_to_df(self, folders, samples_list=None, top=0, functional=True, exclude_singletons=False, cdr3aa_len_range=[], metadata_filename="vdjtools_metadata.txt"):
