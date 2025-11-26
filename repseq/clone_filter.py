@@ -318,7 +318,7 @@ class Filter:
                 raise ValueError(f"Incorrect value '{self.top}' for top. Value too low")
         if not isinstance(self.seed, Hashable):
             raise ValueError(f"Incorrect value '{self.seed}' for seed. Must be hashable")
-        pool_by_options = ["", "aa", "aaV", "aaVj", "nt", "ntV", "ntVJ"]
+        pool_by_options = ["", "aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ"]
         if self.pool_by not in pool_by_options:
             raise ValueError(f"Incorrect value '{self.pool_by}' for clonoset pool. Possible values: {', '.join(pool_by_options)}")
   
