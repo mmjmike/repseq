@@ -734,7 +734,7 @@ def calc_cluster_consensus(cluster, seq_type="dna", weighed=False):
     consensus_seq = get_consensus_from_motif_dict(motif_dict)
     return consensus_seq
 
-def plot_cluster_logo(cluster, seq_type="prot", weighed=False):
+def plot_cluster_logo(cluster, seq_type="prot", weighed=False, plot=True):
     list_of_clonotypes = []
     seq_types = ["prot", "dna"]
     if seq_type not in seq_types:
@@ -752,7 +752,7 @@ def plot_cluster_logo(cluster, seq_type="prot", weighed=False):
         else:
             clone = (seq,)
         list_of_clonotypes.append(clone)
-    get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=True)
+    get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=plot)
 
 
 def calc_cluster_consensus_segment(cluster, segment_type="v", weighed=False):

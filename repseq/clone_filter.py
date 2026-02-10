@@ -46,7 +46,7 @@ class Filter:
             It is applied before `black_list`
         black_list (list of tuples): If specified, only clonotypes not listed will be retained. Either `aa`, `aaV` or `aaVJ` 
             formats can be used to list clonotypes, e.g. [(“CASSS..”)], [(“CASSS..”, “TRBV2”)] or [(“CASSS..”, “TRBV2”, “TRBJ1”)]
-        pool_clonoset_by (str): possible values are ["", "aa", "aaV", "aaVj", "nt", "ntV", "ntVJ"]. Clones with identical parameters are merged, 
+        pool_clonoset_by (str): possible values are ["", "aa", "aaV", "aaVJ, "nt", "ntV", "ntVJ"]. Clones with identical parameters are merged, 
             keeping the largest one, while their counts are summed.
         convert (bool): By default, columns are added to the clonotype set to convert 
             it to the VDJtools format, and the original columns are removed. If set to  `False`, all original columns are preserved.
