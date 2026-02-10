@@ -752,7 +752,10 @@ def plot_cluster_logo(cluster, seq_type="prot", weighed=False, plot=True):
         else:
             clone = (seq,)
         list_of_clonotypes.append(clone)
-    get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=plot)
+    if plot:
+        get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=plot)
+    else:
+        return get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=plot)
 
 
 def calc_cluster_consensus_segment(cluster, segment_type="v", weighed=False):
