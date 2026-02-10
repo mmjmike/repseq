@@ -1,0 +1,1339 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../usage_intersections/">
+      
+      
+        <link rel="next" href="../usage_diffexp/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Clustering - Repseq Library for Immune repertoire postanalysis</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#usage-clustering" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Repseq Library for Immune repertoire postanalysis" class="md-header__button md-logo" aria-label="Repseq Library for Immune repertoire postanalysis" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Repseq Library for Immune repertoire postanalysis
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Clustering
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6m0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4M7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="lime"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../modules/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Modules
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../usage_mixcr/" class="md-tabs__link">
+          
+  
+  
+  Usage
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../functions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Functions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Repseq Library for Immune repertoire postanalysis" class="md-nav__button md-logo" aria-label="Repseq Library for Immune repertoire postanalysis" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Repseq Library for Immune repertoire postanalysis
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Usage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage_mixcr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MiXCR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage_stats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage_intersections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intersections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clustering
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clustering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-create-clusters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to create clusters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clusters-from-a-pooled-dataframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clusters from a pooled DataFrame
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-metadata-to-clusters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding metadata to clusters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#save-clusters-in-cytoscape-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Save clusters in Cytoscape format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cluster-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster properties
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequence-logo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequence logo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-cluster-metric-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom cluster metric example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#community-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Community detection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alice-antigen-specific-lymphocyte-identification-by-clustering-of-expanded-sequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ALICE (Antigen-specific Lymphocyte Identification by Clustering of Expanded sequences)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage_diffexp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differential expression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href=".." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../usage_mixcr/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Usage
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="usage-clustering">Usage: clustering</h1>
+<p><a href="../functions/#clustering">Clustering</a> finds clusters in given clonosets.</p>
+<h2 id="how-to-create-clusters">How to create clusters</h2>
+<p><code>create_clusters</code> function args:</p>
+<ul>
+<li><code>cl_filter</code>: see <a href="../usage_stats/#filtering-clonosets">the previous page</a> and <a href="../functions/#-clone_filter">Filter</a> for further explanations.</li>
+<li><code>mismatches</code>: specifies the maximum number of mismatches allowed for clonotypes to qualify as neighbours (adjacent).</li>
+<li><code>overlap_type</code>: Possible overlap types are [<code>aa</code>, <code>aaV</code>, <code>aaVJ</code>, <code>nt</code>, <code>ntV</code>, <code>ntVJ</code>], <code>aa</code>/<code>nt</code> stands for an amino acid or nucleotide sequence, and <code>V</code>/<code>J</code>/<code>VJ</code> denote a segment type.</li>
+<li>If <code>igh</code>=True, the constant (C) segment is kept.</li>
+<li>If <code>tcrdist_radius</code> is not None, only edges between clones with a tsrdist metric less than or equal to the specified radius are built. It overrides <code>overlap_type</code> and <code>mismatches</code>. A TCRdist modification is introduced: no gaps are allowed in CDR3, weights are in 3:1 ratio for CDR3 compared to other regions. Also, V-segment distances are pre-calculated and currently are available only for <i>Homo sapiens</i>.</li>
+<li>If <code>by_freq</code>=True (default), clonotype frequencies are used instead of counts.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">repseq</span><span class="w"> </span><span class="kn">import</span> <span class="n">clustering</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">clusters</span> <span class="o">=</span> <span class="n">clustering</span><span class="o">.</span><span class="n">create_clusters</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="n">top_filter</span><span class="p">,</span> <span class="n">mismatches</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">overlap_type</span><span class="o">=</span><span class="s2">&quot;aaV&quot;</span><span class="p">,</span> <span class="n">igh</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">tcrdist_radius</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">count_by_freq</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<p>Output is a list of NetworkX Graph() objects — separate clusters and single nodes. The list is sorted by cluster size.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">clusters</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="p">[</span><span class="o">&lt;</span><span class="n">networkx</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">Graph</span> <span class="n">at</span> <span class="mh">0x7fa133b1bd00</span><span class="o">&gt;</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a> <span class="o">&lt;</span><span class="n">networkx</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">Graph</span> <span class="n">at</span> <span class="mh">0x7fa15200cb80</span><span class="o">&gt;</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a> <span class="o">&lt;</span><span class="n">networkx</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">Graph</span> <span class="n">at</span> <span class="mh">0x7fa154aa3c10</span><span class="o">&gt;</span><span class="p">]</span>
+</code></pre></div>
+<p><br></p>
+<h2 id="clusters-from-a-pooled-dataframe">Clusters from a pooled DataFrame</h2>
+<p>Alternatively, one can create clusters from a dataframe with clonotypes. Mandatory columns are [<code>freq</code>, <code>count</code>, <code>v</code>, <code>j</code>, <code>cdr3aa</code>, <code>cdr3nt</code>, <code>sample_id</code>].</p>
+<p><code>pooled_df</code> example:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;"></th>
+<th style="text-align: right;">count</th>
+<th style="text-align: right;">freq</th>
+<th style="text-align: left;">cdr3nt</th>
+<th style="text-align: left;">cdr3aa</th>
+<th style="text-align: left;">v</th>
+<th style="text-align: left;">d</th>
+<th style="text-align: left;">j</th>
+<th style="text-align: left;">c</th>
+<th style="text-align: right;">VEnd</th>
+<th style="text-align: right;">DStart</th>
+<th style="text-align: right;">DEnd</th>
+<th style="text-align: right;">JStart</th>
+<th style="text-align: left;">sample_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">117</td>
+<td style="text-align: right;">7.46674e-05</td>
+<td style="text-align: left;">TGTGCCAGCAGTCGCCACAGTTACAGGGATGGCTACACCTTC</td>
+<td style="text-align: left;">CASSRHSYRDGYTF</td>
+<td style="text-align: left;">TRBV12-3</td>
+<td style="text-align: left;">TRBD1</td>
+<td style="text-align: left;">TRBJ1-2</td>
+<td style="text-align: left;">TRBC1</td>
+<td style="text-align: right;">11</td>
+<td style="text-align: right;">22</td>
+<td style="text-align: right;">27</td>
+<td style="text-align: right;">28</td>
+<td style="text-align: left;">sample1_nCD4_1_TRB</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">109</td>
+<td style="text-align: right;">6.95619e-05</td>
+<td style="text-align: left;">TGTGCCAGCAGTTTAGCGCATCAGGGAGGCAGCTATGGCTACACCTTC</td>
+<td style="text-align: left;">CASSLAHQGGSYGYTF</td>
+<td style="text-align: left;">TRBV12-4</td>
+<td style="text-align: left;">TRBD2</td>
+<td style="text-align: left;">TRBJ1-2</td>
+<td style="text-align: left;">TRBC1</td>
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">28</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: left;">sample1_nCD4_1_TRB</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">105</td>
+<td style="text-align: right;">6.70092e-05</td>
+<td style="text-align: left;">TGTGCCAGCAGCCCGGGACTGGCCTACAATGAGCAGTTCTTC</td>
+<td style="text-align: left;">CASSPGLAYNEQFF</td>
+<td style="text-align: left;">TRBV12-3</td>
+<td style="text-align: left;">TRBD2</td>
+<td style="text-align: left;">TRBJ2-1</td>
+<td style="text-align: left;">TRBC2</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">11</td>
+<td style="text-align: right;">19</td>
+<td style="text-align: right;">22</td>
+<td style="text-align: left;">sample1_nCD4_1_TRB</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">create_clusters_from_pooled_df</span><span class="p">(</span><span class="n">pooled_df</span><span class="p">,</span> <span class="n">mismatches</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">overlap_type</span><span class="o">=</span><span class="s2">&quot;aaV&quot;</span><span class="p">,</span> <span class="n">igh</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">tcrdist_radius</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>                                   <span class="n">count_by_freq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">_run_from_create_clusters</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="adding-metadata-to-clusters">Adding metadata to clusters</h2>
+<p>Metadata, if present, could also be added to node properties prior to saving to Cytoscape. The info will be added to <code>node.additional_properties</code> dictionary. Note that the metadata should contain the same <code>sample_id</code>s that were used in the <code>clonosets_df</code> when creating the clusters. </p>
+<p>Metadata example:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;"></th>
+<th style="text-align: left;">sample_id</th>
+<th style="text-align: right;">group</th>
+<th style="text-align: left;">type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">sample1_nCD4_1_TRB</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">nCD4</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">sample1_nCD8_1_TRB</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">nCD8</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">sample2_nCD4_1_TRB</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">nCD4</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">sample2_nCD8_1_TRB</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">nCD8</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">clustering</span><span class="o">.</span><span class="n">add_metadata</span><span class="p">(</span><span class="n">clusters</span><span class="p">,</span> <span class="n">metadata</span><span class="p">)</span>
+</code></pre></div>
+<p><br></p>
+<h2 id="save-clusters-in-cytoscape-format">Save clusters in Cytoscape format</h2>
+<p>Here, we filter out single-node clusters. Clusters are exported in two forms: edges are saved in a .sif file and cluster properties are in a tab-separated .csv file.  In the case of TCRdist, the edges are also assigned a length (radius).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">clusters_output_prefix</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s2">&quot;clusters&quot;</span><span class="p">)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># here, one-node clusters are filtered out</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">clusters_filtered</span> <span class="o">=</span> <span class="n">clustering</span><span class="o">.</span><span class="n">filter_one_node_clusters</span><span class="p">(</span><span class="n">clusters</span><span class="p">)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">clustering</span><span class="o">.</span><span class="n">save_clusters_for_cytoscape</span><span class="p">(</span><span class="n">clusters_filtered</span><span class="p">,</span> <span class="n">clusters_output_prefix</span><span class="p">,</span> <span class="n">sample_metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">)</span>
+</code></pre></div>
+<p><br></p>
+<h2 id="cluster-properties">Cluster properties</h2>
+<div class="admonition tip">
+<p class="admonition-title">node size</p>
+<p>If <code>weighed</code> is set to True, the weight of a node is determined by its size. The size of the node is defined by the <code>by_freq</code> parameter in the <code>create_clusters</code> function, which indicates whether the size is calculated based on counts or frequencies.</p>
+</div>
+<p>Cluster properties include consensus CDR3, v- and j-segment sequences, as well as some properties of clusters as graphs:</p>
+<ul>
+<li>diameter: the maximum eccentricity in a graph.</li>
+<li><a href="https://networkx.org/documentation/stable/reference/generated/networkx.classes.function.density.html">density</a>: The density is 0 for a graph without edges and 1 for a complete graph. The density of multigraphs can be higher than 1.</li>
+<li>eccentricity: for a node v, it is the maximum distance from v to all other nodes in a graph. Cluster-wise, it is the average eccentricity of all the nodes within the cluster.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">cluster_properties</span> <span class="o">=</span> <span class="n">clustering</span><span class="o">.</span><span class="n">cluster_properties</span><span class="p">(</span><span class="n">clusters_filtered</span><span class="p">,</span> <span class="n">weighed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">cluster_properties</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">&#39;clusters.tsv&#39;</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;"></th>
+<th style="text-align: left;">cluster_id</th>
+<th style="text-align: right;">nodes</th>
+<th style="text-align: right;">edges</th>
+<th style="text-align: right;">diameter</th>
+<th style="text-align: right;">density</th>
+<th style="text-align: right;">eccentricity</th>
+<th style="text-align: left;">concensus_cdr3aa</th>
+<th style="text-align: left;">concensus_cdr3nt</th>
+<th style="text-align: left;">concensus_v</th>
+<th style="text-align: left;">concensus_j</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">cluster_0</td>
+<td style="text-align: right;">58</td>
+<td style="text-align: right;">164</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0992136</td>
+<td style="text-align: right;">7.96552</td>
+<td style="text-align: left;">CASSLTGSYEQYF</td>
+<td style="text-align: left;">TGCGCCAGCAGCTTGGCAGGGTCCTACGAGCAGTACTTC</td>
+<td style="text-align: left;">TRBV5-1</td>
+<td style="text-align: left;">TRBJ2-7</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">cluster_1</td>
+<td style="text-align: right;">47</td>
+<td style="text-align: right;">188</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">0.173913</td>
+<td style="text-align: right;">5.40426</td>
+<td style="text-align: left;">CASSLGGNTEAFF</td>
+<td style="text-align: left;">TGCGCCAGCAGCTTGGCAGGGAACACTGAAGCTTTCTTT</td>
+<td style="text-align: left;">TRBV5-1</td>
+<td style="text-align: left;">TRBJ1-1</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">cluster_2</td>
+<td style="text-align: right;">38</td>
+<td style="text-align: right;">154</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">0.219061</td>
+<td style="text-align: right;">5.5</td>
+<td style="text-align: left;">CASSLDTYEQYF</td>
+<td style="text-align: left;">TGCGCCAGCAGCTTGGACACCTACGAGCAGTACTTC</td>
+<td style="text-align: left;">TRBV5-1</td>
+<td style="text-align: left;">TRBJ2-7</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">cluster_3</td>
+<td style="text-align: right;">35</td>
+<td style="text-align: right;">167</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">0.280672</td>
+<td style="text-align: right;">4.45714</td>
+<td style="text-align: left;">CASSLSYEQYF</td>
+<td style="text-align: left;">TGTGCCAGCAGTTTAGCCTACGAGCAGTACTTC</td>
+<td style="text-align: left;">TRBV12-3</td>
+<td style="text-align: left;">TRBJ2-7</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">cluster_4</td>
+<td style="text-align: right;">33</td>
+<td style="text-align: right;">79</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">0.149621</td>
+<td style="text-align: right;">5.42424</td>
+<td style="text-align: left;">CASSLGTDTQYF</td>
+<td style="text-align: left;">TGCGCCAGCAGCTTGGGCACAGATACGCAGTATTTT</td>
+<td style="text-align: left;">TRBV5-1</td>
+<td style="text-align: left;">TRBJ2-3</td>
+</tr>
+</tbody>
+</table>
+<p>For creating a table with counts or frequencies by cluster, see <a href="../usage_intersections/#count_table_by_cluster">the previous page</a>.</p>
+<p><br></p>
+<h2 id="sequence-logo">Sequence logo</h2>
+<p>To visualize cluster's CDR3 consensus sequence, use <code>plot_cluster_logo</code>. Possible <code>seq_type</code> are <code>prot</code> and <code>dna</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">clustering</span><span class="o">.</span><span class="n">plot_cluster_logo</span><span class="p">(</span><span class="n">clusters</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+</code></pre></div>
+<p><img alt="logo" src="../images_docs/logo.png" /></p>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">clustering</span><span class="o">.</span><span class="n">plot_cluster_logo</span><span class="p">(</span><span class="n">clusters</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">seq_type</span><span class="o">=</span><span class="s1">&#39;dna&#39;</span><span class="p">,</span> <span class="n">weighed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<img alt="logo" src="../images_docs/logo_dna.png" /></p>
+<p><br></p>
+<h2 id="custom-cluster-metric-example">Custom cluster metric example</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">top_filter</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">functionality</span><span class="o">=</span><span class="s2">&quot;f&quot;</span><span class="p">,</span> <span class="n">top</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span> <span class="n">by_umi</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">mix_tails</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">cd4_clusters</span> <span class="o">=</span> <span class="n">clustering</span><span class="o">.</span><span class="n">create_clusters</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="n">top_filter</span><span class="p">,</span> <span class="n">mismatches</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">overlap_type</span><span class="o">=</span><span class="s2">&quot;aaV&quot;</span><span class="p">,</span> <span class="n">igh</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">tcrdist_radius</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">count_by_freq</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">clustering</span><span class="o">.</span><span class="n">add_metadata</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">metadata</span><span class="p">)</span>
+</code></pre></div>
+<p>Metadata in this example:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;"></th>
+<th style="text-align: left;">sample_id</th>
+<th style="text-align: left;">experimental_group</th>
+<th style="text-align: left;">subset</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">UCB4_nCD4_1_TRB</td>
+<td style="text-align: left;">late</td>
+<td style="text-align: left;">nCD4</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">UCB11_nCD4_1_TRB</td>
+<td style="text-align: left;">preterm</td>
+<td style="text-align: left;">nCD4</td>
+</tr>
+<tr>
+<td style="text-align: right;">7</td>
+<td style="text-align: left;">UCB10_nCD4_1_TRB</td>
+<td style="text-align: left;">term</td>
+<td style="text-align: left;">nCD4</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: left;">UCB2_nCD4_1_TRB</td>
+<td style="text-align: left;">term</td>
+<td style="text-align: left;">nCD4</td>
+</tr>
+</tbody>
+</table>
+<p>This function calculates the total frequency of all clonotypes within a cluster, as well as the percentage of clonotypes from different experimental groups present in the cluster.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">calc_custom_clusters_properties</span><span class="p">(</span><span class="n">clusters</span><span class="p">):</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">properties</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;nodes&quot;</span><span class="p">,</span> <span class="s2">&quot;sum_frequency&quot;</span><span class="p">,</span> <span class="s2">&quot;preterm_percent&quot;</span><span class="p">,</span> <span class="s2">&quot;term_percent&quot;</span><span class="p">,</span> <span class="s2">&quot;late_percent&quot;</span><span class="p">]</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="k">for</span> <span class="n">cluster</span> <span class="ow">in</span> <span class="n">clusters</span><span class="p">:</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>        <span class="n">prop1_nodes</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">cluster</span><span class="p">)</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>        <span class="n">prop2_sum_size</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="n">node</span><span class="o">.</span><span class="n">size</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">cluster</span><span class="p">])</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>        <span class="n">prop3_sum_size</span> <span class="o">=</span> <span class="n">calc_cluster_preterm_clones_percent</span><span class="p">(</span><span class="n">cluster</span><span class="p">)</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>        <span class="n">result</span> <span class="o">=</span> <span class="p">[</span><span class="n">prop1_nodes</span><span class="p">,</span> <span class="n">prop2_sum_size</span><span class="p">,</span> <span class="o">*</span><span class="n">prop3_sum_size</span><span class="p">]</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="n">columns</span> <span class="o">=</span> <span class="n">properties</span><span class="p">)</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>    <span class="k">return</span> <span class="n">df</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="k">def</span><span class="w"> </span><span class="nf">calc_cluster_clones_percent</span><span class="p">(</span><span class="n">cluster</span><span class="p">):</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>    <span class="n">total_size</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="n">node</span><span class="o">.</span><span class="n">size</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">cluster</span><span class="p">])</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>    <span class="n">preterm</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="n">node</span><span class="o">.</span><span class="n">size</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">cluster</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">additional_properties</span><span class="p">[</span><span class="s2">&quot;experimental_group&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;preterm&quot;</span><span class="p">])</span>
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>    <span class="n">term</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="n">node</span><span class="o">.</span><span class="n">size</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">cluster</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">additional_properties</span><span class="p">[</span><span class="s2">&quot;experimental_group&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;term&quot;</span><span class="p">])</span>
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a>    <span class="n">late</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="n">node</span><span class="o">.</span><span class="n">size</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">cluster</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">additional_properties</span><span class="p">[</span><span class="s2">&quot;experimental_group&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;late&quot;</span><span class="p">])</span>
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>    <span class="n">percent_preterm</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">preterm</span><span class="o">/</span><span class="n">total_size</span><span class="o">*</span><span class="mi">100</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a>    <span class="n">percent_term</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">term</span><span class="o">/</span><span class="n">total_size</span><span class="o">*</span><span class="mi">100</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a>    <span class="n">percent_late</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">late</span><span class="o">/</span><span class="n">total_size</span><span class="o">*</span><span class="mi">100</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a>    <span class="k">return</span> <span class="n">percent_preterm</span><span class="p">,</span> <span class="n">percent_term</span><span class="p">,</span> <span class="n">percent_late</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;"></th>
+<th style="text-align: right;">nodes</th>
+<th style="text-align: right;">sum_frequency</th>
+<th style="text-align: right;">preterm_percent</th>
+<th style="text-align: right;">term_percent</th>
+<th style="text-align: right;">late_percent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">73</td>
+<td style="text-align: right;">0.0210043</td>
+<td style="text-align: right;">24.1</td>
+<td style="text-align: right;">62.04</td>
+<td style="text-align: right;">13.86</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">41</td>
+<td style="text-align: right;">0.0115223</td>
+<td style="text-align: right;">44.21</td>
+<td style="text-align: right;">41.43</td>
+<td style="text-align: right;">14.36</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">39</td>
+<td style="text-align: right;">0.0114498</td>
+<td style="text-align: right;">25.18</td>
+<td style="text-align: right;">65.35</td>
+<td style="text-align: right;">9.47</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">38</td>
+<td style="text-align: right;">0.0119551</td>
+<td style="text-align: right;">32.43</td>
+<td style="text-align: right;">55.64</td>
+<td style="text-align: right;">11.93</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">29</td>
+<td style="text-align: right;">0.00817272</td>
+<td style="text-align: right;">36.06</td>
+<td style="text-align: right;">55.56</td>
+<td style="text-align: right;">8.38</td>
+</tr>
+</tbody>
+</table>
+<p><br>To see another example of a custom function for stats calculation, visit <a href="../usage_stats/#custom-stats">stats</a> page.</p>
+<p><br></p>
+<h2 id="community-detection">Community detection</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">communities_louvain</span> <span class="o">=</span> <span class="n">clustering</span><span class="o">.</span><span class="n">find_cluster_communities_louvain</span><span class="p">(</span><span class="n">clusters</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+<p><br></p>
+<h2 id="alice-antigen-specific-lymphocyte-identification-by-clustering-of-expanded-sequences"><a href="https://journals.plos.org/plosbiology/article?id=10.1371/journal.pbio.3000314">ALICE</a> (Antigen-specific Lymphocyte Identification by Clustering of Expanded sequences)</h2>
+<p>ALICE works by treating clonotypes as graph vertices, with edges connecting sequences which differ by at most 1 CDR3 amino acid. It identifies clonotypes with a higher numbers of neighbors than expected by a null model of recombination, separating clusters of antigen-responding clonotypes from clusters arising from recombination statistics.<br>Currently, it is implemented for <i>H.sapiens</i> only.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">alice</span><span class="p">(</span><span class="n">clusters</span><span class="p">,</span> <span class="n">overlap_type</span><span class="o">=</span><span class="s1">&#39;aaVJ&#39;</span><span class="p">,</span> <span class="n">mismatches</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">species</span><span class="o">=</span><span class="s2">&quot;hs&quot;</span><span class="p">,</span> <span class="n">olga_warnings</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      &copy; 2023 <a href="https://github.com/mmjmike" target="_blank" rel="noopener">Mikhail Myshkin</a>
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/mmjmike" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M202.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1M496 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2m-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3m-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.path", "toc.integrate", "navigation.top", "search.suggest", "search.highlight", "content.tabs.link", "content.code.annotation", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
