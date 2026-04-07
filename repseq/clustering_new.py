@@ -10,10 +10,11 @@ import numpy as np
 from scipy.sparse import csr_matrix
 import os
 import json
+import functools
 
 
+# !!! add freq, count
 class Node:
-    
     def __init__(self, node_id, seq_nt, seq_aa, v, j, sample_id, cluster_no=None, size=1):
         self.id = node_id
         self.v = v
@@ -22,9 +23,10 @@ class Node:
         self.seq_nt = seq_nt
         self.sample_id = sample_id
         self.size = size
+        self.freq = None
+        self.count = None
         self.additional_properties = {}
         
-
     def is_neighbour_of(self, other, mismatches=1, aa=True, check_v=False, check_j=False):
         """function compares two strings and returns
         True if their are equal
@@ -50,8 +52,9 @@ class Node:
         return True
     
 
+# !!! id, cluster_no, sample_id, v, j, seq_aa, seq_nt, size: count and freq
     def __str__(self):
-        return "{}_{}".format(self.seq_aa, self.id)
+        return f"{self.seq_aa}_{self.id}"
 
 
     def add_properties(self, metadata):
@@ -201,6 +204,8 @@ class Clusters(list):
 
 
     @property
+    # !!! functools - cache
+    @functools.lru_cache(maxsize=10)
     def properties(self, weighed=False):
         properties_list = ["cluster_id", "nodes", "edges", "diameter", "density", "eccentricity",
                        "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j"]
@@ -215,7 +220,8 @@ class Clusters(list):
             nt_consensus = cluster.calc_cluster_consensus(seq_type="dna", weighed=weighed)
             v_consensus = cluster.calc_cluster_consensus_segment(segment_type="v", weighed=weighed)
             j_consensus = cluster.calc_cluster_consensus_segment(segment_type="j", weighed=weighed)
-            result = (cluster_id,
+            result = (cluster_no,
+                    cluster_id,
                     len(cluster), 
                     nx.number_of_edges(cluster), 
                     nx.diameter(cluster),
@@ -254,7 +260,7 @@ class Clusters(list):
         self.is_pooled = pooled
 
 
-    def read_from_clonosets_df(self, clonosets_df: 'pd.DataFrame', cl_filter=Filter(), show=True):
+    def read_from_clonosets_df(self, clonosets_df: 'pd.DataFrame', cl_filter=Filter()):
 
         if self.cl_filter is None:
             self.cl_filter = cl_filter
@@ -273,8 +279,7 @@ class Clusters(list):
         self.clonotypes = pd.concat(clonotypes_dfs).reset_index(drop=True)
         self.set_pooled(False)
         print(f"Pooled {len(self.clonotypes)} clonotypes from {len(clonosets_df)} samples")
-        if show == True:
-            return self.clonotypes
+        return
 
 
     def read_from_pooled_clonoset(self, pooled_clonoset: 'pd.DataFrame') -> None:
@@ -548,6 +553,7 @@ class Clusters(list):
             return [c for c in self.clusters if len(c) > 1]
 
 
+# !!! add igh check inside the function - only if there is a c column 
     def create_clusters(self,
                         overlap_type=None, 
                         mismatches=None,
@@ -589,7 +595,6 @@ class Clusters(list):
             self.overlap_type = overlap_type
             self.mismatches = mismatches
 
-        
         if tcr_dist:
             self.tcrdist_radius = tcrdist_radius
             nodes, edges = self.find_nodes_and_edges_tcrdist_no_gaps(radius=tcrdist_radius, 
@@ -631,8 +636,6 @@ class Clusters(list):
             for j, node in enumerate(cluster):
                 node.additional_properties["cluster_no"] = i
                 node.additional_properties['n_neighbors'] = cluster.degree(node)
-
-        return self.clusters
 
 
     def find_cluster_communities_louvain(self, resolution=1, threshold=1e-07, seed=1):
