@@ -22,9 +22,9 @@ class Node:
         self.seq_nt = seq_nt
         self.sample_id = sample_id
         self.size = size
-        self.cluster_no = cluster_no
         self.additional_properties = {}
         
+
     def is_neighbour_of(self, other, mismatches=1, aa=True, check_v=False, check_j=False):
         """function compares two strings and returns
         True if their are equal
@@ -49,8 +49,10 @@ class Node:
             return False     
         return True
     
+
     def __str__(self):
         return "{}_{}".format(self.seq_aa, self.id)
+
 
     def add_properties(self, metadata):
         if self.sample_id not in metadata:
@@ -61,13 +63,14 @@ class Node:
 
 
 class Cluster(nx.Graph):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.id = None
     
-    def __getitem__(self, index):
-        return list(self.nodes)[index]     
+
+    def get_node_by_index(self, index):
+        return list(self.nodes)[index]
+
 
     def plot_cluster_logo(self, seq_type="prot", weighed=False):
         list_of_clonotypes = []
@@ -109,7 +112,6 @@ class Cluster(nx.Graph):
         return consensus_seq
 
 
-
     def calc_cluster_consensus_segment(self, segment_type="v", weighed=False):
         segments = {}
         for node in self.nodes:
@@ -135,17 +137,17 @@ class Cluster(nx.Graph):
 
 
 class Clusters(list):
-    def __init__(self, clonosets, *args, overlap_type="aaV", mismatches=1, cl_filter=None):
-        super().__init__(*args) 
-        self.clonosets = clonosets
-        self.pooled_clonosets = None
-        self.overlap_type = overlap_type
-        self.mismatches = mismatches
-        if cl_filter is None:
-            cl_filter = Filter()
-        self.cl_filter = cl_filter
+    def __init__(self):
+        super().__init__() 
+        self.clonosets = None
+        self.clonotypes = None
+        self.cl_filter = None
+        self.mismatches = None
+        self.overlap_type = None
+        self.is_pooled = None
         self.clusters = []
         self.cluster_communities_louvain = None
+        self.tcrdist_radius = None
         self.TCRDIST_BLOSUM = {('A', 'A'): 0,  ('A', 'C'): 4,  ('A', 'D'): 4,  ('A', 'E'): 4,  ('A', 'F'): 4,  ('A', 'G'): 4,  ('A', 'H'): 4,  ('A', 'I'): 4,  ('A', 'K'): 4,  ('A', 'L'): 4,  ('A', 'M'): 4,  ('A', 'N'): 4,  ('A', 'P'): 4,  ('A', 'Q'): 4,  ('A', 'R'): 4,  ('A', 'S'): 3,  ('A', 'T'): 4,  ('A', 'V'): 4,  ('A', 'W'): 4,  ('A', 'Y'): 4,  ('C', 'A'): 4,  ('C', 'C'): 0,  ('C', 'D'): 4,  ('C', 'E'): 4,  ('C', 'F'): 4,  ('C', 'G'): 4,  ('C', 'H'): 4,  ('C', 'I'): 4,  ('C', 'K'): 4,  ('C', 'L'): 4,  ('C', 'M'): 4,  ('C', 'N'): 4,  ('C', 'P'): 4,  ('C', 'Q'): 4,  ('C', 'R'): 4,  ('C', 'S'): 4,  ('C', 'T'): 4,  ('C', 'V'): 4,  ('C', 'W'): 4,  ('C', 'Y'): 4,  ('D', 'A'): 4,  ('D', 'C'): 4,  ('D', 'D'): 0,  ('D', 'E'): 2,  ('D', 'F'): 4,  ('D', 'G'): 4,  ('D', 'H'): 4,  ('D', 'I'): 4,  ('D', 'K'): 4,  ('D', 'L'): 4,  ('D', 'M'): 4,  ('D', 'N'): 3,  ('D', 'P'): 4,  ('D', 'Q'): 4,  ('D', 'R'): 4,  ('D', 'S'): 4,  ('D', 'T'): 4,  ('D', 'V'): 4,  ('D', 'W'): 4,  ('D', 'Y'): 4,  ('E', 'A'): 4,  ('E', 'C'): 4,  ('E', 'D'): 2,  ('E', 'E'): 0,  ('E', 'F'): 4,  ('E', 'G'): 4,  ('E', 'H'): 4,  ('E', 'I'): 4,  ('E', 'K'): 3,  ('E', 'L'): 4,  ('E', 'M'): 4,  ('E', 'N'): 4,  ('E', 'P'): 4,  ('E', 'Q'): 2,  ('E', 'R'): 4,  ('E', 'S'): 4,  ('E', 'T'): 4,  ('E', 'V'): 4,  ('E', 'W'): 4,  ('E', 'Y'): 4,  ('F', 'A'): 4,  ('F', 'C'): 4,  ('F', 'D'): 4,  ('F', 'E'): 4,  ('F', 'F'): 0,  ('F', 'G'): 4,  ('F', 'H'): 4,  ('F', 'I'): 4,  ('F', 'K'): 4,  ('F', 'L'): 4,  ('F', 'M'): 4,  ('F', 'N'): 4,  ('F', 'P'): 4,  ('F', 'Q'): 4,  ('F', 'R'): 4,  ('F', 'S'): 4,  ('F', 'T'): 4,  ('F', 'V'): 4,  ('F', 'W'): 3,  ('F', 'Y'): 1,  ('G', 'A'): 4,  ('G', 'C'): 4,  ('G', 'D'): 4,  ('G', 'E'): 4,  ('G', 'F'): 4,  ('G', 'G'): 0,  ('G', 'H'): 4,  ('G', 'I'): 4,  ('G', 'K'): 4,  ('G', 'L'): 4,  ('G', 'M'): 4,  ('G', 'N'): 4,  ('G', 'P'): 4,  ('G', 'Q'): 4,  ('G', 'R'): 4,  ('G', 'S'): 4,  ('G', 'T'): 4,  ('G', 'V'): 4,  ('G', 'W'): 4,  ('G', 'Y'): 4,  ('H', 'A'): 4,  ('H', 'C'): 4,  ('H', 'D'): 4,  ('H', 'E'): 4,  ('H', 'F'): 4,  ('H', 'G'): 4,  ('H', 'H'): 0,  ('H', 'I'): 4,  ('H', 'K'): 4,  ('H', 'L'): 4,  ('H', 'M'): 4,  ('H', 'N'): 3,  ('H', 'P'): 4,  ('H', 'Q'): 4,  ('H', 'R'): 4,  ('H', 'S'): 4,  ('H', 'T'): 4,  ('H', 'V'): 4,  ('H', 'W'): 4,  ('H', 'Y'): 2,  ('I', 'A'): 4,  ('I', 'C'): 4,  ('I', 'D'): 4,  ('I', 'E'): 4,  ('I', 'F'): 4,  ('I', 'G'): 4,  ('I', 'H'): 4,  ('I', 'I'): 0,  ('I', 'K'): 4,  ('I', 'L'): 2,  ('I', 'M'): 3,  ('I', 'N'): 4,  ('I', 'P'): 4,  ('I', 'Q'): 4,  ('I', 'R'): 4,  ('I', 'S'): 4,  ('I', 'T'): 4,  ('I', 'V'): 1,  ('I', 'W'): 4,  ('I', 'Y'): 4,  ('K', 'A'): 4,  ('K', 'C'): 4,  ('K', 'D'): 4,  ('K', 'E'): 3,  ('K', 'F'): 4,  ('K', 'G'): 4,  ('K', 'H'): 4,  ('K', 'I'): 4,  ('K', 'K'): 0,  ('K', 'L'): 4,  ('K', 'M'): 4,  ('K', 'N'): 4,  ('K', 'P'): 4,  ('K', 'Q'): 3,  ('K', 'R'): 2,  ('K', 'S'): 4,  ('K', 'T'): 4,  ('K', 'V'): 4,  ('K', 'W'): 4,  ('K', 'Y'): 4,  ('L', 'A'): 4,  ('L', 'C'): 4,  ('L', 'D'): 4,  ('L', 'E'): 4,  ('L', 'F'): 4,  ('L', 'G'): 4,  ('L', 'H'): 4,  ('L', 'I'): 2,  ('L', 'K'): 4,  ('L', 'L'): 0,  ('L', 'M'): 2,  ('L', 'N'): 4,  ('L', 'P'): 4,  ('L', 'Q'): 4,  ('L', 'R'): 4,  ('L', 'S'): 4,  ('L', 'T'): 4,  ('L', 'V'): 3,  ('L', 'W'): 4,  ('L', 'Y'): 4,  ('M', 'A'): 4,  ('M', 'C'): 4,  ('M', 'D'): 4,  ('M', 'E'): 4,  ('M', 'F'): 4,  ('M', 'G'): 4,  ('M', 'H'): 4,  ('M', 'I'): 3,  ('M', 'K'): 4,  ('M', 'L'): 2,  ('M', 'M'): 0,  ('M', 'N'): 4,  ('M', 'P'): 4,  ('M', 'Q'): 4,  ('M', 'R'): 4,  ('M', 'S'): 4,  ('M', 'T'): 4,  ('M', 'V'): 3,  ('M', 'W'): 4,  ('M', 'Y'): 4,  ('N', 'A'): 4,  ('N', 'C'): 4,  ('N', 'D'): 3,  ('N', 'E'): 4,  ('N', 'F'): 4,  ('N', 'G'): 4,  ('N', 'H'): 3,  ('N', 'I'): 4,  ('N', 'K'): 4,  ('N', 'L'): 4,  ('N', 'M'): 4,  ('N', 'N'): 0,  ('N', 'P'): 4,  ('N', 'Q'): 4,  ('N', 'R'): 4,  ('N', 'S'): 3,  ('N', 'T'): 4,  ('N', 'V'): 4,  ('N', 'W'): 4,  ('N', 'Y'): 4,  ('P', 'A'): 4,  ('P', 'C'): 4,  ('P', 'D'): 4,  ('P', 'E'): 4,  ('P', 'F'): 4,  ('P', 'G'): 4,  ('P', 'H'): 4,  ('P', 'I'): 4,  ('P', 'K'): 4,  ('P', 'L'): 4,  ('P', 'M'): 4,  ('P', 'N'): 4,  ('P', 'P'): 0,  ('P', 'Q'): 4,  ('P', 'R'): 4,  ('P', 'S'): 4,  ('P', 'T'): 4,  ('P', 'V'): 4,  ('P', 'W'): 4,  ('P', 'Y'): 4,  ('Q', 'A'): 4,  ('Q', 'C'): 4,  ('Q', 'D'): 4,  ('Q', 'E'): 2,  ('Q', 'F'): 4,  ('Q', 'G'): 4,  ('Q', 'H'): 4,  ('Q', 'I'): 4,  ('Q', 'K'): 3,  ('Q', 'L'): 4,  ('Q', 'M'): 4,  ('Q', 'N'): 4,  ('Q', 'P'): 4,  ('Q', 'Q'): 0,  ('Q', 'R'): 3,  ('Q', 'S'): 4,  ('Q', 'T'): 4,  ('Q', 'V'): 4,  ('Q', 'W'): 4,  ('Q', 'Y'): 4,  ('R', 'A'): 4,  ('R', 'C'): 4,  ('R', 'D'): 4,  ('R', 'E'): 4,  ('R', 'F'): 4,  ('R', 'G'): 4,  ('R', 'H'): 4,  ('R', 'I'): 4,  ('R', 'K'): 2,  ('R', 'L'): 4,  ('R', 'M'): 4,  ('R', 'N'): 4,  ('R', 'P'): 4,  ('R', 'Q'): 3,  ('R', 'R'): 0,  ('R', 'S'): 4,  ('R', 'T'): 4,  ('R', 'V'): 4,  ('R', 'W'): 4,  ('R', 'Y'): 4,  ('S', 'A'): 3,  ('S', 'C'): 4,  ('S', 'D'): 4,  ('S', 'E'): 4,  ('S', 'F'): 4,  ('S', 'G'): 4,  ('S', 'H'): 4,  ('S', 'I'): 4,  ('S', 'K'): 4,  ('S', 'L'): 4,  ('S', 'M'): 4,  ('S', 'N'): 3,  ('S', 'P'): 4,  ('S', 'Q'): 4,  ('S', 'R'): 4,  ('S', 'S'): 0,  ('S', 'T'): 3,  ('S', 'V'): 4,  ('S', 'W'): 4,  ('S', 'Y'): 4,  ('T', 'A'): 4,  ('T', 'C'): 4,  ('T', 'D'): 4,  ('T', 'E'): 4,  ('T', 'F'): 4,  ('T', 'G'): 4,  ('T', 'H'): 4,  ('T', 'I'): 4,  ('T', 'K'): 4,  ('T', 'L'): 4,  ('T', 'M'): 4,  ('T', 'N'): 4,  ('T', 'P'): 4,  ('T', 'Q'): 4,  ('T', 'R'): 4,  ('T', 'S'): 3,  ('T', 'T'): 0,  ('T', 'V'): 4,  ('T', 'W'): 4,  ('T', 'Y'): 4,  ('V', 'A'): 4,  ('V', 'C'): 4,  ('V', 'D'): 4,  ('V', 'E'): 4,  ('V', 'F'): 4,  ('V', 'G'): 4,  ('V', 'H'): 4,  ('V', 'I'): 1,  ('V', 'K'): 4,  ('V', 'L'): 3,  ('V', 'M'): 3,  ('V', 'N'): 4,  ('V', 'P'): 4,  ('V', 'Q'): 4,  ('V', 'R'): 4,  ('V', 'S'): 4,  ('V', 'T'): 4,  ('V', 'V'): 0,  ('V', 'W'): 4,  ('V', 'Y'): 4,  ('W', 'A'): 4,  ('W', 'C'): 4,  ('W', 'D'): 4,  ('W', 'E'): 4,  ('W', 'F'): 3,  ('W', 'G'): 4,  ('W', 'H'): 4,  ('W', 'I'): 4,  ('W', 'K'): 4,  ('W', 'L'): 4,  ('W', 'M'): 4,  ('W', 'N'): 4,  ('W', 'P'): 4,  ('W', 'Q'): 4,  ('W', 'R'): 4,  ('W', 'S'): 4,  ('W', 'T'): 4,  ('W', 'V'): 4,  ('W', 'W'): 0,  ('W', 'Y'): 2,  ('Y', 'A'): 4,  ('Y', 'C'): 4,  ('Y', 'D'): 4,  ('Y', 'E'): 4,  ('Y', 'F'): 1,  ('Y', 'G'): 4,  ('Y', 'H'): 2,  ('Y', 'I'): 4,  ('Y', 'K'): 4,  ('Y', 'L'): 4,  ('Y', 'M'): 4,  ('Y', 'N'): 4,  ('Y', 'P'): 4,  ('Y', 'Q'): 4,  ('Y', 'R'): 4,  ('Y', 'S'): 4,  ('Y', 'T'): 4,  ('Y', 'V'): 4,  ('Y', 'W'): 2,  ('Y', 'Y'): 0}
         self.TCRDIST_CDR3_N_CUT = 3
         self.TCRDIST_CDR3_C_CUT = 2
@@ -162,8 +164,18 @@ class Clusters(list):
        return iter(self.clusters)
 
     def __str__(self):
-        return f'Clusters with {len(self.clusters)} clusters'
+        total_clusters = len(self.clusters)
+        possible_params = ['cl_filter', 'is_pooled', 'overlap_type','mismatches', 'tcrdist_radius']
+        params_used = {param: getattr(self, param, None)
+                        for param in possible_params
+                        if getattr(self, param, None) is not None}
+        params_used = ''.join(f'{k}: {v}\n' for k, v in params_used.items())
+        single_nodes = len(self.filter_one_node_clusters(inplace=False))
+        n_samples = len(self.clonotypes['sample_id'].unique()) if self.clonotypes is not None else 0
+        sample_word = 'samples' if n_samples != 1 else 'sample'
+        return f'Clusters from {n_samples} {sample_word} with {total_clusters} nodes, of which {single_nodes} are single nodes.\nParameters:\n{params_used}'
     
+
     def __repr__(self):
         return self.__str__()
 
@@ -188,6 +200,7 @@ class Clusters(list):
                 node.add_properties(metadata_dict)
 
 
+    @property
     def properties(self, weighed=False):
         properties_list = ["cluster_id", "nodes", "edges", "diameter", "density", "eccentricity",
                        "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j"]
@@ -195,7 +208,7 @@ class Clusters(list):
         for cluster in self.clusters:
             for node in cluster:
                 break
-            cluster_no = node.cluster_no
+            cluster_no = node.additional_properties["cluster_no"]
             cluster_id = f"cluster_{cluster_no}"
             average_eccentricity = np.mean(list(nx.eccentricity(cluster).values()))
             aa_consensus = cluster.calc_cluster_consensus(seq_type="prot", weighed=weighed)
@@ -217,69 +230,120 @@ class Clusters(list):
 
 
     def split(self, method="leiden", resolution=0.5, threshold=1e-07, seed=1):
+        """
+        Performs a community detection on pre-calculated clusters. Available methods are `louvain` and `leiden`. 
+        The latter uses `leidenalg` implementation.   
+
+        Args:
+            method (str): method for detecting communities. Possible options are `leiden` and `louvain`.
+            resolution (float): Default is 0.5
+            threshold (float): Default is 1e-07.
+            seed (int): default is 1.
+        
+        Returns:
+            List of NetworkX Graphs corresponding to detected communities.
+        """
         pass
 
 
-    def pool_clonotypes_from_clonosets_df(self):
-    
+    def check_compulsory_columns(self, clonoset, compulsory_columns):
+        return all(c in clonoset.columns for c in compulsory_columns)
+
+
+    def set_pooled(self, pooled: bool):
+        self.is_pooled = pooled
+
+
+    def read_from_clonosets_df(self, clonosets_df: 'pd.DataFrame', cl_filter=Filter(), show=True):
+
         if self.cl_filter is None:
-            cl_filter = Filter()
-        
+            self.cl_filter = cl_filter
+        self.clonosets_df = clonosets_df
+
         clonotypes_dfs = []
         
-        for index, row in self.clonosets.iterrows():
+        for index, row in clonosets_df.iterrows():
             sample_id = row["sample_id"]
             filename = row["filename"]
             clonoset = read_clonoset(filename)
-            clonoset = self.cl_filter.apply(clonoset)
+            clonoset = cl_filter.apply(clonoset)
             clonoset["sample_id"] = sample_id
             clonotypes_dfs.append(clonoset)
 
-        self.pooled_clonosets = pd.concat(clonotypes_dfs).reset_index(drop=True)
+        self.clonotypes = pd.concat(clonotypes_dfs).reset_index(drop=True)
+        self.set_pooled(False)
+        print(f"Pooled {len(self.clonotypes)} clonotypes from {len(clonosets_df)} samples")
+        if show == True:
+            return self.clonotypes
 
-        print(f"Pooled {len(self.pooled_clonosets)} clonotypes from {len(self.clonosets)} samples")
 
-        return self.pooled_clonosets
+    def read_from_pooled_clonoset(self, pooled_clonoset: 'pd.DataFrame') -> None:
+        """
+        Reads clonotypes from a pooled clonoset. Automatically applies filtering
+        if compulsory columns are missing.
+        
+        Args:
+            pooled_clonoset (pd.DataFrame): Input clonoset to read from.
+            
+        Raises:
+            ValueError: If compulsory columns are missing after filtering.
+        """
+        compulsory_columns = ["freq", "count", "v", "j", "cdr3aa", "cdr3nt", "sample_id"]
+        self.set_pooled(True)
+        if self.check_compulsory_columns(pooled_clonoset, compulsory_columns):
+            self.clonotypes = pooled_clonoset
+            return
+        else:
+            print("Trying to convert pooled clonoset...")
+            pooled_df = Filter(by_umi=True, convert=False, recount_fractions=False).apply(pooled_clonoset)
+            if not self.check_compulsory_columns(pooled_df, compulsory_columns):
+                error_message = "Couldn't find at least one of compulsory columns in pooled_df: " +", ".join(compulsory_columns)
+                if not 'sample_id' in pooled_clonoset.columns:
+                    error_message += '\nNo `sample_id` column. Ensure this column is present or add it manually before proceeding.'
+                raise ValueError(error_message)    
+        self.clonotypes = pooled_clonoset
 
 
-    def _split_c(self, c_segm):
+    @staticmethod
+    def _split_c(c_segm):
         try:
             return c_segm.split("*")[0]
         except AttributeError:
             return "None"
                 
 
-    def find_nodes_and_edges(self, clonoset_input, igh=False, count_by_freq=False):
+    def find_nodes_and_edges(self, mismatches, overlap_type, igh=False, count_by_freq=False):
+        """
+        Builds nodes from clonotypes and finds edges between similar sequences. 
+        Parallel calculations are implemented.
 
-        if isinstance(clonoset_input, str):
-            clonoset = pd.read_csv(self.clonosets, sep="\t")
-        else:
-            clonoset = clonoset_input
-            
-        possible_overlap_types = ["aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ"]
-        if self.overlap_type not in possible_overlap_types:
-            print("Incorrect overlap type. Possible values: {}".format(", ".join(possible_overlap_types)))    
-            return None
+        Args:
+            self
+            mismatches: Number of allowed mismatches for clustering.
+            overlap_type: Rules for sequence comparison (e.g., "aaV", "ntVJ").
+            igh (bool): Processes IGH constant region. Default is False.
+            count_by_freq (bool): Uses `freq` for node size. Default is False.
+
+        Returns:
+            tuple: (single nodes, edges)
+        """
+        clonoset = self.clonotypes
         aa = False
-        if self.overlap_type[0:2] == "aa":
+        if overlap_type[0:2] == "aa":
             aa = True
         check_v = False
-        if "V" in self.overlap_type:
+        if "V" in overlap_type:
             check_v = True
         check_j = False
-        if "J" in self.overlap_type:
+        if "J" in overlap_type:
             check_j = True
         clonoset = Filter(by_umi=True).apply(clonoset)
-        
-        # clonoset["v"] = clonoset["v"].apply(lambda x: x.split("*")[0].split("(")[0])
-        # clonoset["j"] = clonoset["j"].apply(lambda x: x.split("*")[0].split("(")[0])
         if igh:
             clonoset["c"] = clonoset["c"].apply(lambda x: self._split_c(x).split("(")[0])
 
         nodes_by_len={}
         list_of_all_nodes = []
 
-        
         size_column_name = "freq"
         if not count_by_freq:
             size_column_name = "count"
@@ -313,7 +377,7 @@ class Clusters(list):
         tasks = []
         for aa_len in nodes_by_len:
             nodes_list=nodes_by_len[aa_len]
-            task = (nodes_list, self.mismatches, aa, check_v, check_j)
+            task = (nodes_list, mismatches, aa, check_v, check_j)
             tasks.append(task)
         
         program_name = "Find neighbour clonotypes"
@@ -327,7 +391,6 @@ class Clusters(list):
             connected_nodes_set.add(edge[1])
         single_nodes_set = nodes_set.difference(connected_nodes_set)
         
-        print(len(single_nodes_set))
         return list(single_nodes_set), edges
 
 
@@ -355,11 +418,11 @@ class Clusters(list):
                                     "TRAV36/DV7": "TRAV36DV7",
                                     "TRAV38-2/DV8": "TRAV38-2DV8"}
         
-        if isinstance(self.clonoset, str):
-            clonoset = pd.read_csv(self.clonoset,sep="\t")
-        else:
-            clonoset = self.clonoset
-        
+        # if isinstance(self.clonotypes, str):
+        #     clonoset = pd.read_csv(self.clonotypes,sep="\t")
+        # else:
+        #     clonoset = self.clonotypes
+        clonoset = self.clonotypes
         clonoset = clonoset.rename(columns={"bestVGene": "v",
                                             "bestJGene": "j",
                                             "CDR3.amino.acid.sequence": "cdr3aa",
@@ -480,42 +543,63 @@ class Clusters(list):
 
     def filter_one_node_clusters(self, inplace=False):
         if inplace:
-            self.clusters = [c for c in self.clusters if len(c)>1]
+            self.clusters = [c for c in self.clusters if len(c) > 1]
         else:
-            return [c for c in self.clusters if len(c)>1]
+            return [c for c in self.clusters if len(c) > 1]
 
 
-    def check_compulsory_columns(self, clonoset, compulsory_columns):
-        for c in compulsory_columns:
-            if c not in clonoset.columns:
-                return False
-        return True
-    
+    def create_clusters(self,
+                        overlap_type=None, 
+                        mismatches=None,
+                        igh=False, 
+                        tcrdist_radius=None, 
+                        count_by_freq=True):
+        """
+        Creates clusters of clonotypes using either mismatch-based or distance-based methods.
 
-    def create_clusters_from_pooled_df(self, pooled_df, igh=False, tcrdist_radius=None,
-                                count_by_freq=True, _run_from_create_clusters=False):
-        
-        overlap_type = self.overlap_type
+        If `tcrdist_radius` is provided, clustering uses TCRdist algorithm 
+        without CDR3 gaps. Otherwise, clustering is based on sequence similarity using 
+        the specified `overlap_type` and allowed number of `mismatches`.
+
+        Args:
+            self
+            overlap_type (str): Sequence comparison rule (possible values are: "aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ").
+            mismatches (int): Maximum allowed mismatches for clustering.
+            igh (bool): Process IGH constant region. Default is False.
+            tcrdist_radius (int, optional): TCRdist radius.
+            count_by_freq (bool): If True, node size is based on `freq`, otherwise it is based on `count`.
+
+        Returns:
+            list: List of clusters (nx.Graph objects).
+        """
+        possible_overlap_types = ["aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ"]
         compulsory_columns = ["freq", "count", "v", "j", "cdr3aa", "cdr3nt", "sample_id"]
+        tcr_dist = isinstance(tcrdist_radius, int)
 
-        if not _run_from_create_clusters:
-            if not self.check_compulsory_columns(pooled_df):
-                print("Trying to convert pooled clonoset...")
-                pooled_df = Filter(by_umi=True, convert=False, recount_fractions=False).apply(pooled_df)
-                if not self.check_compulsory_columns(pooled_df):
-                    print("Failed")
-                    error_message = "Couldn't find at least one of compulsory columns in pooled_df: " +", ".join(compulsory_columns)
-                    raise ValueError(error_message)    
+        if tcrdist_radius is None: 
 
-        clonoset_input=pooled_df
+            if overlap_type not in possible_overlap_types:
+                error_message = f'Incorrect overlap type  {overlap_type}. Possible values: {", ".join(possible_overlap_types)}'
+                raise ValueError(error_message)
+
+            if not isinstance(mismatches, int):
+                error_message = f"Incorrect value for mismatches: {mismatches}. Expected a non-negative integer (e.g., 0, 1, 2)."
+                raise ValueError(error_message)
+
+            self.overlap_type = overlap_type
+            self.mismatches = mismatches
+
         
-        tcr_dist = False
-
-        if isinstance(tcrdist_radius, int):
-            tcr_dist = True
-            nodes, edges = self.find_nodes_and_edges_tcrdist_no_gaps(clonoset_input, radius=tcrdist_radius, count_by_freq=count_by_freq, igh=igh)
+        if tcr_dist:
+            self.tcrdist_radius = tcrdist_radius
+            nodes, edges = self.find_nodes_and_edges_tcrdist_no_gaps(radius=tcrdist_radius, 
+                                                                    igh=igh,
+                                                                    count_by_freq=count_by_freq)
         else:
-            nodes, edges = self.find_nodes_and_edges(clonoset_input, igh=igh, count_by_freq=count_by_freq)
+            nodes, edges = self.find_nodes_and_edges(mismatches, 
+                                                    overlap_type,
+                                                    igh=igh, 
+                                                    count_by_freq=count_by_freq)
         
         main_graph = Cluster()
         main_graph.add_nodes_from(nodes)
@@ -524,7 +608,6 @@ class Clusters(list):
         program_name = "Adding edges..."
         edges_done = 0
         edges_total = len(edges)
-        # print_progress_bar(edges_done, edges_total, program_name=program_name, object_name="edge(s)")
         node_id_dict = {node.id: node for node in main_graph}
         for edge in edges:
             node1 = node_id_dict[edge[0].id]
@@ -532,35 +615,38 @@ class Clusters(list):
             length = edge[2]
             main_graph.add_edge(node1, node2, length=length)
             edges_done += 1
-            # print_progress_bar(edges_done, edges_total, program_name=program_name, object_name="edge(s)")
 
         self.clusters = [main_graph.subgraph(c).copy() for c in nx.connected_components(main_graph)]
         total_clusters = len(self.clusters)
         cluster_num = len(self.filter_one_node_clusters(inplace=False))
         singletons = total_clusters - cluster_num
+        
         print(f"Found {cluster_num} clusters (2 or more nodes) and {singletons} single nodes. Total: {total_clusters}")
+        
         self.clusters.sort(key=lambda x: (-len(x), x.calc_cluster_consensus(seq_type="prot", weighed=False)))
-
         self.write_cluster_no_to_nodes()
 
-
-    def create_clusters(self, igh=False, tcrdist_radius=None, count_by_freq=True):
-        
-        clonoset_input = self.pool_clonotypes_from_clonosets_df()
-
-        clusters = self.create_clusters_from_pooled_df(clonoset_input, 
-                                                igh=igh, tcrdist_radius=tcrdist_radius,
-                                                count_by_freq=count_by_freq,
-                                                _run_from_create_clusters=True)     
         for i, cluster in enumerate(self.clusters):
             cluster.id = i
             for j, node in enumerate(cluster):
-                node.cluster_no = i
+                node.additional_properties["cluster_no"] = i
+                node.additional_properties['n_neighbors'] = cluster.degree(node)
 
-        return clusters
+        return self.clusters
 
 
     def find_cluster_communities_louvain(self, resolution=1, threshold=1e-07, seed=1):
+        """
+        Apply Louvain community detection to each cluster.
+        
+        Args:
+            resolution (float): Resolution parameter for Louvain algorithm.
+            threshold (float): Convergence threshold.
+            seed (int): Random seed for reproducibility.
+        
+        Returns:
+            List of NetworkX Graphs corresponding to detected communities.
+        """
         total_communities = 0
         self.cluster_communities_louvain = []
         for cluster in self.clusters:
@@ -638,7 +724,6 @@ class Clusters(list):
 
     def save_to_cytoscape(self, output_prefix, sample_metadata=None):
         sif_filename = output_prefix + ".sif"
-        #properties_filename = output_prefix + ".prop.tsv"
         properties_metadata_filename = output_prefix + ".prop.metadata.tsv"
         edges = []
         nodes = []
@@ -680,7 +765,7 @@ class Clusters(list):
         print("Saved node properties and metadata to: {}".format(properties_metadata_filename))
 
 
-    def clusters_to_df(self):
+    def as_dataframe(self):
         additional_properties=[]
         for node in self.clusters[0]:
             additional_properties = list(node.additional_properties.keys())
@@ -693,8 +778,8 @@ class Clusters(list):
         properties_names = ["node_id", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "size"] + additional_properties
         df = pd.DataFrame(nodes, columns=properties_names)
         first_columns = ["cluster_no", "node_id"]
-        print(df.columns)
         df = df[first_columns + [c for c in df.columns if c not in first_columns]]
+        return df
 
 
     def pool_clonotypes_to_df(self, folders, samples_list=None, top=0, functional=True, exclude_singletons=False, cdr3aa_len_range=[], metadata_filename="vdjtools_metadata.txt"):

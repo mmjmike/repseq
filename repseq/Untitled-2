@@ -1,0 +1,53 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6df0238e-e9e5-41d1-bcd2-9175a0edc030",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "clusters = repseq.Clusters() # пустой объект\n",
+    "clusters.read_from_clonosets_df(clonosets_df, cl_filter=func_filter) #use case 1 появляются клоны\n",
+    "clusters.read_from_pooled_clonoset(pooled_clonoset) #use case 2 появляются клоны\n",
+    "clusters.add_metadata(metadata)\n",
+    "\n",
+    "\n",
+    "clusters.create_clusters(mismatches=1, overlap_type=\"ntVJ\") # еще в additional properties посчитать соседей | tcr_dist\n",
+    "\n",
+    "\n",
+    "clusters # написать сколько клонов, из какого количества образцов (sample_id посчитать), каким образом посчитаны кластеры,\n",
+    "         # какой фильтр использовался, если from pooled clonoset\n",
+    "         # Если кластеры построены, сколько их, и сколько однушек\n",
+    "clusters.save_to_cytoscape(output_prefix)\n",
+    "clusters.as_dataframe \n",
+    "clusters.properties\n",
+    "clusters.split(method=\"leiden\", resolution=0.56) # returns new clusters obj\n",
+    "clusters.calc_pgen_olga(model) # adds new additional property\n",
+    "clusters.alice() # adds new additional properties -- \"alice_hit\", \"neighbours\", \"expected neighbours\", \"p_value\", \"p_value_adj\", запретить использовать, если кластеры tcr_dist\n",
+    "clusters.calc_count_table(clonosets_df, cl_filter, overlap_type, mismatches) #взять арги из count_table)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python [conda env:.conda-main-repseq-yet-another]",
+   "language": "python",
+   "name": "conda-env-.conda-main-repseq-yet-another-py"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.11.11"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
