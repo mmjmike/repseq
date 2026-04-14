@@ -811,7 +811,7 @@ class Clusters(list):
                 clonoset_data=clonoset_data.loc[(clonoset_data["cdr3aa"].str.len() <= cdr3aa_len_range[-1]) 
                                                 & (clonoset_data["cdr3aa"].str.len() >= cdr3aa_len_range[0])]
             clonoset_data["freq"]=clonoset_data["count"]/clonoset_data["count"].sum()
-            sample_id = row["sample.id"]AlleleMiner
+            sample_id = row["sample.id"]
             # clonotypes_num = clonoset_data.shape[0]
             clonoset_data["sample_id"] = sample_id
             clonotypes_dfs.append(clonoset_data)
