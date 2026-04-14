@@ -13,18 +13,17 @@ import json
 import functools
 
 
-# !!! add freq, count
+# ? add freq, count
 class Node:
-    def __init__(self, node_id, seq_nt, seq_aa, v, j, sample_id, cluster_no=None, size=1):
+    def __init__(self, node_id, seq_nt, seq_aa, v, j, sample_id, freq, count):
         self.id = node_id
         self.v = v
         self.j = j
         self.seq_aa = seq_aa
         self.seq_nt = seq_nt
         self.sample_id = sample_id
-        self.size = size
-        self.freq = None
-        self.count = None
+        self.freq = freq
+        self.count = count
         self.additional_properties = {}
         
     def is_neighbour_of(self, other, mismatches=1, aa=True, check_v=False, check_j=False):
@@ -52,9 +51,13 @@ class Node:
         return True
     
 
-# !!! id, cluster_no, sample_id, v, j, seq_aa, seq_nt, size: count and freq
+# ? id, cluster_no, sample_id, v, j, seq_aa, seq_nt, size: count and freq
     def __str__(self):
-        return f"{self.seq_aa}_{self.id}"
+        return (
+            f'id={self.id} | cluster_no={self.additional_properties["cluster_no"]} | V={self.v} | J={self.j} | '
+            f'aa={self.seq_aa} | nt={self.seq_nt} | '
+            f'count={self.count} | freq={self.freq:.3e}')
+    
 
 
     def add_properties(self, metadata):
@@ -75,7 +78,17 @@ class Cluster(nx.Graph):
         return list(self.nodes)[index]
 
 
-    def plot_cluster_logo(self, seq_type="prot", weighed=False):
+    def plot_cluster_logo(self, seq_type="prot", weigh_by=None):
+        """
+        Plots cluster sequence logo.
+
+        Args:
+            seq_type (str): "prot" or "dna".
+            weigh_by (str | None): "freq", "count", or None.
+
+        Returns:
+            None
+        """
         list_of_clonotypes = []
         seq_types = ["prot", "dna"]
         if seq_type not in seq_types:
@@ -87,21 +100,37 @@ class Cluster(nx.Graph):
                     raise ValueError(f"Node '{node.id}' does not have specified 'cdr3nt' value. Unable to create Logo for 'dna' seq_type")
             else:
                 seq = node.seq_aa
-            if weighed:
-                weight = node.size
-                clone = (seq, weight)
+            if weigh_by:
+                if weigh_by == 'freq':
+                    weight = node.freq
+                    clone = (seq, weight)
+                elif weigh_by == 'count':
+                    weight = node.count
+                    clone = (seq, weight)
             else:
                 clone = (seq,)
             list_of_clonotypes.append(clone)
         get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=True)   
     
 
-    def calc_cluster_consensus(self, seq_type="dna", weighed=False):
+    def calc_cluster_consensus(self, seq_type="dna", weigh_by=None):
+        """
+        Calculates cluster consensus.
+
+        Args:
+            seq_type (str): "prot" or "dna".
+            weigh_by (str | None): "freq", "count", or None.
+
+        Returns:
+            consensus_seq: Consensus sequence
+        """
         motif_dicts = []
         for node in self.nodes:
             weight = 1
-            if weighed:
-                weight = node.size
+            if weigh_by == 'freq':
+                weight = node.freq
+            elif weigh_by == 'count':
+                weight = node.count
             if seq_type == "dna":
                 seq = node.seq_nt
                 if seq == "-":
@@ -115,7 +144,7 @@ class Cluster(nx.Graph):
         return consensus_seq
 
 
-    def calc_cluster_consensus_segment(self, segment_type="v", weighed=False):
+    def calc_cluster_consensus_segment(self, segment_type="v", weigh_by=None):
         segments = {}
         for node in self.nodes:
             if segment_type == "v":
@@ -123,8 +152,10 @@ class Cluster(nx.Graph):
             else:
                 segment = node.j
             weight = 1
-            if weighed:
-                weight = node.size
+            if weigh_by == 'freq':
+                weight = node.freq
+            elif weigh_by == 'count':
+                weight = node.count
             if segment not in segments:
                 segments[segment] = weight
             else:
@@ -203,11 +234,11 @@ class Clusters(list):
                 node.add_properties(metadata_dict)
 
 
+    # ! functools - cache
+    # ! @functools.lru_cache(maxsize=50) doesn't work - it requires hashable input
     @property
-    # !!! functools - cache
-    @functools.lru_cache(maxsize=10)
-    def properties(self, weighed=False):
-        properties_list = ["cluster_id", "nodes", "edges", "diameter", "density", "eccentricity",
+    def properties(self, weigh_by=None):
+        properties_list = ["cluster_no", "cluster_id", "nodes", "edges", "diameter", "density", "eccentricity",
                        "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j"]
         results = []
         for cluster in self.clusters:
@@ -216,10 +247,10 @@ class Clusters(list):
             cluster_no = node.additional_properties["cluster_no"]
             cluster_id = f"cluster_{cluster_no}"
             average_eccentricity = np.mean(list(nx.eccentricity(cluster).values()))
-            aa_consensus = cluster.calc_cluster_consensus(seq_type="prot", weighed=weighed)
-            nt_consensus = cluster.calc_cluster_consensus(seq_type="dna", weighed=weighed)
-            v_consensus = cluster.calc_cluster_consensus_segment(segment_type="v", weighed=weighed)
-            j_consensus = cluster.calc_cluster_consensus_segment(segment_type="j", weighed=weighed)
+            aa_consensus = cluster.calc_cluster_consensus(seq_type="prot", weigh_by=weigh_by)
+            nt_consensus = cluster.calc_cluster_consensus(seq_type="dna", weigh_by=weigh_by)
+            v_consensus = cluster.calc_cluster_consensus_segment(segment_type="v", weigh_by=weigh_by)
+            j_consensus = cluster.calc_cluster_consensus_segment(segment_type="j", weigh_by=weigh_by)
             result = (cluster_no,
                     cluster_id,
                     len(cluster), 
@@ -317,7 +348,7 @@ class Clusters(list):
             return "None"
                 
 
-    def find_nodes_and_edges(self, mismatches, overlap_type, igh=False, count_by_freq=False):
+    def find_nodes_and_edges(self, mismatches, overlap_type):
         """
         Builds nodes from clonotypes and finds edges between similar sequences. 
         Parallel calculations are implemented.
@@ -326,8 +357,6 @@ class Clusters(list):
             self
             mismatches: Number of allowed mismatches for clustering.
             overlap_type: Rules for sequence comparison (e.g., "aaV", "ntVJ").
-            igh (bool): Processes IGH constant region. Default is False.
-            count_by_freq (bool): Uses `freq` for node size. Default is False.
 
         Returns:
             tuple: (single nodes, edges)
@@ -343,15 +372,18 @@ class Clusters(list):
         if "J" in overlap_type:
             check_j = True
         clonoset = Filter(by_umi=True).apply(clonoset)
+        
+        igh = "c" in clonoset.columns
+        is_freq = "freq" in clonoset.columns
+        is_count = "count" in clonoset.columns
         if igh:
             clonoset["c"] = clonoset["c"].apply(lambda x: self._split_c(x).split("(")[0])
+        if is_count:
+            clonoset["count"] = 1
 
         nodes_by_len={}
         list_of_all_nodes = []
 
-        size_column_name = "freq"
-        if not count_by_freq:
-            size_column_name = "count"
         
         for index, row in clonoset.iterrows():
             v = row["v"]
@@ -361,7 +393,11 @@ class Clusters(list):
                 cdr3nt = row["cdr3nt"]
             else:
                 cdr3nt = "-"
-            size = row[size_column_name]
+            if is_freq:
+                freq = row["freq"]
+            else:
+                freq = 1 / len(clonoset)
+            count = row["count"]
             sample_id = row["sample_id"]
             len_cdr3aa = len(cdr3aa)
             if len_cdr3aa not in nodes_by_len:
@@ -372,7 +408,8 @@ class Clusters(list):
                         v=v, 
                         j=j, 
                         sample_id=sample_id, 
-                        size=size)
+                        freq=freq,
+                        count=count)
             if igh:
                 node.additional_properties["c"] = row["c"]
             nodes_by_len[len_cdr3aa].append(node)
@@ -412,7 +449,7 @@ class Clusters(list):
         return edges
 
 
-    def find_nodes_and_edges_tcrdist_no_gaps(self, radius=16, count_by_freq=True, igh=False):
+    def find_nodes_and_edges_tcrdist_no_gaps(self, radius=16):
         
         with open(os.path.join(os.path.dirname(__file__), 'tcrdist_ab_v_segments.json')) as f:
             TCRDIST_V_DIST = json.load(f)
@@ -457,6 +494,9 @@ class Clusters(list):
         clonoset["v"] = clonoset["v"].apply(lambda x: x.split("*")[0])
         clonoset["v"] = clonoset["v"].apply(lambda x: rename_some_v_segments_dict[x] if x in rename_some_v_segments_dict else x)
         clonoset["j"] = clonoset["j"].apply(lambda x: x.split("*")[0])
+
+        igh = "c" in clonoset.columns 
+
         if igh:
             def _split_c(c_segm):
                 try:
@@ -469,13 +509,10 @@ class Clusters(list):
         nodes_by_len = {}
         list_of_all_nodes = []
 
-        if count_by_freq and "freq" in clonoset.columns:
-            size_column_name = "freq"
-        else:
-            size_column_name = "count"
-            if size_column_name not in clonoset.columns:
-                clonoset["count"] = 1
-        print(size_column_name)
+        is_freq = "freq" in clonoset.columns
+        is_count = "count" in clonoset.columns
+        if not is_count:
+            clonoset["count"] = 1
 
         for index, row in clonoset.iterrows():
             v = row["v"]
@@ -488,12 +525,16 @@ class Clusters(list):
                 cdr3nt = row["cdr3nt"]
             else:
                 cdr3nt = "-"
-            size = row[size_column_name]
+            if is_freq:
+                freq = row["freq"]
+            else:
+                freq = 1 / len(clonoset)
+            count = row["count"]
             sample_id = row["sample_id"]
             len_cdr3aa = len(cdr3aa)
             if len_cdr3aa not in nodes_by_len:
                 nodes_by_len[len_cdr3aa] = []
-            node = Node(index, cdr3nt, cdr3aa, v, j, sample_id, size=size)
+            node = Node(index, cdr3nt, cdr3aa, v, j, sample_id, freq=freq, count=count)
             if igh:
                 node.additional_properties["c"] = row["c"]
             nodes_by_len[len_cdr3aa].append(node)
@@ -557,9 +598,7 @@ class Clusters(list):
     def create_clusters(self,
                         overlap_type=None, 
                         mismatches=None,
-                        igh=False, 
-                        tcrdist_radius=None, 
-                        count_by_freq=True):
+                        tcrdist_radius=None):
         """
         Creates clusters of clonotypes using either mismatch-based or distance-based methods.
 
@@ -571,9 +610,7 @@ class Clusters(list):
             self
             overlap_type (str): Sequence comparison rule (possible values are: "aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ").
             mismatches (int): Maximum allowed mismatches for clustering.
-            igh (bool): Process IGH constant region. Default is False.
             tcrdist_radius (int, optional): TCRdist radius.
-            count_by_freq (bool): If True, node size is based on `freq`, otherwise it is based on `count`.
 
         Returns:
             list: List of clusters (nx.Graph objects).
@@ -597,14 +634,10 @@ class Clusters(list):
 
         if tcr_dist:
             self.tcrdist_radius = tcrdist_radius
-            nodes, edges = self.find_nodes_and_edges_tcrdist_no_gaps(radius=tcrdist_radius, 
-                                                                    igh=igh,
-                                                                    count_by_freq=count_by_freq)
+            nodes, edges = self.find_nodes_and_edges_tcrdist_no_gaps(radius=tcrdist_radius)
         else:
             nodes, edges = self.find_nodes_and_edges(mismatches, 
-                                                    overlap_type,
-                                                    igh=igh, 
-                                                    count_by_freq=count_by_freq)
+                                                    overlap_type)
         
         main_graph = Cluster()
         main_graph.add_nodes_from(nodes)
@@ -628,7 +661,7 @@ class Clusters(list):
         
         print(f"Found {cluster_num} clusters (2 or more nodes) and {singletons} single nodes. Total: {total_clusters}")
         
-        self.clusters.sort(key=lambda x: (-len(x), x.calc_cluster_consensus(seq_type="prot", weighed=False)))
+        self.clusters.sort(key=lambda x: (-len(x), x.calc_cluster_consensus(seq_type="prot", weigh_by=None)))
         self.write_cluster_no_to_nodes()
 
         for i, cluster in enumerate(self.clusters):
@@ -638,6 +671,10 @@ class Clusters(list):
                 node.additional_properties['n_neighbors'] = cluster.degree(node)
 
 
+# !!! add check_progress
+# !!! add cluster_no before communities and visa versa
+# !!! add wrapper for louvain and leiden
+# !!! remove networkx representation from the user
     def find_cluster_communities_louvain(self, resolution=1, threshold=1e-07, seed=1):
         """
         Apply Louvain community detection to each cluster.
@@ -668,61 +705,11 @@ class Clusters(list):
                     total_communities += 1  
                     self.cluster_communities_louvain.append(cluster.subgraph(com_nodes))
         self.cluster_communities_louvain.sort(key=lambda x: len(x), reverse=True)
-        return self.cluster_communities_louvain
 
 
     @staticmethod
     def weight_function(length):
         return 1 /(1 + length)
-
-
-    def export_clusters_to_gae(self):
-        
-        # additional_properties=[]
-        # for node in clusters[0]:
-        #     additional_properties = list(node.additional_properties.keys())
-        #     break
-        
-        node_id = 0
-        clone_id_dict = {}
-        weights = []
-        rows = []
-        columns = []
-        clone_list = []
-        for cluster in self.clusters:
-            for node in cluster:
-                # add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
-                # clone_list.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.size, *add_properties_values))
-                clone_list.append((node_id, node.v, node.j, node.seq_aa, node.seq_nt, node.sample_id, node.size))
-                clone_id_dict[node.id] = node_id
-                weights.append(1)
-                rows.append(node_id)
-                columns.append(node_id)
-                node_id += 1
-
-            attributes = nx.get_edge_attributes(cluster,'length')
-            for u,v in cluster.edges():
-                length = attributes[(u,v)]
-                weight = self.weight_function(length)
-                u_id = clone_id_dict[u.id]
-                v_id = clone_id_dict[v.id]
-                weights.append(weight)
-                weights.append(weight)
-                rows.append(u_id)
-                rows.append(v_id)
-                columns.append(v_id)
-                columns.append(u_id)
-
-        col_names = ["node_id", "v", "j", "cdr3aa", "cdr3nt", "sample_id", "size"]
-        # col_names += additional_properties
-        clonoset = pd.DataFrame(clone_list, columns=col_names)
-        clone_count = len(clonoset)
-
-        # create sparse adjacency matrix with floats
-        adjacency_matrix = csr_matrix((np.array(weights), (np.array(rows), np.array(columns))),
-                            shape = (clone_count, clone_count), 
-                            dtype = float).toarray()
-        return (adjacency_matrix, clonoset, weights, rows, columns)
 
 
     def save_to_cytoscape(self, output_prefix, sample_metadata=None):
@@ -754,13 +741,13 @@ class Clusters(list):
                 edges.append(str(list(cluster.nodes())[0]))
             for node in cluster:
                 add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
-                nodes.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.size, *add_properties_values))
+                nodes.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.freq, node.count, *add_properties_values))
 
         with open(sif_filename, "w") as f:
             f.write("\n".join(edges))
         print("Saved edges to: {}".format(sif_filename))
         
-        properties_names = ["code", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "size"] + additional_properties
+        properties_names = ["code", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "freq", "count"] + additional_properties
         properties_df = pd.DataFrame(nodes, columns=properties_names)
         if sample_metadata is not None:
             properties_df = properties_df.merge(sample_metadata)
@@ -777,8 +764,8 @@ class Clusters(list):
         for cluster in self.clusters:
             for node in cluster:
                 add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
-                nodes.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.size, *add_properties_values))
-        properties_names = ["node_id", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "size"] + additional_properties
+                nodes.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.freq, node.count, *add_properties_values))
+        properties_names = ["node_id", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "freq", "count"] + additional_properties
         df = pd.DataFrame(nodes, columns=properties_names)
         first_columns = ["cluster_no", "node_id"]
         df = df[first_columns + [c for c in df.columns if c not in first_columns]]
@@ -916,50 +903,50 @@ class Clusters(list):
         return result_df
 
 
-    def export_clusters_to_gae(self):
+    # def export_clusters_to_gae(self):
         
-        # additional_properties=[]
-        # for node in clusters[0]:
-        #     additional_properties = list(node.additional_properties.keys())
-        #     break
+    #     # additional_properties=[]
+    #     # for node in clusters[0]:
+    #     #     additional_properties = list(node.additional_properties.keys())
+    #     #     break
         
-        node_id = 0
-        clone_id_dict = {}
-        weights = []
-        rows = []
-        columns = []
-        clone_list = []
-        for cluster in self.clusters:
-            for node in cluster:
-                # add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
-                # clone_list.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.size, *add_properties_values))
-                clone_list.append((node_id, node.v, node.j, node.seq_aa, node.seq_nt, node.sample_id, node.size))
-                clone_id_dict[node.id] = node_id
-                weights.append(1)
-                rows.append(node_id)
-                columns.append(node_id)
-                node_id += 1
+    #     node_id = 0
+    #     clone_id_dict = {}
+    #     weights = []
+    #     rows = []
+    #     columns = []
+    #     clone_list = []
+    #     for cluster in self.clusters:
+    #         for node in cluster:
+    #             # add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
+    #             # clone_list.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.size, *add_properties_values))
+    #             clone_list.append((node_id, node.v, node.j, node.seq_aa, node.seq_nt, node.sample_id, node.size))
+    #             clone_id_dict[node.id] = node_id
+    #             weights.append(1)
+    #             rows.append(node_id)
+    #             columns.append(node_id)
+    #             node_id += 1
 
-            attributes = nx.get_edge_attributes(cluster,'length')
-            for u,v in cluster.edges():
-                length = attributes[(u,v)]
-                weight = self.weight_function(length)
-                u_id = clone_id_dict[u.id]
-                v_id = clone_id_dict[v.id]
-                weights.append(weight)
-                weights.append(weight)
-                rows.append(u_id)
-                rows.append(v_id)
-                columns.append(v_id)
-                columns.append(u_id)
+    #         attributes = nx.get_edge_attributes(cluster,'length')
+    #         for u,v in cluster.edges():
+    #             length = attributes[(u,v)]
+    #             weight = self.weight_function(length)
+    #             u_id = clone_id_dict[u.id]
+    #             v_id = clone_id_dict[v.id]
+    #             weights.append(weight)
+    #             weights.append(weight)
+    #             rows.append(u_id)
+    #             rows.append(v_id)
+    #             columns.append(v_id)
+    #             columns.append(u_id)
 
-        col_names = ["node_id", "v", "j", "cdr3aa", "cdr3nt", "sample_id", "size"]
-        # col_names += additional_properties
-        clonoset = pd.DataFrame(clone_list, columns=col_names)
-        clone_count = len(clonoset)
+    #     col_names = ["node_id", "v", "j", "cdr3aa", "cdr3nt", "sample_id", "size"]
+    #     # col_names += additional_properties
+    #     clonoset = pd.DataFrame(clone_list, columns=col_names)
+    #     clone_count = len(clonoset)
 
-        # create sparse adjacency matrix with floats
-        adjacency_matrix = csr_matrix((np.array(weights), (np.array(rows), np.array(columns))),
-                            shape = (clone_count, clone_count), 
-                            dtype = float).toarray()
-        return (adjacency_matrix, clonoset, weights, rows, columns)
+    #     # create sparse adjacency matrix with floats
+    #     adjacency_matrix = csr_matrix((np.array(weights), (np.array(rows), np.array(columns))),
+    #                         shape = (clone_count, clone_count), 
+    #                         dtype = float).toarray()
+    #     return (adjacency_matrix, clonoset, weights, rows, columns)
