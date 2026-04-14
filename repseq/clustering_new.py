@@ -726,8 +726,8 @@ class Clusters(list):
         for cluster in self.clusters:
             attributes = nx.get_edge_attributes(cluster,'length')
             for u,v in cluster.edges():
-                node1_id = str(u)
-                node2_id = str(v)
+                node1_id = str(u.id)
+                node2_id = str(v.id)
                 try:
                     length = attributes[(u,v)]
                     edges.append(f"{node1_id}\t{length}\t{node2_id}")
@@ -742,7 +742,7 @@ class Clusters(list):
                 edges.append(str(list(cluster.nodes())[0]))
             for node in cluster:
                 add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
-                nodes.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.freq, node.count, *add_properties_values))
+                nodes.append((str(node.id), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.freq, node.count, *add_properties_values))
 
         with open(sif_filename, "w") as f:
             f.write("\n".join(edges))
