@@ -51,7 +51,7 @@ class Node:
         return True
     
 
-# ? id, cluster_no, sample_id, v, j, seq_aa, seq_nt, size: count and freq
+# !!! id, cluster_no, sample_id, v, j, seq_aa, seq_nt, size: count and freq
     def __str__(self):
         return (
             f'id={self.id} | cluster_no={self.additional_properties["cluster_no"]} | V={self.v} | J={self.j} | '
@@ -236,6 +236,7 @@ class Clusters(list):
 
     # ! functools - cache
     # ! @functools.lru_cache(maxsize=50) doesn't work - it requires hashable input
+    # ! total count for each cluster
     @property
     def properties(self, weigh_by=None):
         properties_list = ["cluster_no", "cluster_id", "nodes", "edges", "diameter", "density", "eccentricity",
@@ -764,7 +765,7 @@ class Clusters(list):
         for cluster in self.clusters:
             for node in cluster:
                 add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
-                nodes.append((str(node), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.freq, node.count, *add_properties_values))
+                nodes.append((node.id, node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.freq, node.count, *add_properties_values))
         properties_names = ["node_id", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "freq", "count"] + additional_properties
         df = pd.DataFrame(nodes, columns=properties_names)
         first_columns = ["cluster_no", "node_id"]
@@ -810,7 +811,7 @@ class Clusters(list):
                 clonoset_data=clonoset_data.loc[(clonoset_data["cdr3aa"].str.len() <= cdr3aa_len_range[-1]) 
                                                 & (clonoset_data["cdr3aa"].str.len() >= cdr3aa_len_range[0])]
             clonoset_data["freq"]=clonoset_data["count"]/clonoset_data["count"].sum()
-            sample_id = row["sample.id"]
+            sample_id = row["sample.id"]AlleleMiner
             # clonotypes_num = clonoset_data.shape[0]
             clonoset_data["sample_id"] = sample_id
             clonotypes_dfs.append(clonoset_data)
