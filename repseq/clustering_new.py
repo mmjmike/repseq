@@ -291,8 +291,9 @@ class Clusters(list):
     def set_pooled(self, pooled: bool):
         self.is_pooled = pooled
 
-
     def read_from_clonosets_df(self, clonosets_df: 'pd.DataFrame', cl_filter=Filter()):
+
+        self.clusters = []
 
         if self.cl_filter is None:
             self.cl_filter = cl_filter
@@ -325,6 +326,9 @@ class Clusters(list):
         Raises:
             ValueError: If compulsory columns are missing after filtering.
         """
+
+        self.clusters = []
+
         compulsory_columns = ["freq", "count", "v", "j", "cdr3aa", "cdr3nt", "sample_id"]
         self.set_pooled(True)
         if self.check_compulsory_columns(pooled_clonoset, compulsory_columns):
