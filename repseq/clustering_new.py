@@ -3,6 +3,10 @@ from .common_functions import run_parallel_calculation, combine_metadata_from_fo
 from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_dict, get_logo_for_list_of_clonotypes
 from .clone_filter import Filter
 from .io import read_clonoset
+from .pgen_calculation import calculate_clonotypes_pgen
+from scipy.stats import poisson
+from statsmodels.stats.multitest import multipletests
+from .common_functions import overlap_type_to_flags
 
 import networkx as nx
 from networkx.algorithms import community
@@ -181,6 +185,7 @@ class Clusters(list):
         self.is_pooled = None
         self.clusters = []
         self.cluster_communities_louvain = None
+        self.alice_results = None
         self.tcrdist_radius = None
         self.TCRDIST_BLOSUM = {('A', 'A'): 0,  ('A', 'C'): 4,  ('A', 'D'): 4,  ('A', 'E'): 4,  ('A', 'F'): 4,  ('A', 'G'): 4,  ('A', 'H'): 4,  ('A', 'I'): 4,  ('A', 'K'): 4,  ('A', 'L'): 4,  ('A', 'M'): 4,  ('A', 'N'): 4,  ('A', 'P'): 4,  ('A', 'Q'): 4,  ('A', 'R'): 4,  ('A', 'S'): 3,  ('A', 'T'): 4,  ('A', 'V'): 4,  ('A', 'W'): 4,  ('A', 'Y'): 4,  ('C', 'A'): 4,  ('C', 'C'): 0,  ('C', 'D'): 4,  ('C', 'E'): 4,  ('C', 'F'): 4,  ('C', 'G'): 4,  ('C', 'H'): 4,  ('C', 'I'): 4,  ('C', 'K'): 4,  ('C', 'L'): 4,  ('C', 'M'): 4,  ('C', 'N'): 4,  ('C', 'P'): 4,  ('C', 'Q'): 4,  ('C', 'R'): 4,  ('C', 'S'): 4,  ('C', 'T'): 4,  ('C', 'V'): 4,  ('C', 'W'): 4,  ('C', 'Y'): 4,  ('D', 'A'): 4,  ('D', 'C'): 4,  ('D', 'D'): 0,  ('D', 'E'): 2,  ('D', 'F'): 4,  ('D', 'G'): 4,  ('D', 'H'): 4,  ('D', 'I'): 4,  ('D', 'K'): 4,  ('D', 'L'): 4,  ('D', 'M'): 4,  ('D', 'N'): 3,  ('D', 'P'): 4,  ('D', 'Q'): 4,  ('D', 'R'): 4,  ('D', 'S'): 4,  ('D', 'T'): 4,  ('D', 'V'): 4,  ('D', 'W'): 4,  ('D', 'Y'): 4,  ('E', 'A'): 4,  ('E', 'C'): 4,  ('E', 'D'): 2,  ('E', 'E'): 0,  ('E', 'F'): 4,  ('E', 'G'): 4,  ('E', 'H'): 4,  ('E', 'I'): 4,  ('E', 'K'): 3,  ('E', 'L'): 4,  ('E', 'M'): 4,  ('E', 'N'): 4,  ('E', 'P'): 4,  ('E', 'Q'): 2,  ('E', 'R'): 4,  ('E', 'S'): 4,  ('E', 'T'): 4,  ('E', 'V'): 4,  ('E', 'W'): 4,  ('E', 'Y'): 4,  ('F', 'A'): 4,  ('F', 'C'): 4,  ('F', 'D'): 4,  ('F', 'E'): 4,  ('F', 'F'): 0,  ('F', 'G'): 4,  ('F', 'H'): 4,  ('F', 'I'): 4,  ('F', 'K'): 4,  ('F', 'L'): 4,  ('F', 'M'): 4,  ('F', 'N'): 4,  ('F', 'P'): 4,  ('F', 'Q'): 4,  ('F', 'R'): 4,  ('F', 'S'): 4,  ('F', 'T'): 4,  ('F', 'V'): 4,  ('F', 'W'): 3,  ('F', 'Y'): 1,  ('G', 'A'): 4,  ('G', 'C'): 4,  ('G', 'D'): 4,  ('G', 'E'): 4,  ('G', 'F'): 4,  ('G', 'G'): 0,  ('G', 'H'): 4,  ('G', 'I'): 4,  ('G', 'K'): 4,  ('G', 'L'): 4,  ('G', 'M'): 4,  ('G', 'N'): 4,  ('G', 'P'): 4,  ('G', 'Q'): 4,  ('G', 'R'): 4,  ('G', 'S'): 4,  ('G', 'T'): 4,  ('G', 'V'): 4,  ('G', 'W'): 4,  ('G', 'Y'): 4,  ('H', 'A'): 4,  ('H', 'C'): 4,  ('H', 'D'): 4,  ('H', 'E'): 4,  ('H', 'F'): 4,  ('H', 'G'): 4,  ('H', 'H'): 0,  ('H', 'I'): 4,  ('H', 'K'): 4,  ('H', 'L'): 4,  ('H', 'M'): 4,  ('H', 'N'): 3,  ('H', 'P'): 4,  ('H', 'Q'): 4,  ('H', 'R'): 4,  ('H', 'S'): 4,  ('H', 'T'): 4,  ('H', 'V'): 4,  ('H', 'W'): 4,  ('H', 'Y'): 2,  ('I', 'A'): 4,  ('I', 'C'): 4,  ('I', 'D'): 4,  ('I', 'E'): 4,  ('I', 'F'): 4,  ('I', 'G'): 4,  ('I', 'H'): 4,  ('I', 'I'): 0,  ('I', 'K'): 4,  ('I', 'L'): 2,  ('I', 'M'): 3,  ('I', 'N'): 4,  ('I', 'P'): 4,  ('I', 'Q'): 4,  ('I', 'R'): 4,  ('I', 'S'): 4,  ('I', 'T'): 4,  ('I', 'V'): 1,  ('I', 'W'): 4,  ('I', 'Y'): 4,  ('K', 'A'): 4,  ('K', 'C'): 4,  ('K', 'D'): 4,  ('K', 'E'): 3,  ('K', 'F'): 4,  ('K', 'G'): 4,  ('K', 'H'): 4,  ('K', 'I'): 4,  ('K', 'K'): 0,  ('K', 'L'): 4,  ('K', 'M'): 4,  ('K', 'N'): 4,  ('K', 'P'): 4,  ('K', 'Q'): 3,  ('K', 'R'): 2,  ('K', 'S'): 4,  ('K', 'T'): 4,  ('K', 'V'): 4,  ('K', 'W'): 4,  ('K', 'Y'): 4,  ('L', 'A'): 4,  ('L', 'C'): 4,  ('L', 'D'): 4,  ('L', 'E'): 4,  ('L', 'F'): 4,  ('L', 'G'): 4,  ('L', 'H'): 4,  ('L', 'I'): 2,  ('L', 'K'): 4,  ('L', 'L'): 0,  ('L', 'M'): 2,  ('L', 'N'): 4,  ('L', 'P'): 4,  ('L', 'Q'): 4,  ('L', 'R'): 4,  ('L', 'S'): 4,  ('L', 'T'): 4,  ('L', 'V'): 3,  ('L', 'W'): 4,  ('L', 'Y'): 4,  ('M', 'A'): 4,  ('M', 'C'): 4,  ('M', 'D'): 4,  ('M', 'E'): 4,  ('M', 'F'): 4,  ('M', 'G'): 4,  ('M', 'H'): 4,  ('M', 'I'): 3,  ('M', 'K'): 4,  ('M', 'L'): 2,  ('M', 'M'): 0,  ('M', 'N'): 4,  ('M', 'P'): 4,  ('M', 'Q'): 4,  ('M', 'R'): 4,  ('M', 'S'): 4,  ('M', 'T'): 4,  ('M', 'V'): 3,  ('M', 'W'): 4,  ('M', 'Y'): 4,  ('N', 'A'): 4,  ('N', 'C'): 4,  ('N', 'D'): 3,  ('N', 'E'): 4,  ('N', 'F'): 4,  ('N', 'G'): 4,  ('N', 'H'): 3,  ('N', 'I'): 4,  ('N', 'K'): 4,  ('N', 'L'): 4,  ('N', 'M'): 4,  ('N', 'N'): 0,  ('N', 'P'): 4,  ('N', 'Q'): 4,  ('N', 'R'): 4,  ('N', 'S'): 3,  ('N', 'T'): 4,  ('N', 'V'): 4,  ('N', 'W'): 4,  ('N', 'Y'): 4,  ('P', 'A'): 4,  ('P', 'C'): 4,  ('P', 'D'): 4,  ('P', 'E'): 4,  ('P', 'F'): 4,  ('P', 'G'): 4,  ('P', 'H'): 4,  ('P', 'I'): 4,  ('P', 'K'): 4,  ('P', 'L'): 4,  ('P', 'M'): 4,  ('P', 'N'): 4,  ('P', 'P'): 0,  ('P', 'Q'): 4,  ('P', 'R'): 4,  ('P', 'S'): 4,  ('P', 'T'): 4,  ('P', 'V'): 4,  ('P', 'W'): 4,  ('P', 'Y'): 4,  ('Q', 'A'): 4,  ('Q', 'C'): 4,  ('Q', 'D'): 4,  ('Q', 'E'): 2,  ('Q', 'F'): 4,  ('Q', 'G'): 4,  ('Q', 'H'): 4,  ('Q', 'I'): 4,  ('Q', 'K'): 3,  ('Q', 'L'): 4,  ('Q', 'M'): 4,  ('Q', 'N'): 4,  ('Q', 'P'): 4,  ('Q', 'Q'): 0,  ('Q', 'R'): 3,  ('Q', 'S'): 4,  ('Q', 'T'): 4,  ('Q', 'V'): 4,  ('Q', 'W'): 4,  ('Q', 'Y'): 4,  ('R', 'A'): 4,  ('R', 'C'): 4,  ('R', 'D'): 4,  ('R', 'E'): 4,  ('R', 'F'): 4,  ('R', 'G'): 4,  ('R', 'H'): 4,  ('R', 'I'): 4,  ('R', 'K'): 2,  ('R', 'L'): 4,  ('R', 'M'): 4,  ('R', 'N'): 4,  ('R', 'P'): 4,  ('R', 'Q'): 3,  ('R', 'R'): 0,  ('R', 'S'): 4,  ('R', 'T'): 4,  ('R', 'V'): 4,  ('R', 'W'): 4,  ('R', 'Y'): 4,  ('S', 'A'): 3,  ('S', 'C'): 4,  ('S', 'D'): 4,  ('S', 'E'): 4,  ('S', 'F'): 4,  ('S', 'G'): 4,  ('S', 'H'): 4,  ('S', 'I'): 4,  ('S', 'K'): 4,  ('S', 'L'): 4,  ('S', 'M'): 4,  ('S', 'N'): 3,  ('S', 'P'): 4,  ('S', 'Q'): 4,  ('S', 'R'): 4,  ('S', 'S'): 0,  ('S', 'T'): 3,  ('S', 'V'): 4,  ('S', 'W'): 4,  ('S', 'Y'): 4,  ('T', 'A'): 4,  ('T', 'C'): 4,  ('T', 'D'): 4,  ('T', 'E'): 4,  ('T', 'F'): 4,  ('T', 'G'): 4,  ('T', 'H'): 4,  ('T', 'I'): 4,  ('T', 'K'): 4,  ('T', 'L'): 4,  ('T', 'M'): 4,  ('T', 'N'): 4,  ('T', 'P'): 4,  ('T', 'Q'): 4,  ('T', 'R'): 4,  ('T', 'S'): 3,  ('T', 'T'): 0,  ('T', 'V'): 4,  ('T', 'W'): 4,  ('T', 'Y'): 4,  ('V', 'A'): 4,  ('V', 'C'): 4,  ('V', 'D'): 4,  ('V', 'E'): 4,  ('V', 'F'): 4,  ('V', 'G'): 4,  ('V', 'H'): 4,  ('V', 'I'): 1,  ('V', 'K'): 4,  ('V', 'L'): 3,  ('V', 'M'): 3,  ('V', 'N'): 4,  ('V', 'P'): 4,  ('V', 'Q'): 4,  ('V', 'R'): 4,  ('V', 'S'): 4,  ('V', 'T'): 4,  ('V', 'V'): 0,  ('V', 'W'): 4,  ('V', 'Y'): 4,  ('W', 'A'): 4,  ('W', 'C'): 4,  ('W', 'D'): 4,  ('W', 'E'): 4,  ('W', 'F'): 3,  ('W', 'G'): 4,  ('W', 'H'): 4,  ('W', 'I'): 4,  ('W', 'K'): 4,  ('W', 'L'): 4,  ('W', 'M'): 4,  ('W', 'N'): 4,  ('W', 'P'): 4,  ('W', 'Q'): 4,  ('W', 'R'): 4,  ('W', 'S'): 4,  ('W', 'T'): 4,  ('W', 'V'): 4,  ('W', 'W'): 0,  ('W', 'Y'): 2,  ('Y', 'A'): 4,  ('Y', 'C'): 4,  ('Y', 'D'): 4,  ('Y', 'E'): 4,  ('Y', 'F'): 1,  ('Y', 'G'): 4,  ('Y', 'H'): 2,  ('Y', 'I'): 4,  ('Y', 'K'): 4,  ('Y', 'L'): 4,  ('Y', 'M'): 4,  ('Y', 'N'): 4,  ('Y', 'P'): 4,  ('Y', 'Q'): 4,  ('Y', 'R'): 4,  ('Y', 'S'): 4,  ('Y', 'T'): 4,  ('Y', 'V'): 4,  ('Y', 'W'): 2,  ('Y', 'Y'): 0}
         self.TCRDIST_CDR3_N_CUT = 3
@@ -601,8 +606,8 @@ class Clusters(list):
 
 # !!! add igh check inside the function - only if there is a c column 
     def create_clusters(self,
-                        overlap_type=None, 
-                        mismatches=None,
+                        overlap_type='aaVJ', 
+                        mismatches=1,
                         tcrdist_radius=None):
         """
         Creates clusters of clonotypes using either mismatch-based or distance-based methods.
@@ -673,7 +678,7 @@ class Clusters(list):
             cluster.id = i
             for j, node in enumerate(cluster):
                 node.additional_properties["cluster_no"] = i
-                node.additional_properties['n_neighbors'] = cluster.degree(node)
+                node.additional_properties['n_neighbours'] = cluster.degree(node)
 
 
 # !!! add check_progress
@@ -760,16 +765,22 @@ class Clusters(list):
         print("Saved node properties and metadata to: {}".format(properties_metadata_filename))
 
 
-    def as_dataframe(self):
+    def as_dataframe(self, filter_one_node_clusters=False):
         additional_properties=[]
         for node in self.clusters[0]:
             additional_properties = list(node.additional_properties.keys())
             break
         nodes = []
-        for cluster in self.clusters:
-            for node in cluster:
-                add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
-                nodes.append((node.id, node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.freq, node.count, *add_properties_values))
+        if not filter_one_node_clusters:
+            for cluster in self.clusters:
+                for node in cluster:
+                    add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
+                    nodes.append((node.id, node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.freq, node.count, *add_properties_values))
+        else:
+            for cluster in self.filter_one_node_clusters(inplace=False):
+                for node in cluster:
+                    add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
+                    nodes.append((node.id, node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.freq, node.count, *add_properties_values))
         properties_names = ["node_id", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "freq", "count"] + additional_properties
         df = pd.DataFrame(nodes, columns=properties_names)
         first_columns = ["cluster_no", "node_id"]
@@ -828,84 +839,69 @@ class Clusters(list):
         return result_df
 
 
-    def add_alice_hits_to_clusters(self, alice_hits_df, check_samples=True):
-        nt_seq_colname = "CDR3.nucleotide.sequence"
-        if nt_seq_colname not in alice_hits_df.columns:
-            nt_seq_colname = "cdr3nt"
-        if check_samples:
-            samples = list(alice_hits_df["sample_id"].unique())
-            alice_hits_dict = {}
-            for sample in samples:
-                hits = set()
-                for index, row in alice_hits_df.loc[alice_hits_df["sample_id"] == sample].iterrows():
-                    v = row["bestVGene"]
-                    j = row["bestJGene"]
-                    cdr3nt = row[nt_seq_colname]
-                    hit = (cdr3nt, v, j)
-                    hits.add(hit)
-                alice_hits_dict[sample] = hits
-            for cluster in self.clusters:
-                for node in cluster:
-                    if node.sample_id in samples and (node.seq_nt, node.v, node.j) in alice_hits_dict[node.sample_id]:
-                        node.additional_properties["alice_hit"] = True
-                    else:
-                        node.additional_properties["alice_hit"] = False
+    def alice(self, 
+        cl_filter=None, 
+        overlap_type=None, 
+        mismatches=None,
+        generation_model='human_T_beta', 
+        Q=9.41, 
+        alpha=0.05, 
+        olga_warnings=False,
+        method='bonferroni'):
+
+        if not overlap_type:
+            overlap_type = self.overlap_type
+        if not mismatches:
+            mismatches = self.mismatches
+        if not self.clusters:
+            raise ValueError('No clusters are found.')
+        if method not in ['bonferroni', 'sidak', 'holm-sidak', 'holm', 'simes-hochberg', 'hommel', 'fdr_bh', 'fdr_by','fdr_tsbh', 'fdr_tsbky']:
+            raise ValueError("P-value adjustment method is not one on the list. Possible values are: ['bonferroni', 'sidak', 'holm-sidak', 'holm', 'simes-hochberg', 'hommel', 'fdr_bh', 'fdr_by','fdr_tsbh', 'fdr_tsbky']")
+        if mismatches > 1:
+            print(f'Using {mismatches} may increase runtime.')
+        
+        clusters_all = self.as_dataframe(filter_one_node_clusters=False)
+        clusters_all_pgen = calculate_clonotypes_pgen(clonosets_df=clusters_all, 
+                                                                    cl_filter=cl_filter, 
+                                                                    overlap_type=overlap_type, 
+                                                                    mismatches=mismatches, 
+                                                                    generation_model=generation_model, 
+                                                                    olga_warnings=olga_warnings)
+        aa, check_v, check_j = overlap_type_to_flags(overlap_type)
+        if not check_v and not check_j:
+            clusters_all_pgen['n'] = len(clusters_all_pgen)
         else:
-            hits = set()
-            for index, row in alice_hits_df.iterrows():
-                v = row["bestVGene"]
-                j = row["bestJGene"]
-                cdr3nt = row[nt_seq_colname]
-                hit = (cdr3nt, v, j)
-                hits.add(hit)
-                for cluster in self.clusters:
-                    for node in cluster:
-                        if (node.seq_nt, node.v, node.j) in hits:
-                            node.additional_properties["alice_hit"] = True
-                        else:
-                            node.additional_properties["alice_hit"] = False
+            columns_to_check = ['v']
+            if check_j:
+                columns_to_check = ['v', 'j']
+            group_counts = clusters_all_pgen[columns_to_check + ['cdr3aa']].groupby(by=columns_to_check).count().rename(columns={'cdr3aa': 'n'}).reset_index()
+            clusters_all_pgen = clusters_all_pgen.merge(group_counts)
+            
+        alice_lambda = clusters_all_pgen['n'] * Q * clusters_all_pgen['pgen'].to_numpy()
+        d = clusters_all_pgen['n_neighbours'].to_numpy()
+        p = poisson.pmf(d, mu=alice_lambda)
+        reject, pvals_corrected, alphacSidak, alphacBonf = multipletests(p, alpha=alpha, method=method)
+        clusters_all_pgen['p_value'] = p
+        clusters_all_pgen['p_value_adj'] = pvals_corrected
+        clusters_all_pgen['is_alice_hit'] = pvals_corrected < alpha
+        self.alice_results = clusters_all_pgen.sort_values(by='p_value_adj').reset_index(drop=True)
 
 
-    def filter_clusters_with_alice_hits(self):
-        filtered_clusters = []
+    def add_alice_hits_to_clusters(self):
+
+        node_lookup = {}
         for cluster in self.clusters:
-            good_node = False
             for node in cluster:
-                try:
-                    a = node.additional_properties["alice_hit"]
-                except KeyError:
-                    print ("ALICE hits are not specified for these clusters. Specify this by ... [still not written]")
-                    return None
-                if node.additional_properties["alice_hit"]:
-                    good_node = True
-                    break
-            if good_node:
-                filtered_clusters.append(cluster)
-                continue
-        return filtered_clusters
+                node_lookup[node.id] = node
 
-
-    def pool_alice_hits_to_df(self, folders, samples_list=None, metadata_filename="vdjtools_metadata.txt"):
-        all_metadata = combine_metadata_from_folders(folders, metadata_filename=metadata_filename)
-        #pool_metadata(folders, metadata_filename,samples_list)
-        clonotypes_dfs = []
-        for index, row in all_metadata.iterrows():
-            sample_id = row["sample.id"]
-            if samples_list is not None:
-                if sample_id not in samples_list:
-                    continue
-            clonoset_data=pd.read_csv(row["#file.name"],sep="\t")
-            clonoset_data["freq"]=clonoset_data["Read.count"]/clonoset_data["Read.count"].sum()
-            sample_id = row["sample.id"]
-            # clonotypes_num = clonoset_data.shape[0]
-            clonoset_data["sample_id"] = sample_id
-            clonotypes_dfs.append(clonoset_data)
-    #         print("Added {} clonotypes from {}".format(clonotypes_num, sample_id))
-        result_df = pd.concat(clonotypes_dfs).reset_index(drop=True)
-        clonotypes_number = len(result_df)
-        samples_number = len(result_df["sample_id"].unique())
-        print("Pooled {} clonotypes from {} samples".format(clonotypes_number, samples_number))
-        return result_df
+        for _, row in self.alice_results.iterrows():
+            node_id = row['node_id']
+            node = node_lookup[node_id]
+            node.additional_properties['pgen'] = row['pgen']
+            node.additional_properties['alice_neighbour_count'] = row['alice_neighbour_count']
+            node.additional_properties['p_value'] = row['p_value']
+            node.additional_properties['p_value_adj'] = row['p_value_adj']
+            node.additional_properties['is_alice_hit'] = row['is_alice_hit']
 
 
     # def export_clusters_to_gae(self):
@@ -955,3 +951,82 @@ class Clusters(list):
     #                         shape = (clone_count, clone_count), 
     #                         dtype = float).toarray()
     #     return (adjacency_matrix, clonoset, weights, rows, columns)
+
+    #     def add_alice_hits_to_clusters(self, alice_hits_df, check_samples=True):
+    #     nt_seq_colname = "CDR3.nucleotide.sequence"
+    #     if nt_seq_colname not in alice_hits_df.columns:
+    #         nt_seq_colname = "cdr3nt"
+    #     if check_samples:
+    #         samples = list(alice_hits_df["sample_id"].unique())
+    #         alice_hits_dict = {}
+    #         for sample in samples:
+    #             hits = set()
+    #             for index, row in alice_hits_df.loc[alice_hits_df["sample_id"] == sample].iterrows():
+    #                 v = row["bestVGene"]
+    #                 j = row["bestJGene"]
+    #                 cdr3nt = row[nt_seq_colname]
+    #                 hit = (cdr3nt, v, j)
+    #                 hits.add(hit)
+    #             alice_hits_dict[sample] = hits
+    #         for cluster in self.clusters:
+    #             for node in cluster:
+    #                 if node.sample_id in samples and (node.seq_nt, node.v, node.j) in alice_hits_dict[node.sample_id]:
+    #                     node.additional_properties["alice_hit"] = True
+    #                 else:
+    #                     node.additional_properties["alice_hit"] = False
+    #     else:
+    #         hits = set()
+    #         for index, row in alice_hits_df.iterrows():
+    #             v = row["bestVGene"]
+    #             j = row["bestJGene"]
+    #             cdr3nt = row[nt_seq_colname]
+    #             hit = (cdr3nt, v, j)
+    #             hits.add(hit)
+    #             for cluster in self.clusters:
+    #                 for node in cluster:
+    #                     if (node.seq_nt, node.v, node.j) in hits:
+    #                         node.additional_properties["alice_hit"] = True
+    #                     else:
+    #                         node.additional_properties["alice_hit"] = False
+
+
+    # def filter_clusters_with_alice_hits(self):
+    #     filtered_clusters = []
+    #     for cluster in self.clusters:
+    #         good_node = False
+    #         for node in cluster:
+    #             try:
+    #                 a = node.additional_properties["alice_hit"]
+    #             except KeyError:
+    #                 print ("ALICE hits are not specified for these clusters. Specify this by ... [still not written]")
+    #                 return None
+    #             if node.additional_properties["alice_hit"]:
+    #                 good_node = True
+    #                 break
+    #         if good_node:
+    #             filtered_clusters.append(cluster)
+    #             continue
+    #     return filtered_clusters
+    
+
+    #    def pool_alice_hits_to_df(self, folders, samples_list=None, metadata_filename="vdjtools_metadata.txt"):
+    #     all_metadata = combine_metadata_from_folders(folders, metadata_filename=metadata_filename)
+    #     #pool_metadata(folders, metadata_filename,samples_list)
+    #     clonotypes_dfs = []
+    #     for index, row in all_metadata.iterrows():
+    #         sample_id = row["sample.id"]
+    #         if samples_list is not None:
+    #             if sample_id not in samples_list:
+    #                 continue
+    #         clonoset_data=pd.read_csv(row["#file.name"],sep="\t")
+    #         clonoset_data["freq"]=clonoset_data["Read.count"]/clonoset_data["Read.count"].sum()
+    #         sample_id = row["sample.id"]
+    #         # clonotypes_num = clonoset_data.shape[0]
+    #         clonoset_data["sample_id"] = sample_id
+    #         clonotypes_dfs.append(clonoset_data)
+    # #         print("Added {} clonotypes from {}".format(clonotypes_num, sample_id))
+    #     result_df = pd.concat(clonotypes_dfs).reset_index(drop=True)
+    #     clonotypes_number = len(result_df)
+    #     samples_number = len(result_df["sample_id"].unique())
+    #     print("Pooled {} clonotypes from {} samples".format(clonotypes_number, samples_number))
+    #     return result_df

@@ -13,7 +13,11 @@ import os
 import sys
 
 
-def calculate_clonotypes_pgen(clonosets_df, cl_filter=None, overlap_type='aaVJ', mismatches=1, generation_model='human_T_beta', olga_warnings=False):
+def calculate_clonotypes_pgen(clonosets_df, cl_filter=None,
+                              overlap_type='aaVJ', mismatches=1, 
+                              generation_model='human_T_beta', 
+                              olga_warnings=False,
+                              calculate_neighbours=True):
     
     '''
     calculates probability of clonotype generation using OLGA model
@@ -35,7 +39,7 @@ def calculate_clonotypes_pgen(clonosets_df, cl_filter=None, overlap_type='aaVJ',
     pgen_model = create_olga_model(generation_model)
     
     if not cl_filter:
-        cl_filter = clf.Filter(functionality="a")
+        cl_filter = clf.Filter(functionality="a", convert=False)
     clns_olga = cl_filter.apply(clonosets_df)
     
     # creating tuples of size 1-3 each according to the overlap_type 
@@ -70,10 +74,12 @@ def calculate_clonotypes_pgen(clonosets_df, cl_filter=None, overlap_type='aaVJ',
     # create a temporary column to merge p_gen values with respective clonotypes
     clonoset_total_pgen = clns_olga.copy()
     clonoset_total_pgen['temp'] = clonoset_seqs
-    neighbours, cln_neighbours_dict = create_neighbours(clonoset_seqs, mismatches, check_v, check_j)
-        
+    if calculate_neighbours == True:
+        neighbours, cln_neighbours_dict = create_neighbours(clonoset_seqs, mismatches, check_v, check_j)
+        neighbour_counts = {ct: len(ns) for ct, ns in cln_neighbours_dict.items()}
+        neighbours_pgen_dict = {}
+
     clonotype_pgen_dict = {}
-    neighbours_pgen_dict = {}
     
     n_chunks = 40
     chunk_size = len(clonoset_seqs_for_calculation) // n_chunks + 1
@@ -94,42 +100,58 @@ def calculate_clonotypes_pgen(clonosets_df, cl_filter=None, overlap_type='aaVJ',
     if len(overlap_type_vars) != 3:
         clonotype_pgen_dict = {tuple([x for x in ct if x is not None]):pgen for ct, pgen in clonotype_pgen_dict.items()}
     
-    n_chunks = 40
-    chunk_size = len(neighbours) // n_chunks + 1
-    tasks_nb = []
-    for i in range(0, len(neighbours), chunk_size):
-        if i + chunk_size < len(neighbours):
-            task = (neighbours[i:i + chunk_size], aa, pgen_model, olga_warnings)
-        else:
-            task = (neighbours[i:], aa, pgen_model, olga_warnings)
-        tasks_nb.append(task)
+    if calculate_neighbours == True:
+        n_chunks = 40
+        chunk_size = len(neighbours) // n_chunks + 1
+        tasks_nb = []
+        for i in range(0, len(neighbours), chunk_size):
+            if i + chunk_size < len(neighbours):
+                task = (neighbours[i:i + chunk_size], aa, pgen_model, olga_warnings)
+            else:
+                task = (neighbours[i:], aa, pgen_model, olga_warnings)
+            tasks_nb.append(task)
+            
+        neighbours_pgen = run_parallel_calculation(calculate_pgen_mp, 
+                                                    tasks_nb, 
+                                                    'Calculating p_gen using OLGA', 
+                                                    'chunks_neighbors')
+        for el in neighbours_pgen:
+            neighbours_pgen_dict.update(el)
+    
+        # matching (neighbor, pgen) pairs with their respective clonotypes
+        clonotype_neighbours_pgen = {ct: [(n, neighbours_pgen_dict[n]) for n in ns] 
+                                    for ct, ns in cln_neighbours_dict.items()}
         
-    neighbours_pgen = run_parallel_calculation(calculate_pgen_mp, 
-                                                tasks_nb, 
-                                                'Calculating p_gen using OLGA', 
-                                                'chunks_neighbors')
-    for el in neighbours_pgen:
-        neighbours_pgen_dict.update(el)
-    
-    # matching (neighbor, pgen) pairs with their respective clonotypes
-    clonotype_neighbours_pgen = {ct: [(n, neighbours_pgen_dict[n]) for n in ns] 
-                                 for ct, ns in cln_neighbours_dict.items()}
-    
-    # pgen = sum(neighbors_pgen) - (C(len(cdr3),mismatches) - 1) * pgen(clonotype)
-    clonoset_total_pgen_to_add = {'temp': [], 'p_gen': []}
-    for ct, ns in clonotype_neighbours_pgen.items():
-        ns_pgen_sum = sum([pgen[1] for pgen in ns])
-        n_overlaps = comb(len(ct[0]), mismatches) - 1
-        pgen_ct = clonotype_pgen_dict[ct]
-        clonoset_total_pgen_to_add['temp'].append(ct)
-        clonoset_total_pgen_to_add['p_gen'].append(ns_pgen_sum - n_overlaps * pgen_ct)
+        # pgen = sum(neighbors_pgen) - (C(len(cdr3),mismatches) - 1) * pgen(clonotype)
+        clonoset_total_pgen_to_add = {'temp': [], 'p_gen': [], 'alice_neighbour_count': []}
 
-    clonoset_total_pgen_to_add = pd.DataFrame(clonoset_total_pgen_to_add)
+        for ct, ns in clonotype_neighbours_pgen.items():
+            ns_pgen_sum = sum([pgen[1] for pgen in ns])
+            n_overlaps = comb(len(ct[0]), mismatches) - 1
+            pgen_ct = clonotype_pgen_dict[ct]
+
+            clonoset_total_pgen_to_add['temp'].append(ct)
+            clonoset_total_pgen_to_add['p_gen'].append(
+                ns_pgen_sum - n_overlaps * pgen_ct)
+            
+            clonoset_total_pgen_to_add['alice_neighbour_count'].append(
+                neighbour_counts[ct])
+
+        clonoset_total_pgen_to_add = pd.DataFrame(clonoset_total_pgen_to_add)
     
-    result_df = pd.merge(clonoset_total_pgen_to_add, clonoset_total_pgen, how='right', on=['temp'])
-    result_df.drop('temp', axis=1, inplace=True)
-    pgen = result_df.pop('p_gen')
-    result_df['pgen'] = pgen
+        result_df = pd.merge(clonoset_total_pgen_to_add, clonoset_total_pgen, how='right', on=['temp'])
+        result_df.drop('temp', axis=1, inplace=True)
+        pgen = result_df.pop('p_gen')
+        result_df['pgen'] = pgen
+        neighbour_count = result_df.pop('alice_neighbour_count')
+        result_df['alice_neighbour_count'] = neighbour_count
+
+    else:
+        clonotype_pgen_result = pd.DataFrame({'temp': clonotype_pgen_dict.keys(), 'pgen': clonotype_pgen_dict.values()})
+        result_df = clonoset_total_pgen.merge(clonotype_pgen_result, on=['temp'])
+        result_df.drop('temp', axis=1, inplace=True)
+        result_df['alice_neighbour_count'] = 0
+
     return result_df
     
     
