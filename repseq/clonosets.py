@@ -3,6 +3,7 @@ import numpy as np
 import os
 import re
 from .io import read_mixcr_clonoset, read_clonoset
+from .clone_filter import Filter
 from .common_functions import print_progress_bar
 import random
 
@@ -461,6 +462,29 @@ def pool_clonosets(folders, samples_list=None, only_functional=False):
     total_clones = len(pooled_clonoset)
     print(f"Pooled {total_clones} clones from {samples} samples")
     return pooled_clonoset
+
+
+def pool_clonotypes_from_clonosets_df(clonosets_df, cl_filter=None):
+    
+    if cl_filter is None:
+        cl_filter = Filter()
+    
+    clonotypes_dfs = []
+    
+    for index, row in clonosets_df.iterrows():
+        sample_id = row["sample_id"]
+        filename = row["filename"]
+        clonoset = read_clonoset(filename)
+        clonoset = cl_filter.apply(clonoset)
+        clonoset["sample_id"] = sample_id
+        clonotypes_dfs.append(clonoset)
+
+    result_df = pd.concat(clonotypes_dfs).reset_index(drop=True)
+
+    print(f"Pooled {len(result_df)} clonotypes from {len(clonosets_df)} samples")
+
+    return result_df
+
 
 # dirty
 # def convert_mixcr_clonoset(filename, output_filename, filter_nonfunctional=False, by_umi=True):
