@@ -7,11 +7,11 @@ from .pgen_calculation import calculate_clonotypes_pgen
 from scipy.stats import poisson
 from statsmodels.stats.multitest import multipletests
 from .common_functions import overlap_type_to_flags
-
+import numpy as np
 import networkx as nx
 from networkx.algorithms import community
 import leidenalg
-import igraph as igimport numpy as np
+import igraph as ig
 from scipy.sparse import csr_matrix
 import os
 import json
@@ -731,50 +731,50 @@ class Clusters(list):
         self.cluster_communities_louvain.communities.sort(key=lambda x: len(x), reverse=True)
 
 
-def find_cluster_communities_leiden(self, resolution=1, seed=1):
-    """
-    Apply Leiden community detection to each cluster.
-    
-    Args:
-        resolution (float): Resolution parameter for Leiden algorithm.
-        seed (int): Random seed for reproducibility.
-    
-    Returns:
-        List of NetworkX Graphs corresponding to detected communities.
-    """
+    def find_cluster_communities_leiden(self, resolution=1, seed=1):
+        """
+        Apply Leiden community detection to each cluster.
+        
+        Args:
+            resolution (float): Resolution parameter for Leiden algorithm.
+            seed (int): Random seed for reproducibility.
+        
+        Returns:
+            List of NetworkX Graphs corresponding to detected communities.
+        """
 
-    total_communities = 0
-    self.cluster_communities_leiden = ClusterCommunities()
-    self.cluster_communities_leiden.resolution = resolution
-    self.cluster_communities_leiden.seed = seed 
+        total_communities = 0
+        self.cluster_communities_leiden = ClusterCommunities()
+        self.cluster_communities_leiden.resolution = resolution
+        self.cluster_communities_leiden.seed = seed 
 
-    for cluster in self.clusters:
-        if len(cluster) < 2:
-            for node in cluster:
-                node.additional_properties["leiden_community"] = total_communities
-            total_communities += 1 
-            self.cluster_communities_leiden.communities.append(cluster)
-        else:
-            # leidenalg requires an igraph Graph, hence the conversion
-            cluster_igraph = igraph.Graph.from_networkx(cluster)
-            nodes = cluster_igraph.vs["_nx_name"]
-
-            partition = leidenalg.find_partition(
-                cluster_igraph,
-                leidenalg.RBConfigurationVertexPartition,
-                resolution_parameter=resolution,
-                seed=seed)
-
-            for com in partition:
-                com_nodes = []
-                for i in com:
-                    node = nodes[i]
+        for cluster in self.clusters:
+            if len(cluster) < 2:
+                for node in cluster:
                     node.additional_properties["leiden_community"] = total_communities
-                    com_nodes.append(node)
-                total_communities += 1  
-                self.cluster_communities_leiden.communities.append(cluster.subgraph(com_nodes))
+                total_communities += 1 
+                self.cluster_communities_leiden.communities.append(cluster)
+            else:
+                # leidenalg requires an igraph Graph, hence the conversion
+                cluster_igraph = ig.Graph.from_networkx(cluster)
+                nodes = cluster_igraph.vs["_nx_name"]
 
-    self.cluster_communities_leiden.communities.sort(key=lambda x: len(x), reverse=True)
+                partition = leidenalg.find_partition(
+                    cluster_igraph,
+                    leidenalg.RBConfigurationVertexPartition,
+                    resolution_parameter=resolution,
+                    seed=seed)
+
+                for com in partition:
+                    com_nodes = []
+                    for i in com:
+                        node = nodes[i]
+                        node.additional_properties["leiden_community"] = total_communities
+                        com_nodes.append(node)
+                    total_communities += 1  
+                    self.cluster_communities_leiden.communities.append(cluster.subgraph(com_nodes))
+
+        self.cluster_communities_leiden.communities.sort(key=lambda x: len(x), reverse=True)
 
 
     @staticmethod
