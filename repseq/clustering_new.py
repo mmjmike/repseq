@@ -10,7 +10,8 @@ from .common_functions import overlap_type_to_flags
 
 import networkx as nx
 from networkx.algorithms import community
-import numpy as np
+import leidenalg
+import igraph as igimport numpy as np
 from scipy.sparse import csr_matrix
 import os
 import json
@@ -275,7 +276,7 @@ class Clusters(list):
     def split(self, method="leiden", resolution=0.5, threshold=1e-07, seed=1):
         """
         Performs a community detection on pre-calculated clusters. Available methods are `louvain` and `leiden`. 
-        The latter uses `leidenalg` implementation.   
+        The latter uses `leidenalg` implementation. The result is saved as either `cluster_communities_leiden` or `cluster_communities_louvain`.
 
         Args:
             method (str): method for detecting communities. Possible options are `leiden` and `louvain`.
@@ -284,9 +285,17 @@ class Clusters(list):
             seed (int): default is 1.
         
         Returns:
-            List of NetworkX Graphs corresponding to detected communities.
+            None
         """
-        pass
+        if method == 'louvain':
+            self.find_cluster_communities_louvain(resolution=resolution, 
+                                                  threshold=threshold, 
+                                                  seed=seed)
+        elif method == 'leiden':
+            self.find_cluster_communities_leiden(resolution=resolution, 
+                                                  seed=seed)
+        else:
+            raise ValueError(f'Unknown method: {method}')
 
 
     def check_compulsory_columns(self, clonoset, compulsory_columns):
@@ -697,14 +706,19 @@ class Clusters(list):
         Returns:
             List of NetworkX Graphs corresponding to detected communities.
         """
+
         total_communities = 0
-        self.cluster_communities_louvain = []
+        self.cluster_communities_louvain = ClusterCommunities()
+        self.cluster_communities_louvain.resolution = resolution
+        self.cluster_communities_louvain.threshold = threshold
+        self.cluster_communities_louvain.seed = seed 
+
         for cluster in self.clusters:
             if len(cluster) < 2:
                 for node in cluster:
                     node.additional_properties["community"] = total_communities
                 total_communities += 1 
-                self.cluster_communities_louvain.append(cluster)
+                self.cluster_communities_louvain.communities.append(cluster)
             else:
                 cluster_communities = community.louvain_communities(cluster, resolution=resolution, threshold=threshold, seed=seed)
                 for com in cluster_communities:
@@ -713,8 +727,54 @@ class Clusters(list):
                         node.additional_properties["community"] = total_communities
                         com_nodes.append(node)
                     total_communities += 1  
-                    self.cluster_communities_louvain.append(cluster.subgraph(com_nodes))
-        self.cluster_communities_louvain.sort(key=lambda x: len(x), reverse=True)
+                    self.cluster_communities_louvain.communities.append(cluster.subgraph(com_nodes))
+        self.cluster_communities_louvain.communities.sort(key=lambda x: len(x), reverse=True)
+
+
+def find_cluster_communities_leiden(self, resolution=1, seed=1):
+    """
+    Apply Leiden community detection to each cluster.
+    
+    Args:
+        resolution (float): Resolution parameter for Leiden algorithm.
+        seed (int): Random seed for reproducibility.
+    
+    Returns:
+        List of NetworkX Graphs corresponding to detected communities.
+    """
+
+    total_communities = 0
+    self.cluster_communities_leiden = ClusterCommunities()
+    self.cluster_communities_leiden.resolution = resolution
+    self.cluster_communities_leiden.seed = seed 
+
+    for cluster in self.clusters:
+        if len(cluster) < 2:
+            for node in cluster:
+                node.additional_properties["leiden_community"] = total_communities
+            total_communities += 1 
+            self.cluster_communities_leiden.communities.append(cluster)
+        else:
+            # leidenalg requires an igraph Graph, hence the conversion
+            cluster_igraph = igraph.Graph.from_networkx(cluster)
+            nodes = cluster_igraph.vs["_nx_name"]
+
+            partition = leidenalg.find_partition(
+                cluster_igraph,
+                leidenalg.RBConfigurationVertexPartition,
+                resolution_parameter=resolution,
+                seed=seed)
+
+            for com in partition:
+                com_nodes = []
+                for i in com:
+                    node = nodes[i]
+                    node.additional_properties["leiden_community"] = total_communities
+                    com_nodes.append(node)
+                total_communities += 1  
+                self.cluster_communities_leiden.communities.append(cluster.subgraph(com_nodes))
+
+    self.cluster_communities_leiden.communities.sort(key=lambda x: len(x), reverse=True)
 
 
     @staticmethod
@@ -847,6 +907,7 @@ class Clusters(list):
         Q=9.41, 
         alpha=0.05, 
         olga_warnings=False,
+        skip_single_nodes=False,
         method='bonferroni'):
 
         if not overlap_type:
@@ -860,13 +921,16 @@ class Clusters(list):
         if mismatches > 1:
             print(f'Using {mismatches} may increase runtime.')
         
-        clusters_all = self.as_dataframe(filter_one_node_clusters=False)
-        clusters_all_pgen = calculate_clonotypes_pgen(clonosets_df=clusters_all, 
+        if skip_single_nodes:
+            clusters_all = self.as_dataframe()
+        clusters = self.as_dataframe(filter_one_node_clusters=skip_single_nodes)
+        clusters_all_pgen = calculate_clonotypes_pgen(clonosets_df=clusters, 
                                                                     cl_filter=cl_filter, 
                                                                     overlap_type=overlap_type, 
                                                                     mismatches=mismatches, 
                                                                     generation_model=generation_model, 
                                                                     olga_warnings=olga_warnings)
+
         aa, check_v, check_j = overlap_type_to_flags(overlap_type)
         if not check_v and not check_j:
             clusters_all_pgen['n'] = len(clusters_all_pgen)
@@ -884,7 +948,10 @@ class Clusters(list):
         clusters_all_pgen['p_value'] = p
         clusters_all_pgen['p_value_adj'] = pvals_corrected
         clusters_all_pgen['is_alice_hit'] = pvals_corrected < alpha
-        self.alice_results = clusters_all_pgen.sort_values(by='p_value_adj').reset_index(drop=True)
+        if skip_single_nodes:
+            self.alice_results = clusters_all.merge(clusters_all_pgen, how='left')
+        else:
+            self.alice_results = clusters_all_pgen.sort_values(by='p_value_adj').reset_index(drop=True)
 
 
     def add_alice_hits_to_clusters(self):
@@ -1030,3 +1097,122 @@ class Clusters(list):
     #     samples_number = len(result_df["sample_id"].unique())
     #     print("Pooled {} clonotypes from {} samples".format(clonotypes_number, samples_number))
     #     return result_df
+
+
+class ClusterCommunities(list):
+
+    def __init__(self):
+        super().__init__() 
+        self.communities = []
+        self.resolution = None
+        self.threshold = None
+        self.seed = None
+        
+
+    # to enable list-like behaviour 
+    def __getitem__(self, index):
+        return self.communities[index]
+
+
+    def __len__(self):
+        return len(self.communities)
+
+
+    def __iter__(self):
+       return iter(self.communities)
+
+
+    def __str__(self):
+        total_communities = len(self.communities)
+        possible_params = ['resolution', 'threshold', 'seed']
+        params_used = {param: getattr(self, param, None)
+                        for param in possible_params
+                        if getattr(self, param, None) is not None}
+        params_used = ''.join(f'{k}: {v}\n' for k, v in params_used.items())
+        single_nodes = len(self.filter_one_node_communities(inplace=False))
+        return f'Communities with {total_communities} nodes, of which {single_nodes} are single nodes.\nParameters:\n{params_used}'
+
+    def __repr__(self):
+        return self.__str__()
+    
+
+    @property
+    def properties(self, weigh_by=None):
+        properties_list = ["cluster_no", "cluster_id", "nodes", "edges", "diameter", "density", "eccentricity",
+                       "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j"]
+        results = []
+        for cluster in self.communities:
+            for node in cluster:
+                break
+            cluster_no = node.additional_properties["cluster_no"]
+            cluster_id = f"cluster_{cluster_no}"
+            average_eccentricity = np.mean(list(nx.eccentricity(cluster).values()))
+            aa_consensus = cluster.calc_cluster_consensus(seq_type="prot", weigh_by=weigh_by)
+            nt_consensus = cluster.calc_cluster_consensus(seq_type="dna", weigh_by=weigh_by)
+            v_consensus = cluster.calc_cluster_consensus_segment(segment_type="v", weigh_by=weigh_by)
+            j_consensus = cluster.calc_cluster_consensus_segment(segment_type="j", weigh_by=weigh_by)
+            result = (cluster_no,
+                    cluster_id,
+                    len(cluster), 
+                    nx.number_of_edges(cluster), 
+                    nx.diameter(cluster),
+                    nx.density(cluster), 
+                    average_eccentricity,
+                    aa_consensus,
+                    nt_consensus,
+                    v_consensus,
+                    j_consensus)
+            results.append(result)
+        return pd.DataFrame(results, columns=properties_list)
+
+
+    def filter_one_node_communities(self, inplace=False):
+        if inplace:
+            self.communities = [c for c in self.communities if len(c) > 1]
+        else:
+            return [c for c in self.communities if len(c) > 1]
+
+
+def save_to_cytoscape(self, output_prefix, sample_metadata=None):
+        sif_filename = output_prefix + ".sif"
+        properties_metadata_filename = output_prefix + ".prop.metadata.tsv"
+        edges = []
+        nodes = []
+
+        additional_properties=[]
+        for node in self.communities[0]:
+            additional_properties = list(node.additional_properties.keys())
+            break
+        for cluster in self.communities:
+            attributes = nx.get_edge_attributes(cluster,'length')
+            for u,v in cluster.edges():
+                node1_id = str(u.id)
+                node2_id = str(v.id)
+                try:
+                    length = attributes[(u,v)]
+                    edges.append(f"{node1_id}\t{length}\t{node2_id}")
+                except KeyError:
+                    try:
+                        length = attributes[(v,u)]
+                        edges.append(f"{node1_id}\t{length}\t{node2_id}")
+                    except KeyError:
+                        edges.append(f"{node1_id}\ttneighbour\t{node2_id}")
+            if len(cluster) == 1:
+                list(cluster.nodes())[0].id
+                edges.append(str(list(cluster.nodes())[0]))
+            for node in cluster:
+                add_properties_values = [node.additional_properties[add_property] for add_property in additional_properties]
+                nodes.append((str(node.id), node.seq_aa, node.v, node.j, node.seq_nt, node.sample_id, node.freq, node.count, *add_properties_values))
+
+        with open(sif_filename, "w") as f:
+            f.write("\n".join(edges))
+        print("Saved edges to: {}".format(sif_filename))
+        
+        properties_names = ["code", "cdr3aa", "v", "j", "cdr3nt", "sample_id", "freq", "count"] + additional_properties
+        properties_df = pd.DataFrame(nodes, columns=properties_names)
+        if sample_metadata is not None:
+            properties_df = properties_df.merge(sample_metadata)
+        properties_df.to_csv(properties_metadata_filename, index=False, sep="\t")
+        print("Saved node properties and metadata to: {}".format(properties_metadata_filename))
+        
+    
