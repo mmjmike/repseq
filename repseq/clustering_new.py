@@ -91,7 +91,7 @@ class Cluster(nx.Graph):
     def __getitem__(self, index):
         return list(self.nodes)[index]     
 
-    def plot_cluster_logo(self, seq_type="prot", weighed=False):
+    def plot_logo(self, seq_type="prot", weighed=False, return_matrix=False):
         list_of_clonotypes = []
         seq_types = ["prot", "dna"]
         if seq_type not in seq_types:
@@ -109,11 +109,17 @@ class Cluster(nx.Graph):
             else:
                 clone = (seq,)
             list_of_clonotypes.append(clone)
-        get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=True)   
+        if return_matrix:
+            return get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=False)   
+        else:
+            get_logo_for_list_of_clonotypes(list_of_clonotypes, seq_type, plot=True)
     
 
-    def calc_cluster_consensus(self, seq_type="dna", weighed=False):
+    def calc_cluster_consensus(self, seq_type="prot", weighed=False):
         motif_dicts = []
+
+        # ADD: check seq_type
+
         for node in self.nodes:
             weight = 1
             if weighed:

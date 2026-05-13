@@ -386,7 +386,7 @@ def create_clusters_from_pooled_df(pooled_df, mismatches=1, overlap_type="aaV", 
     compulsory_columns = ["freq", "count", "v", "j", "cdr3aa", "cdr3nt", "sample_id"]
 
     if not _run_from_create_clusters:
-        if not check_compulsory_columns(pooled_df):
+        if not check_compulsory_columns(pooled_df, compulsory_columns):
             print("Trying to convert pooled clonoset...")
             pooled_df = Filter(by_umi=True, convert=False, recount_fractions=False).apply(pooled_df)
             if not check_compulsory_columns(pooled_df):
