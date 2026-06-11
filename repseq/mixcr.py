@@ -1,11 +1,11 @@
-from .common_functions import print_progress_bar
+from .common_functions import print_progress_bar, filter_by_functionality
 from .constants import MIXCR
 import pandas as pd
 import numpy as np
 import os
 from .slurm import create_slurm_batch_file, run_slurm_command_from_jupyter
 from .io import read_json_report, read_clonoset
-from .clonosets import find_all_exported_clonosets_in_folder, filter_nonfunctional_clones
+from .clonosets import find_all_exported_clonosets_in_folder
 from subprocess import Popen, PIPE
 from IPython.display import Image, display, SVG
 import matplotlib.pyplot as plt
@@ -309,7 +309,7 @@ def get_processing_table(folder, show_offtarget=False, offtarget_chain_threshold
 
         # print(sample_id, chain)
         clonoset = read_clonoset(r.filename)
-        clonoset_f = filter_nonfunctional_clones(clonoset)
+        clonoset_f = filter_by_functionality(clonoset)
 
         # align report
         Rt=align_report["totalReadsProcessed"]

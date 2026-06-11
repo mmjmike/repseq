@@ -3,32 +3,18 @@ import pandas as pd
 import concurrent.futures
 import numpy as np
 import math
+from collections import OrderedDict
 
 def print_progress_bar(samples_done, samples_total, program_name="", object_name="sample(s)"):
-    done = int(samples_done/samples_total*50)
-    bar = '#'*done + '-'*(50-done)
+    total_steps = 50
+    done = int(samples_done/samples_total*total_steps)
+    bar = '#'*done + '-'*(total_steps-done)
     progress_bar = f"{program_name} |{bar}| {samples_done}/{samples_total} {object_name} processed"
     end = "\r"
     if samples_done == samples_total:
         end = "\n"
     print(progress_bar, end=end)
     
-def combine_metadata_from_folders(folders, metadata_filename="metadata.txt"):
-    if isinstance(folders, str):
-        folders = [folders]
-    list_of_metadata_dfs = []
-    for folder in folders:
-        filenames = []
-        full_paths = False
-        curr_metadata = pd.read_csv(os.path.join(folder, metadata_filename), sep="\t")
-        if "#file.name" in curr_metadata.columns:
-            if os.path.exists(curr_metadata.iloc[0]["#file.name"]):
-                full_paths = True
-            if not full_paths:
-                curr_metadata["#file.name"] = curr_metadata["#file.name"].apply(lambda x: os.path.join(folder, x))
-        list_of_metadata_dfs.append(curr_metadata)
-    return pd.concat(list_of_metadata_dfs)
-
 def run_parallel_calculation(function, tasks, program_name, object_name="tasks", verbose=True, cpu=None):
     result_list = []
     tasks_total = len(tasks)
@@ -145,7 +131,6 @@ def overlap_type_to_flags(overlap_type):
     return aa, check_v, check_j
 
 
-
 def jaccard_index(list1, list2):
     set1 = set(list1)
     set2 = set(list2)
@@ -210,3 +195,83 @@ def jensen_shannon_divergence(p, q, epsilon=1e-10):
     # Calculate JSD
     jsd = 0.5 * kld_p_m + 0.5 * kld_q_m
     return jsd
+
+
+def decide_count_and_frac_columns(colnames, by_umi, suppress_warnings=False):
+    count_column = colnames["count_column"]
+    fraction_column = colnames["fraction_column"]
+    if by_umi:
+        if colnames["umi"] is not None:
+            count_column = colnames["umi_column"]
+            fraction_column = colnames["umi_fraction_column"]
+        elif not suppress_warnings:
+            print("WARNING! Clonoset does not contain UMI column. Using reads for clone count instead.\nTo avoid this warning set parameter 'by_umi=False'")
+    return count_column, fraction_column
+
+
+def filter_by_functionality(clonoset_in, colnames=None, functional=True):
+    clonoset = clonoset_in.copy()
+    if colnames is None:
+        colnames = get_column_names_from_clonoset(clonoset)
+    cdr3aa_column = colnames["cdr3aa_column"]
+    if functional:
+        clonoset = clonoset.loc[~clonoset[cdr3aa_column].str.contains("\*|_", na=False)]
+        clonoset = clonoset.loc[clonoset[cdr3aa_column] != ""]
+    else:
+        clonoset = clonoset.loc[(clonoset[cdr3aa_column].str.contains("\*|_", na=False)) | (clonoset[cdr3aa_column] == "")]
+
+    return clonoset
+
+
+def get_column_names_from_clonoset(clonoset, *, normalize=str.lower, strict=False):
+
+    # all possible names for column types
+    column_alias_map = OrderedDict({
+        "umi_column": ["uniqueumicount", "uniquemoleculecount"],
+        "umi_fraction_column": ["uniqueumifraction", "uniquemoleculefraction"],
+        "count_column": ["count", "clonecount", "readcount", "read.count"],
+        "fraction_column": ["freq", "clonefraction", "frequency", "readfraction"],
+        "v_column": ["v", "allvhitswithscore", "bestvgene", "v_call"],
+        "d_column": ["d", "alldhitswithscore", "bestdgene", "d_call"],
+        "j_column": ["j", "alljhitswithscore", "bestjgene", "j_call"],
+        "c_column": ["c", "allchitswithscore", "bestcgene"],
+        "cdr3aa_column": ["cdr3aa", "aaseqcdr3", "cdr3.amino.acid.sequence", "junction_aa"],
+        "cdr3nt_column": ["cdr3nt", "nseqcdr3", "cdr3.nucleotide.sequence", "junction"]
+    })
+
+    cols = {normalize(c): c for c in clonoset.columns}
+
+    colnames = {}
+    missing = []
+
+    for required_name, aliases in column_alias_map.items():
+        match = next((cols[normalize(a)] for a in aliases if normalize(a) in cols), None)
+        if match is None:
+            missing.append(required_name)
+            colnames[required_name] = None
+        else:
+            colnames[required_name] = match
+
+    if strict and missing:
+        raise KeyError(f"Missing required columns: {missing}")
+
+    # detect if there is a separate column for UMI counts
+    colnames["umi"] = colnames["umi_column"] is not None
+
+    return colnames
+
+
+# def combine_metadata_from_folders(folders, metadata_filename="metadata.txt"):
+#     if isinstance(folders, str):
+#         folders = [folders]
+#     list_of_metadata_dfs = []
+#     for folder in folders:
+#         full_paths = False
+#         curr_metadata = pd.read_csv(os.path.join(folder, metadata_filename), sep="\t")
+#         if "#file.name" in curr_metadata.columns:
+#             if os.path.exists(curr_metadata.iloc[0]["#file.name"]):
+#                 full_paths = True
+#             if not full_paths:
+#                 curr_metadata["#file.name"] = curr_metadata["#file.name"].apply(lambda x: os.path.join(folder, x))
+#         list_of_metadata_dfs.append(curr_metadata)
+#     return pd.concat(list_of_metadata_dfs)

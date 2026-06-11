@@ -1,9 +1,9 @@
-from .clonosets import (decide_count_and_frac_columns,
-                        get_column_names_from_clonoset,
-                        filter_by_functionality)
-
-from .common_functions import (extract_segment,
-                               extract_refpoint_position, overlap_type_to_flags)
+from .common_functions import (get_column_names_from_clonoset,
+                               extract_segment,
+                               filter_by_functionality,
+                               extract_refpoint_position,
+                               decide_count_and_frac_columns,
+                               overlap_type_to_flags)
 
 from collections.abc import Hashable
 

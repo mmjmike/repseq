@@ -3,9 +3,10 @@ import numpy as np
 import random
 import os
 
-from .clonosets import (get_column_names_from_clonoset,
-                        filter_by_functionality)
-from .common_functions import (calc_insert_size,
+
+from .common_functions import (get_column_names_from_clonoset,
+                               filter_by_functionality,
+                               calc_insert_size,
                                extract_refpoint_position,
                                center_5,
                                diversity_metrics,
@@ -304,7 +305,9 @@ def calculate_diversity_stats_cl(clonoset_in, colnames=None):
     return result
 
 
-def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, program_name="Calculation", iterations=1, seed=None, drop_small_samples=False, verbose=True, skip_checks=False, **kwargs):
+def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, program_name="Calculation",
+                         iterations=1, seed=None, drop_small_samples=False, verbose=True,
+                         skip_checks=False, **kwargs):
     '''
     Main function that applies batch calculations for multiple clonosets
     using a `calc_function`. It checks inputs, checks if clonotype counts are 
