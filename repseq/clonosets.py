@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 import re
-from .io import read_mixcr_clonoset, read_clonoset
+from .io import read_clonoset
 from .clone_filter import Filter
 from .common_functions import get_column_names_from_clonoset
 # import random
@@ -93,7 +93,7 @@ def remove_non_target_clonosets_from_files_df(files_df, threshold=0.01):
         if count > 1:
             sample_reads = 0
             for i, r in files_df.loc[files_df.sample_id == sample].iterrows():
-                clonoset = read_mixcr_clonoset(r["filename"])
+                clonoset = read_clonoset(r["filename"])
                 colnames = get_column_names_from_clonoset(clonoset)
                 clonoset_reads = clonoset[colnames["count_column"]].sum()
                 files_df.loc[i,"read_count"] = clonoset_reads

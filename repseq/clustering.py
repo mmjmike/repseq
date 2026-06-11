@@ -1,5 +1,5 @@
 import pandas as pd
-from .common_functions import run_parallel_calculation, combine_metadata_from_folders, print_progress_bar
+from .common_functions import run_parallel_calculation, print_progress_bar
 from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_dict, get_logo_for_list_of_clonotypes
 from .clone_filter import Filter
 from .io import read_clonoset
@@ -557,56 +557,56 @@ def filter_clusters_with_alice_hits(clusters):
             continue
     return filtered_clusters
 
-def pool_clonotypes_to_df(folders, samples_list=None, top=0, functional=True, exclude_singletons=False, cdr3aa_len_range=[], metadata_filename="vdjtools_metadata.txt"):
-    all_metadata = combine_metadata_from_folders(folders, metadata_filename=metadata_filename)
-    #pool_metadata(folders, metadata_filename,samples_list)
+# def pool_clonotypes_to_df(folders, samples_list=None, top=0, functional=True, exclude_singletons=False, cdr3aa_len_range=[], metadata_filename="vdjtools_metadata.txt"):
+#     all_metadata = combine_metadata_from_folders(folders, metadata_filename=metadata_filename)
+#     #pool_metadata(folders, metadata_filename,samples_list)
     
-    clonotypes_dfs = []
-    for index, row in all_metadata.iterrows():
-        sample_id = row["sample.id"]
-        if samples_list is not None:
-            if sample_id not in samples_list:
-                continue
-        clonoset_data=pd.read_csv(row["#file.name"],sep="\t")
+#     clonotypes_dfs = []
+#     for index, row in all_metadata.iterrows():
+#         sample_id = row["sample.id"]
+#         if samples_list is not None:
+#             if sample_id not in samples_list:
+#                 continue
+#         clonoset_data=pd.read_csv(row["#file.name"],sep="\t")
 
-        clonoset_data = clonoset_data.rename(columns={"bestVGene": "v",
-                                        "bestJGene": "j",
-                                        "CDR3.amino.acid.sequence": "cdr3aa",
-                                        "CDR3.nucleotide.sequence": "cdr3nt",
-                                        "allVHitsWithScore": "v",
-                                        "allJHitsWithScore": "j",
-                                        "aaSeqCDR3": "cdr3aa",
-                                        "nSeqCDR3": "cdr3nt",
-                                        "Sample":"sample_id",
-                                        "cloneFraction":"freq",
-                                        "Read.count": "count",
-                                        "cloneCount": "count"})
+#         clonoset_data = clonoset_data.rename(columns={"bestVGene": "v",
+#                                         "bestJGene": "j",
+#                                         "CDR3.amino.acid.sequence": "cdr3aa",
+#                                         "CDR3.nucleotide.sequence": "cdr3nt",
+#                                         "allVHitsWithScore": "v",
+#                                         "allJHitsWithScore": "j",
+#                                         "aaSeqCDR3": "cdr3aa",
+#                                         "nSeqCDR3": "cdr3nt",
+#                                         "Sample":"sample_id",
+#                                         "cloneFraction":"freq",
+#                                         "Read.count": "count",
+#                                         "cloneCount": "count"})
     
-        clonoset_data["v"] = clonoset_data["v"].apply(lambda x: x.split("*")[0])
-        clonoset_data["j"] = clonoset_data["j"].apply(lambda x: x.split("*")[0])
+#         clonoset_data["v"] = clonoset_data["v"].apply(lambda x: x.split("*")[0])
+#         clonoset_data["j"] = clonoset_data["j"].apply(lambda x: x.split("*")[0])
 
-        if exclude_singletons:
-            clonoset_data=clonoset_data.loc[clonoset_data["count"]>1]
-        if functional:
-            clonoset_data=clonoset_data.loc[~clonoset_data["cdr3aa"].str.contains("\*|_")]
-            clonoset_data=clonoset_data.sample(frac=1, random_state=1) #shuffle
-            clonoset_data=clonoset_data.sort_values(by="count", ascending=False) #sort by counts "back" 
-        if top > 0:
-            clonoset_data=clonoset_data.iloc[:top]
-        if cdr3aa_len_range:
-            clonoset_data=clonoset_data.loc[(clonoset_data["cdr3aa"].str.len() <= cdr3aa_len_range[-1]) 
-                                            & (clonoset_data["cdr3aa"].str.len() >= cdr3aa_len_range[0])]
-        clonoset_data["freq"]=clonoset_data["count"]/clonoset_data["count"].sum()
-        sample_id = row["sample.id"]
-        # clonotypes_num = clonoset_data.shape[0]
-        clonoset_data["sample_id"] = sample_id
-        clonotypes_dfs.append(clonoset_data)
-#         print("Added {} clonotypes from {}".format(clonotypes_num, sample_id))
-    result_df = pd.concat(clonotypes_dfs).reset_index(drop=True)
-    clonotypes_number = len(result_df)
-    samples_number = len(result_df["sample_id"].unique())
-    print("Pooled {} clonotypes from {} samples".format(clonotypes_number, samples_number))
-    return result_df
+#         if exclude_singletons:
+#             clonoset_data=clonoset_data.loc[clonoset_data["count"]>1]
+#         if functional:
+#             clonoset_data=clonoset_data.loc[~clonoset_data["cdr3aa"].str.contains("\*|_")]
+#             clonoset_data=clonoset_data.sample(frac=1, random_state=1) #shuffle
+#             clonoset_data=clonoset_data.sort_values(by="count", ascending=False) #sort by counts "back" 
+#         if top > 0:
+#             clonoset_data=clonoset_data.iloc[:top]
+#         if cdr3aa_len_range:
+#             clonoset_data=clonoset_data.loc[(clonoset_data["cdr3aa"].str.len() <= cdr3aa_len_range[-1]) 
+#                                             & (clonoset_data["cdr3aa"].str.len() >= cdr3aa_len_range[0])]
+#         clonoset_data["freq"]=clonoset_data["count"]/clonoset_data["count"].sum()
+#         sample_id = row["sample.id"]
+#         # clonotypes_num = clonoset_data.shape[0]
+#         clonoset_data["sample_id"] = sample_id
+#         clonotypes_dfs.append(clonoset_data)
+# #         print("Added {} clonotypes from {}".format(clonotypes_num, sample_id))
+#     result_df = pd.concat(clonotypes_dfs).reset_index(drop=True)
+#     clonotypes_number = len(result_df)
+#     samples_number = len(result_df["sample_id"].unique())
+#     print("Pooled {} clonotypes from {} samples".format(clonotypes_number, samples_number))
+#     return result_df
 
 def add_metadata(clusters, metadata):
     columns = metadata.columns
@@ -619,28 +619,28 @@ def add_metadata(clusters, metadata):
         for node in cluster:
             node.add_properties(metadata_dict)
 
-def pool_alice_hits_to_df(folders, samples_list=None, metadata_filename="vdjtools_metadata.txt"):
-    all_metadata = combine_metadata_from_folders(folders, metadata_filename=metadata_filename)
-    #pool_metadata(folders, metadata_filename,samples_list)
+# def pool_alice_hits_to_df(folders, samples_list=None, metadata_filename="vdjtools_metadata.txt"):
+#     all_metadata = combine_metadata_from_folders(folders, metadata_filename=metadata_filename)
+#     #pool_metadata(folders, metadata_filename,samples_list)
     
-    clonotypes_dfs = []
-    for index, row in all_metadata.iterrows():
-        sample_id = row["sample.id"]
-        if samples_list is not None:
-            if sample_id not in samples_list:
-                continue
-        clonoset_data=pd.read_csv(row["#file.name"],sep="\t")
-        clonoset_data["freq"]=clonoset_data["Read.count"]/clonoset_data["Read.count"].sum()
-        sample_id = row["sample.id"]
-        # clonotypes_num = clonoset_data.shape[0]
-        clonoset_data["sample_id"] = sample_id
-        clonotypes_dfs.append(clonoset_data)
-#         print("Added {} clonotypes from {}".format(clonotypes_num, sample_id))
-    result_df = pd.concat(clonotypes_dfs).reset_index(drop=True)
-    clonotypes_number = len(result_df)
-    samples_number = len(result_df["sample_id"].unique())
-    print("Pooled {} clonotypes from {} samples".format(clonotypes_number, samples_number))
-    return result_df
+#     clonotypes_dfs = []
+#     for index, row in all_metadata.iterrows():
+#         sample_id = row["sample.id"]
+#         if samples_list is not None:
+#             if sample_id not in samples_list:
+#                 continue
+#         clonoset_data=pd.read_csv(row["#file.name"],sep="\t")
+#         clonoset_data["freq"]=clonoset_data["Read.count"]/clonoset_data["Read.count"].sum()
+#         sample_id = row["sample.id"]
+#         # clonotypes_num = clonoset_data.shape[0]
+#         clonoset_data["sample_id"] = sample_id
+#         clonotypes_dfs.append(clonoset_data)
+# #         print("Added {} clonotypes from {}".format(clonotypes_num, sample_id))
+#     result_df = pd.concat(clonotypes_dfs).reset_index(drop=True)
+#     clonotypes_number = len(result_df)
+#     samples_number = len(result_df["sample_id"].unique())
+#     print("Pooled {} clonotypes from {} samples".format(clonotypes_number, samples_number))
+#     return result_df
 
 def cluster_properties(clusters, weighed=False):
     properties_list = ["cluster_id", "nodes", "edges", "diameter", "density", "eccentricity",
