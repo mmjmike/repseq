@@ -260,26 +260,26 @@ def read_dill_dump(filename):
     with open(filename, 'rb') as f:
         return dill.load(f)
 
-def read_mixcr_clonoset(filename):
-    # DEPRECATED
-    clonoset = pd.read_csv(filename, sep="\t", dtype={'cloneId': int, 'readCount': int, 'readFraction': float,
-                                                          'uniqueUMICount': int, 'uniqueUMIFraction': float,
-                                                          'uniqueMoleculeCount': int, 'uniqueMoleculeFraction': float,
-                                                          'cloneCount': int, 'cloneFraction': float,
-                                                          'targetSequences': str, 'targetQualities': str,
-                                                          'allVHitsWithScore': str, 'allDHitsWithScore': str,
-                                                          'allJHitsWithScore': str, 'allCHitsWithScore': str,
-                                                          'allVAlignments': str, 'allDAlignments': str,
-                                                          'allJAlignments': str, 'allCAlignments': str,
-                                                          'nSeqFR1': str, 'minQualFR1': str,
-                                                          'nSeqCDR1': str, 'minQualCDR1': str,
-                                                          'nSeqFR2': str, 'minQualFR2': str,
-                                                          'nSeqCDR2': str, 'minQualCDR2': str,
-                                                          'nSeqFR3': str, 'minQualFR3': str,
-                                                          'nSeqCDR3': str, 'minQualCDR3': str,
-                                                          'nSeqFR4': str, 'minQualFR4': str,
-                                                          'aaSeqFR1': str, 'aaSeqCDR1': str,
-                                                          'aaSeqFR2': str, 'aaSeqCDR2': str,
-                                                          'aaSeqFR3': str, 'aaSeqCDR3': str,
-                                                          'aaSeqFR4': str, 'refPoints': str})
-    return clonoset
+# def read_mixcr_clonoset(filename):
+#     # DEPRECATED
+#     clonoset = pd.read_csv(filename, sep="\t", dtype={'cloneId': int, 'readCount': int, 'readFraction': float,
+#                                                           'uniqueUMICount': int, 'uniqueUMIFraction': float,
+#                                                           'uniqueMoleculeCount': int, 'uniqueMoleculeFraction': float,
+#                                                           'cloneCount': int, 'cloneFraction': float,
+#                                                           'targetSequences': str, 'targetQualities': str,
+#                                                           'allVHitsWithScore': str, 'allDHitsWithScore': str,
+#                                                           'allJHitsWithScore': str, 'allCHitsWithScore': str,
+#                                                           'allVAlignments': str, 'allDAlignments': str,
+#                                                           'allJAlignments': str, 'allCAlignments': str,
+#                                                           'nSeqFR1': str, 'minQualFR1': str,
+#                                                           'nSeqCDR1': str, 'minQualCDR1': str,
+#                                                           'nSeqFR2': str, 'minQualFR2': str,
+#                                                           'nSeqCDR2': str, 'minQualCDR2': str,
+#                                                           'nSeqFR3': str, 'minQualFR3': str,
+#                                                           'nSeqCDR3': str, 'minQualCDR3': str,
+#                                                           'nSeqFR4': str, 'minQualFR4': str,
+#                                                           'aaSeqFR1': str, 'aaSeqCDR1': str,
+#                                                           'aaSeqFR2': str, 'aaSeqCDR2': str,
+#                                                           'aaSeqFR3': str, 'aaSeqCDR3': str,
+#                                                           'aaSeqFR4': str, 'refPoints': str})
+#     return clonoset
