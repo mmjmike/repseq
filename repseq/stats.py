@@ -3,9 +3,10 @@ import numpy as np
 import random
 import os
 
-from .clonosets import (get_column_names_from_clonoset,
-                        filter_by_functionality)
-from .common_functions import (calc_insert_size,
+
+from .common_functions import (get_column_names_from_clonoset,
+                               filter_by_functionality,
+                               calc_insert_size,
                                extract_refpoint_position,
                                center_5,
                                diversity_metrics,

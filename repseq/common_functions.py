@@ -223,6 +223,7 @@ def get_column_names_from_clonoset(clonoset, *, normalize=str.lower, strict=Fals
         match = next((cols[normalize(a)] for a in aliases if normalize(a) in cols), None)
         if match is None:
             missing.append(required_name)
+            colnames[required_name] = None
         else:
             colnames[required_name] = match
 
