@@ -1,6 +1,6 @@
 # Usage: working with MiXCR
 
-MiXCR is the leading software for generating clonoset tables from raw FastQ files. [MiXCR module](functions.md#mixcr) allows to run MiXCR 4.3+ batch analyses with SLURM queue manager.
+MiXCR is the leading software for generating clonoset tables from raw FastQ files. [MiXCR module](functions.md#mixcr) allows to run MiXCR 4.3+ batch analyses locally on Linux or through the SLURM queue manager.
 
 !!! note "Setting up the environment"
     Before getting started, make sure that main_repseq environment is chosen. Otherwise, check the [installation guide](installation.md)
@@ -12,7 +12,6 @@ Create `sample_df` from dataset metadata in `.yaml` format (if it's in a tabular
 
 ``` py
 from repseq import mixcr as mx
-from repseq import slurm
 from repseq import io as repseqio
 
 sample_df = repseqio.read_yaml_metadata(RAW_DATA_DIR, filename=METADATA_FILENAME)
@@ -42,23 +41,53 @@ mixcr_race_command_template = "mixcr analyze milab-mouse-rna-tcr-umi-race -f r1 
 ```
 <br>
 
-## Running `mixcr analyze` in batches using SLURM
+## Running `mixcr analyze` in batches locally
 
-Run mixcr analyze in batches (Relevant only for servers using <b>SLURM</b>). This function generates a set of commands for each sample by creating a SLURM script for each command and submitting them to the SLURM queue. Scripts itself and .log files (contain std.out and std.error outputs) will be saved in `~/temp/SLURM`. 
+Run MiXCR locally on Linux from a notebook. By default, one sample is processed at a time. Increase `max_workers` only if the machine has enough CPU and memory for several MiXCR jobs at once.
 
 ```py
-mx.mixcr4_analyze_batch(sample_df, output_dir, command_template=mixcr_race_command_template,
-                        path_to_mixcr_binary)
+jobs = mx.mixcr4_analyze_batch(
+    sample_df,
+    output_dir,
+    command_template=mixcr_race_command_template,
+    mixcr_path=path_to_mixcr_binary,
+    backend="local",
+    max_workers=1,
+)
 ```
 
 <br>
 
-To check the progress, use `check_slurm_progress`. `loop` set to `True` gives real-time updates with 0.5 s interval while `loop`=`False` shows current progress and runs in the background without blocking other cells. 
-<br>Currently, `check_slurm_progress` might be unreliable in some cases, thus it's recommended to check SLURM queue and .log files in `~/temp/SLURM` folder manually.
+The function returns a dataframe with commands, log filenames and local return codes. Logs are written to `logs/` inside the output folder.
+
+To check the progress file:
 
 ```py
-slurm.check_slurm_progress(os.path.join(output_dir, "mixcr_analyze_slurm_batch.log"), loop=True)
+mx.check_batch_progress(os.path.join(output_dir, "mixcr_analyze_batch.log"))
 ```
+
+## Running `mixcr analyze` in batches using SLURM
+
+On servers using <b>SLURM</b>, set `backend="slurm"`. This creates one SLURM script for each sample and submits it to the queue. SLURM scripts are saved by the SLURM helper, and job logs are written to `logs/` inside the output folder.
+
+```py
+jobs = mx.mixcr4_analyze_batch(
+    sample_df,
+    output_dir,
+    command_template=mixcr_race_command_template,
+    mixcr_path=path_to_mixcr_binary,
+    backend="slurm",
+    cpus=40,
+    memory=32,
+)
+```
+
+To check submitted-job progress from the batch file:
+
+```py
+mx.check_batch_progress(os.path.join(output_dir, "mixcr_analyze_batch.log"), loop=True)
+```
+
 <br>
 
 ## Making report images
@@ -69,11 +98,11 @@ Make reports (combines `mixcr exportQc align`, `chainUsage` and `tags`) and get 
 * chainUsage — calculates chain usage across all clonotypes
 * tags — for samples with barcodes, provides barcode coverage statistics for every sample
 
-To see progress, use `check_slurm_progress` as shown below
+To see progress, use `check_batch_progress` as shown below.
 
 ```py
-mx.mixcr4_reports(output_dir, mixcr_path=path_to_mixcr_binary)
-slurm.check_slurm_progress(os.path.join(output_dir, "mixcr_reports_slurm_batch.log"), loop=True)
+mx.mixcr4_reports(output_dir, mixcr_path=path_to_mixcr_binary, backend="local")
+mx.check_batch_progress(os.path.join(output_dir, "mixcr_reports_batch.log"), loop=True)
 mx.show_report_images(output_dir)
 ```
 

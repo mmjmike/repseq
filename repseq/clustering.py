@@ -3,16 +3,13 @@ from .common_functions import run_parallel_calculation, print_progress_bar
 from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_dict, get_logo_for_list_of_clonotypes
 from .clone_filter import Filter
 from .io import read_clonoset
-from .pgen_calculation import calculate_clonotypes_pgen
 from scipy.stats import poisson
 from statsmodels.stats.multitest import multipletests
 from .common_functions import overlap_type_to_flags
 import numpy as np
 import networkx as nx
 from networkx.algorithms import community
-import leidenalg
-import igraph as ig
-from scipy.sparse import csar_matrix
+from scipy.sparse import csr_matrix
 import os
 import json
 import functools
@@ -742,6 +739,14 @@ class Clusters(list):
         Returns:
             List of NetworkX Graphs corresponding to detected communities.
         """
+        try:
+            import igraph as ig
+            import leidenalg
+        except ImportError as exc:
+            raise ImportError(
+                "Leiden community detection requires optional clustering "
+                "dependencies. Install them with `pip install repseq[clustering]`."
+            ) from exc
 
         total_communities = 0
         self.cluster_communities_leiden = ClusterCommunities()
@@ -920,6 +925,14 @@ class Clusters(list):
             raise ValueError("P-value adjustment method is not one on the list. Possible values are: ['bonferroni', 'sidak', 'holm-sidak', 'holm', 'simes-hochberg', 'hommel', 'fdr_bh', 'fdr_by','fdr_tsbh', 'fdr_tsbky']")
         if mismatches > 1:
             print(f'Using {mismatches} may increase runtime.')
+
+        try:
+            from .pgen_calculation import calculate_clonotypes_pgen
+        except ImportError as exc:
+            raise ImportError(
+                "ALICE pgen calculation requires optional pgen dependencies. "
+                "Install them with `pip install repseq[pgen]`."
+            ) from exc
         
         if skip_single_nodes:
             clusters_all = self.as_dataframe()

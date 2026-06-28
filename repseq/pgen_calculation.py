@@ -5,10 +5,6 @@ from math import comb
 from .common_functions import run_parallel_calculation, overlap_type_to_flags
 from .io import read_clonoset
 from repseq import clone_filter as clf
-import olga
-import olga.load_model as load_model
-import olga.generation_probability as pgen
-import olga.sequence_generation as seq_gen
 import os
 import sys
 
@@ -191,7 +187,16 @@ def create_neighbours(data, mismatches=1, check_v=True, check_j=True):
 
 
 def create_olga_model(generation_model='human_T_beta'):
-        
+    try:
+        import olga
+        import olga.load_model as load_model
+        import olga.generation_probability as pgen
+    except ImportError as exc:
+        raise ImportError(
+            "OLGA support requires optional pgen dependencies. "
+            "Install them with `pip install repseq[pgen]`."
+        ) from exc
+
     olga_path = os.path.dirname(sys.modules['olga'].__file__)
     params_file_name = os.path.join(olga_path, f'default_models/{generation_model}/model_params.txt')
     marginals_file_name = os.path.join(olga_path, f'default_models/{generation_model}/model_marginals.txt')
@@ -206,7 +211,6 @@ def create_olga_model(generation_model='human_T_beta'):
     generative_model.load_and_process_igor_model(marginals_file_name)
         
     pgen_model = pgen.GenerationProbabilityVDJ(generative_model, genomic_data)
-    seq_gen_model = seq_gen.SequenceGenerationVDJ(generative_model, genomic_data)
     
     return pgen_model
     
@@ -221,5 +225,4 @@ def calculate_pgen_mp(args):
             res = {olga_input: pgen_model.compute_nt_CDR3_pgen(*olga_input, olga_warnings)}
         result.update(res)
     return result
-
 
