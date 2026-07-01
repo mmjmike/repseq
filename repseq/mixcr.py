@@ -1,7 +1,6 @@
 from .common_functions import print_progress_bar, filter_by_functionality
 import pandas as pd
 import numpy as np
-import concurrent.futures
 import os
 import shlex
 import subprocess
@@ -13,6 +12,19 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import seaborn as sns
 import re
+
+JOB_TABLE_COLUMNS = [
+    "jobname",
+    "sample_id",
+    "backend",
+    "job_id",
+    "status",
+    "returncode",
+    "cwd",
+    "log_filename",
+    "status_filename",
+    "command",
+]
 
 
 def _validate_backend(backend):
@@ -32,39 +44,110 @@ def _normalize_memory(memory, min_memory=16, max_memory=1500):
     return memory
 
 
-def create_batch_file(filename, program_name, tasks_num, backend="local"):
+def _job_table(jobs, backend):
+    rows = []
+    for job in jobs:
+        rows.append({
+            "jobname": job["jobname"],
+            "sample_id": job.get("sample_id", ""),
+            "backend": backend,
+            "job_id": "",
+            "status": "pending",
+            "returncode": "",
+            "cwd": job["cwd"],
+            "log_filename": job["log_filename"],
+            "status_filename": job["status_filename"],
+            "command": job["command"],
+        })
+    return pd.DataFrame(rows, columns=JOB_TABLE_COLUMNS)
+
+
+def _write_batch_table(filename, table, program_name=None):
     with open(filename, "w") as f:
-        f.write(f"# {program_name}: {backend} run {tasks_num} tasks\n")
+        if program_name is not None:
+            f.write(f"# {program_name}\n")
+        table.to_csv(f, sep="\t", index=False)
 
 
-def _append_batch_status(filename, jobname, status):
-    with open(filename, "a") as f:
-        f.write(f"{jobname} {status}\n")
-
-
-def check_batch_progress(filename, loop=False):
+def _read_batch_table(filename):
     with open(filename, "r") as f:
-        first_line = f.readlines()[0]
-    match = re.match(r'# ([^:]+): ([^ ]+) run ([0-9]+) tasks', first_line)
-    if match is None:
-        raise ValueError("Could not parse batch progress file header")
-    program_name = match[1]
-    tasks = int(match[3])
+        first_line = f.readline().rstrip("\n")
+    program_name = first_line[2:] if first_line.startswith("# ") else "MiXCR Batch"
+    table = pd.read_csv(filename, sep="\t", comment="#", keep_default_na=False)
+    return program_name, table
+
+
+def _resolve_batch_filename(path, default_filename="mixcr_analyze_batch.log"):
+    if os.path.isdir(path):
+        filename = os.path.join(path, default_filename)
+        if not os.path.exists(filename):
+            batch_files = [
+                os.path.join(path, f)
+                for f in os.listdir(path)
+                if f.startswith("mixcr_") and f.endswith("_batch.log")
+            ]
+            if len(batch_files) == 1:
+                filename = batch_files[0]
+        return filename
+    return path
+
+
+def _status_counts(table):
+    finished = int((table["status"] == "finished").sum())
+    failed = int(table["status"].isin(["failed", "submit_failed"]).sum())
+    total = len(table)
+    return finished, failed, total
+
+
+def _sync_status_markers(filename, program_name, table):
+    changed = False
+    for idx, row in table.iterrows():
+        status_filename = row.get("status_filename", "")
+        if not isinstance(status_filename, str) or status_filename == "":
+            continue
+        if row["status"] in ["finished", "failed"]:
+            continue
+        if os.path.exists(status_filename):
+            with open(status_filename, "r") as f:
+                status = f.read().strip()
+            if status in ["finished", "failed"]:
+                table.loc[idx, "status"] = status
+                changed = True
+    if changed:
+        _write_batch_table(filename, table, program_name=program_name)
+    return table
+
+
+def check_batch_progress(path, loop=False, default_filename="mixcr_analyze_batch.log"):
+    filename = _resolve_batch_filename(path, default_filename=default_filename)
 
     while True:
-        with open(filename, "r") as f:
-            text = f.read()
-        finished = len(re.findall(r"\bfinished\b", text))
-        failed = len(re.findall(r"\bfailed\b", text))
+        program_name, table = _read_batch_table(filename)
+        table = _sync_status_markers(filename, program_name, table)
+        finished, failed, tasks = _status_counts(table)
         if not loop:
-            print(text)
+            print(table[["jobname", "sample_id", "backend", "job_id", "status", "returncode", "log_filename"]].to_string(index=False))
         print_progress_bar(finished + failed, tasks, program_name=program_name, object_name="task(s)")
         if not loop or finished + failed == tasks:
             break
         sleep(0.5)
 
 
-def _run_local_command(command, jobname, cwd, log_filename, batch_filename):
+def _update_job_status(batch_filename, program_name, table, jobname, **updates):
+    idx = table.index[table["jobname"] == jobname]
+    if len(idx) != 1:
+        raise ValueError(f"Could not find job '{jobname}' in batch table")
+    for key, value in updates.items():
+        table.loc[idx[0], key] = value
+    _write_batch_table(batch_filename, table, program_name=program_name)
+
+
+def _run_local_command(job, program_name, batch_filename, table):
+    jobname = job["jobname"]
+    command = job["command"]
+    cwd = job["cwd"]
+    log_filename = job["log_filename"]
+    _update_job_status(batch_filename, program_name, table, jobname, status="running")
     with open(log_filename, "w") as log:
         process = subprocess.run(
             command,
@@ -75,25 +158,37 @@ def _run_local_command(command, jobname, cwd, log_filename, batch_filename):
             text=True,
         )
     status = "finished" if process.returncode == 0 else "failed"
-    _append_batch_status(batch_filename, jobname, status)
-    return {
-        "jobname": jobname,
-        "backend": "local",
-        "command": command,
-        "cwd": cwd,
-        "log_filename": log_filename,
-        "returncode": process.returncode,
-        "status": status,
-        "stdout": "",
-        "stderr": "",
-    }
+    _update_job_status(
+        batch_filename,
+        program_name,
+        table,
+        jobname,
+        status=status,
+        returncode=process.returncode,
+    )
 
 
-def _submit_slurm_command(command, jobname, cwd, cpus, time_estimate, memory, log_filename, batch_filename):
+def _parse_slurm_job_id(stdout):
+    text = stdout.decode(errors="replace") if isinstance(stdout, bytes) else str(stdout)
+    match = re.search(r"Submitted batch job\s+([0-9]+)", text)
+    return match.group(1) if match else ""
+
+
+def _submit_slurm_command(job, cpus, time_estimate, memory, batch_filename):
+    command = job["command"]
+    jobname = job["jobname"]
+    cwd = job["cwd"]
+    log_filename = job["log_filename"]
+    status_filename = job["status_filename"]
     slurm_command = command
     if cwd is not None:
         slurm_command = f"cd {shlex.quote(cwd)} && {command}"
-    slurm_command += f'; echo "{jobname} finished" >> {shlex.quote(batch_filename)}'
+    slurm_command += (
+        f'; status=$?; '
+        f'if [ "$status" -eq 0 ]; then echo finished > {shlex.quote(status_filename)}; '
+        f'else echo failed > {shlex.quote(status_filename)}; fi; '
+        f'exit "$status"'
+    )
     stdout, stderr = run_slurm_command_from_jupyter(
         slurm_command,
         jobname,
@@ -101,71 +196,60 @@ def _submit_slurm_command(command, jobname, cwd, cpus, time_estimate, memory, lo
         time_estimate,
         memory,
         log_filename=log_filename,
+        verbose=False,
     )
-    return {
-        "jobname": jobname,
-        "backend": "slurm",
-        "command": slurm_command,
-        "cwd": cwd,
-        "log_filename": log_filename,
-        "returncode": None,
-        "status": "submitted",
-        "stdout": stdout.decode(errors="replace") if isinstance(stdout, bytes) else stdout,
-        "stderr": stderr.decode(errors="replace") if isinstance(stderr, bytes) else stderr,
-    }
+    return _parse_slurm_job_id(stdout), stdout, stderr
+
+
+def _save_result_table(table, table_filename):
+    table.to_csv(table_filename, index=False)
+    print(f"Logs folder: {os.path.dirname(table_filename)}")
+    print(f"Job table: {table_filename}")
 
 
 def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local", max_workers=1,
                     cpus=40, time_estimate=1.5, memory=32):
     _validate_backend(backend)
-    create_batch_file(batch_filename, program_name, len(jobs), backend=backend)
+    table = _job_table(jobs, backend)
+    _write_batch_table(batch_filename, table, program_name=program_name)
 
     if backend == "slurm":
-        results = []
         for job in jobs:
-            result = _submit_slurm_command(
-                job["command"],
-                job["jobname"],
-                job["cwd"],
+            _update_job_status(batch_filename, program_name, table, job["jobname"], status="submitting")
+            job_id, stdout, stderr = _submit_slurm_command(
+                job,
                 cpus,
                 time_estimate,
                 memory,
-                job["log_filename"],
                 batch_filename,
             )
-            print(result["jobname"], result["stdout"], result["stderr"])
-            results.append(result)
-        print(f"{len(jobs)} tasks added to slurm queue\n")
+            status = "submitted" if job_id else "submit_failed"
+            _update_job_status(
+                batch_filename,
+                program_name,
+                table,
+                job["jobname"],
+                job_id=job_id,
+                status=status,
+                returncode="" if job_id else 1,
+            )
+            if stderr:
+                text = stderr.decode(errors="replace") if isinstance(stderr, bytes) else str(stderr)
+                if text.strip():
+                    print(f"{job['jobname']} stderr: {text.strip()}")
+        print(f"{len(jobs)} tasks added to slurm queue")
     else:
-        if not isinstance(max_workers, int) or max_workers < 1:
-            raise ValueError("max_workers must be a positive integer")
-        print(f"Running {len(jobs)} tasks locally with max_workers={max_workers}\n")
-        if max_workers == 1:
-            results = [
-                _run_local_command(job["command"], job["jobname"], job["cwd"], job["log_filename"], batch_filename)
-                for job in jobs
-            ]
-        else:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = [
-                    executor.submit(
-                        _run_local_command,
-                        job["command"],
-                        job["jobname"],
-                        job["cwd"],
-                        job["log_filename"],
-                        batch_filename,
-                    )
-                    for job in jobs
-                ]
-                results = [future.result() for future in concurrent.futures.as_completed(futures)]
+        if max_workers != 1:
+            print("Local backend runs sequentially; max_workers is ignored.")
+        for done, job in enumerate(jobs, start=1):
+            _run_local_command(job, program_name, batch_filename, table)
+            print_progress_bar(done, len(jobs), program_name=program_name, object_name="task(s)")
 
-    print(f'To see progress, run:\nmixcr.check_batch_progress("{batch_filename}", loop=True)')
-    print(f'To see current progress:\nmixcr.check_batch_progress("{batch_filename}")')
-    columns = ["jobname", "backend", "command", "cwd", "log_filename", "returncode", "status", "stdout", "stderr"]
-    if len(results) == 0:
-        return pd.DataFrame(columns=columns)
-    return pd.DataFrame(results, columns=columns).sort_values(by="jobname").reset_index(drop=True)
+    _, table = _read_batch_table(batch_filename)
+    logs_folder = os.path.dirname(jobs[0]["log_filename"]) if jobs else os.path.dirname(batch_filename)
+    table_filename = os.path.join(logs_folder, f"{os.path.splitext(os.path.basename(batch_filename))[0]}_jobs.csv")
+    _save_result_table(table, table_filename)
+    return table.sort_values(by="jobname").reset_index(drop=True)
 
 
 def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
@@ -193,7 +277,7 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
         time_estimate (numeric): time estimate in hours for the calculation. It
             is the limit for SLURM task
         backend (str): `local` or `slurm`
-        max_workers (int): number of local sample jobs to run in parallel
+        max_workers (int): ignored for local backend; local runs are sequential
         cpus (int): CPU request for SLURM jobs
 
     Returns:
@@ -225,6 +309,8 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
     os.makedirs(output_folder, exist_ok=True)
     log_folder = os.path.join(output_folder, "logs")
     os.makedirs(log_folder, exist_ok=True)
+    status_folder = os.path.join(log_folder, "status")
+    os.makedirs(status_folder, exist_ok=True)
 
     memory = _normalize_memory(memory)
         
@@ -246,9 +332,11 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
         jobname = f"mixcr_analyze_{sample_id}"
         jobs.append({
             "jobname": jobname,
+            "sample_id": sample_id,
             "command": command,
             "cwd": output_folder,
             "log_filename": os.path.join(log_folder, f"{jobname}.log"),
+            "status_filename": os.path.join(status_folder, f"{jobname}.status"),
         })
 
     return _run_mixcr_jobs(
@@ -280,7 +368,7 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
         time_estimate (numeric): Time estimate in hours for the calculation; it 
             is the limit for the SLURM task.
         backend (str): `local` or `slurm`.
-        max_workers (int): number of local sample jobs to run in parallel.
+        max_workers (int): ignored for local backend; local runs are sequential.
         cpus (int): CPU request for SLURM jobs.
 
     Returns:
@@ -294,6 +382,8 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
     os.makedirs(output_folder, exist_ok=True)
     log_folder = os.path.join(output_folder, "logs")
     os.makedirs(log_folder, exist_ok=True)
+    status_folder = os.path.join(log_folder, "status")
+    os.makedirs(status_folder, exist_ok=True)
 
     memory = _normalize_memory(memory)
         
@@ -336,9 +426,11 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
         command = " && \\ \n".join(commands)
         jobs.append({
             "jobname": jobname,
+            "sample_id": sample_id,
             "command": command,
             "cwd": output_folder,
             "log_filename": os.path.join(log_folder, f"{jobname}.log"),
+            "status_filename": os.path.join(status_folder, f"{jobname}.status"),
         })
 
     return _run_mixcr_jobs(
@@ -365,7 +457,7 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local", max_workers=1,
         folder (str): folder in which to run the `mixcr exportQc` commands
         mixcr_path (str): path to MiXCR binary
         backend (str): `local` or `slurm`
-        max_workers (int): number of local report jobs to run in parallel
+        max_workers (int): ignored for local backend; local runs are sequential
         cpus (int): CPU request for SLURM jobs
         time_estimate (numeric): time estimate in hours for SLURM jobs
         memory (int): MiXCR memory in GB
@@ -381,6 +473,8 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local", max_workers=1,
     os.makedirs(folder, exist_ok=True)
     log_folder = os.path.join(folder, "logs")
     os.makedirs(log_folder, exist_ok=True)
+    status_folder = os.path.join(log_folder, "status")
+    os.makedirs(status_folder, exist_ok=True)
     
     # clns_filenames = os.path.join(folder, "*.clns")
     # align_filename = os.path.join(folder, "alignQc.png")
@@ -412,9 +506,11 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local", max_workers=1,
     for jobname, command in commands.items():
         jobs.append({
             "jobname": jobname,
+            "sample_id": "",
             "command": command,
             "cwd": folder,
             "log_filename": os.path.join(log_folder, f"{jobname}.log"),
+            "status_filename": os.path.join(status_folder, f"{jobname}.status"),
         })
 
     return _run_mixcr_jobs(

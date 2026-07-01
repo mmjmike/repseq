@@ -63,7 +63,7 @@ mx.mixcr4_analyze_batch(sample_df=sample_df,
 ```
 
 ``` py
-mx.check_batch_progress(os.path.join(MIXCR_DIR, "mixcr_analyze_batch.log"), loop=True)
+mx.check_batch_progress(MIXCR_DIR, loop=True)
 ```
 
 ```

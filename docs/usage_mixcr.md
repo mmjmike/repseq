@@ -43,7 +43,7 @@ mixcr_race_command_template = "mixcr analyze milab-mouse-rna-tcr-umi-race -f r1 
 
 ## Running `mixcr analyze` in batches locally
 
-Run MiXCR locally on Linux from a notebook. By default, one sample is processed at a time. Increase `max_workers` only if the machine has enough CPU and memory for several MiXCR jobs at once.
+Run MiXCR locally on Linux from a notebook. Local execution is sequential: one sample is processed at a time.
 
 ```py
 jobs = mx.mixcr4_analyze_batch(
@@ -52,18 +52,17 @@ jobs = mx.mixcr4_analyze_batch(
     command_template=mixcr_race_command_template,
     mixcr_path=path_to_mixcr_binary,
     backend="local",
-    max_workers=1,
 )
 ```
 
 <br>
 
-The function returns a dataframe with commands, log filenames and local return codes. Logs are written to `logs/` inside the output folder.
+The function returns a dataframe with commands, log filenames and local return codes. Logs and the saved job table are written to `logs/` inside the output folder.
 
 To check the progress file:
 
 ```py
-mx.check_batch_progress(os.path.join(output_dir, "mixcr_analyze_batch.log"))
+mx.check_batch_progress(output_dir)
 ```
 
 ## Running `mixcr analyze` in batches using SLURM
@@ -85,7 +84,7 @@ jobs = mx.mixcr4_analyze_batch(
 To check submitted-job progress from the batch file:
 
 ```py
-mx.check_batch_progress(os.path.join(output_dir, "mixcr_analyze_batch.log"), loop=True)
+mx.check_batch_progress(output_dir, loop=True)
 ```
 
 <br>
@@ -102,7 +101,7 @@ To see progress, use `check_batch_progress` as shown below.
 
 ```py
 mx.mixcr4_reports(output_dir, mixcr_path=path_to_mixcr_binary, backend="local")
-mx.check_batch_progress(os.path.join(output_dir, "mixcr_reports_batch.log"), loop=True)
+mx.check_batch_progress(output_dir, default_filename="mixcr_reports_batch.log", loop=True)
 mx.show_report_images(output_dir)
 ```
 
