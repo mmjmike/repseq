@@ -19,7 +19,6 @@ import sys
 sys.path.append(REPSEQ_PATH)
 from repseq import io as repseqio
 from repseq import mixcr as mx
-from repseq import slurm
 from repseq import clonosets as cl
 from repseq import stats
 from repseq import clone_filter as clf
@@ -58,12 +57,13 @@ mx.mixcr4_analyze_batch(sample_df=sample_df,
                         command_template=None,
                         mixcr_path=MIXCR, 
                         memory=32, 
-                        time_estimate=1.5)
+                        time_estimate=1.5,
+                        backend="local")
 
 ```
 
 ``` py
-slurm.check_slurm_progress(os.path.join(MIXCR_DIR, "mixcr_analyze_slurm_batch.log"), loop=True)
+mx.check_batch_progress(MIXCR_DIR, loop=True)
 ```
 
 ```

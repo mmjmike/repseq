@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,8 @@ version = "0.1.0"
 description = "Python toolbox for bulk immune repertoire (TCR/BCR) sequencing analysis"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }  # or SPDX identifier, e.g. "Apache-2.0"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 authors = [
   { name = "Mikhail Myshkin", email = "mikhailmyshkin.ibch@gmail.com" },
 ]
@@ -23,7 +24,7 @@ keywords = [
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: MIT License",
+  "License :: OSI Approved :: BSD License",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.9",
@@ -33,28 +34,38 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 
-# Runtime dependencies
 dependencies = [
   "numpy>=1.23",
   "pandas>=1.5",
   "scipy>=1.10",
-  "scikit-learn>=1.2",
   "matplotlib>=3.7",
   "seaborn>=0.13",
-  "rpy2",
   "statsmodels",
   "networkx",
   "dill",
-  "pyyaml",
-  "json",
-  "logomaker",
-  "bioconda::olga",
-  "leidenalg",
-  "igraph", 
+  "PyYAML",
+  "requests",
 ]
 
 [project.optional-dependencies]
+clustering = [
+  "igraph",
+  "leidenalg",
+  "logomaker",
+]
+pgen = [
+  "olga",
+]
+r = [
+  "rpy2",
+]
+tcrdist = [
+  "tcrdist3",
+]
 dev = [
+  "build",
+  "twine",
+  "check-manifest",
   "pytest>=7.0",
 ]
 
@@ -64,13 +75,16 @@ Repository = "https://github.com/mmjmike/repseq"
 Documentation = "https://mmjmike.github.io/repseq"
 Issues = "https://github.com/mmjmike/repseq/issues"
 
-# Tell setuptools where your packages live (src layout)
 [tool.setuptools.packages.find]
-where = ["repseq"]
+where = ["."]
+include = ["repseq*"]
+exclude = ["tests*", "docs*"]
 
-# If you have non-Python data files inside packages, configure this:
-# [tool.setuptools.package-data]
-# "repseq" = ["data/*.tsv", "data/*.json"]
+[tool.setuptools.package-data]
+repseq = [
+  "tcrdist_ab_v_segments.json",
+  "resourses/*.txt",
+]
 
 # pytest configuration (so you don't need a separate pytest.ini)
 [tool.pytest.ini_options]

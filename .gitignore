@@ -109,6 +109,10 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+bin/
+mkdocs-env/
+mkdocs-venv/
+pyvenv.cfg
 
 # Spyder project settings
 .spyderproject
