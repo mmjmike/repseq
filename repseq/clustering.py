@@ -12,7 +12,7 @@ import networkx as nx
 from networkx.algorithms import community
 import leidenalg
 import igraph as ig
-from scipy.sparse import csar_matrix
+# from scipy.sparse import csr_matrix
 import os
 import json
 import functools
