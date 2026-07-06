@@ -11,7 +11,7 @@ from scipy.stats import binom, poisson
 from .common_functions import (print_progress_bar, run_parallel_calculation, overlap_type_to_flags,
                                jaccard_index, bray_curtis_dissimilarity, jensen_shannon_divergence)
 from .io import read_clonoset
-from .clonosets import filter_nonfunctional_clones, recount_fractions_for_clonoset, get_column_names_from_clonoset
+from .clonosets import get_column_names_from_clonoset
 from repseq.clone_filter import Filter
 from .clustering import pool_clonotypes_from_clonosets_df
 
