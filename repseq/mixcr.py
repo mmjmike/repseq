@@ -22,7 +22,6 @@ JOB_TABLE_COLUMNS = [
     "returncode",
     "cwd",
     "log_filename",
-    "status_filename",
     "command",
 ]
 
@@ -56,7 +55,6 @@ def _job_table(jobs, backend):
             "returncode": "",
             "cwd": job["cwd"],
             "log_filename": job["log_filename"],
-            "status_filename": job["status_filename"],
             "command": job["command"],
         })
     return pd.DataFrame(rows, columns=JOB_TABLE_COLUMNS)
@@ -67,6 +65,18 @@ def _write_batch_table(filename, table, program_name=None):
         if program_name is not None:
             f.write(f"# {program_name}\n")
         table.to_csv(f, sep="\t", index=False)
+
+
+def _result_table_filename(batch_filename):
+    logs_folder = os.path.join(os.path.dirname(batch_filename), "logs")
+    return os.path.join(logs_folder, f"{os.path.splitext(os.path.basename(batch_filename))[0]}_jobs.csv")
+
+
+def _write_result_table(batch_filename, table):
+    table_filename = _result_table_filename(batch_filename)
+    os.makedirs(os.path.dirname(table_filename), exist_ok=True)
+    table.to_csv(table_filename, index=False)
+    return table_filename
 
 
 def _read_batch_table(filename):
@@ -99,22 +109,135 @@ def _status_counts(table):
     return finished, failed, total
 
 
-def _sync_status_markers(filename, program_name, table):
+def _map_slurm_state(state):
+    state = str(state).upper().split()[0]
+    if state in ["PENDING", "CONFIGURING", "REQUEUED", "RESIZING", "SUSPENDED"]:
+        return "pending"
+    if state in ["RUNNING", "COMPLETING", "STAGE_OUT", "SIGNALING", "STOPPED"]:
+        return "running"
+    if state == "COMPLETED":
+        return "finished"
+    if state in [
+        "BOOT_FAIL",
+        "CANCELLED",
+        "DEADLINE",
+        "FAILED",
+        "NODE_FAIL",
+        "OUT_OF_MEMORY",
+        "PREEMPTED",
+        "REVOKED",
+        "SPECIAL_EXIT",
+        "TIMEOUT",
+    ]:
+        return "failed"
+    return str(state).lower()
+
+
+def _query_squeue(job_ids):
+    if len(job_ids) == 0:
+        return {}
+    command = ["squeue", "-h", "-j", ",".join(job_ids), "-o", "%A\t%T"]
+    try:
+        process = subprocess.run(command, capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        return {}
+    if process.returncode != 0:
+        return {}
+
+    statuses = {}
+    for line in process.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) < 2:
+            continue
+        job_id, state = parts[0].strip(), parts[1].strip()
+        statuses[job_id] = {"status": _map_slurm_state(state), "returncode": ""}
+    return statuses
+
+
+def _query_sacct(job_ids):
+    if len(job_ids) == 0:
+        return {}
+    command = [
+        "sacct",
+        "-n",
+        "-P",
+        "-j",
+        ",".join(job_ids),
+        "-o",
+        "JobID,State,ExitCode",
+    ]
+    try:
+        process = subprocess.run(command, capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        return {}
+    if process.returncode != 0:
+        return {}
+
+    statuses = {}
+    for line in process.stdout.splitlines():
+        parts = line.split("|")
+        if len(parts) < 3:
+            continue
+        raw_job_id, state, exit_code = [p.strip() for p in parts[:3]]
+        job_id = raw_job_id.split(".")[0]
+        if job_id not in job_ids:
+            continue
+        status = _map_slurm_state(state)
+        if status not in ["finished", "failed"]:
+            continue
+        returncode = exit_code.split(":")[0] if exit_code else ""
+        statuses[job_id] = {"status": status, "returncode": returncode}
+    return statuses
+
+
+def _query_scontrol(job_ids):
+    statuses = {}
+    for job_id in job_ids:
+        command = ["scontrol", "show", "job", str(job_id)]
+        try:
+            process = subprocess.run(command, capture_output=True, text=True, check=False)
+        except FileNotFoundError:
+            return statuses
+        if process.returncode != 0:
+            continue
+        state_match = re.search(r"\bJobState=([A-Z_]+)", process.stdout)
+        exit_match = re.search(r"\bExitCode=([0-9]+):[0-9]+", process.stdout)
+        if state_match is None:
+            continue
+        status = _map_slurm_state(state_match.group(1))
+        returncode = exit_match.group(1) if exit_match else ""
+        statuses[str(job_id)] = {"status": status, "returncode": returncode}
+    return statuses
+
+
+def _sync_slurm_status(filename, program_name, table):
     changed = False
-    for idx, row in table.iterrows():
-        status_filename = row.get("status_filename", "")
-        if not isinstance(status_filename, str) or status_filename == "":
+    active_mask = (
+        (table["backend"] == "slurm")
+        & (table["job_id"].astype(str) != "")
+        & (~table["status"].isin(["finished", "failed", "submit_failed"]))
+    )
+    job_ids = list(table.loc[active_mask, "job_id"].astype(str))
+    if len(job_ids) == 0:
+        return table
+
+    statuses = _query_squeue(job_ids)
+    missing_job_ids = [job_id for job_id in job_ids if job_id not in statuses]
+    statuses.update(_query_sacct(missing_job_ids))
+    missing_job_ids = [job_id for job_id in job_ids if job_id not in statuses]
+    statuses.update(_query_scontrol(missing_job_ids))
+
+    for idx, row in table.loc[active_mask].iterrows():
+        job_status = statuses.get(str(row["job_id"]))
+        if job_status is None:
             continue
-        if row["status"] in ["finished", "failed"]:
-            continue
-        if os.path.exists(status_filename):
-            with open(status_filename, "r") as f:
-                status = f.read().strip()
-            if status in ["finished", "failed"]:
-                table.loc[idx, "status"] = status
+        for key, value in job_status.items():
+            if str(table.loc[idx, key]) != str(value):
+                table.loc[idx, key] = value
                 changed = True
     if changed:
         _write_batch_table(filename, table, program_name=program_name)
+        _write_result_table(filename, table)
     return table
 
 
@@ -123,14 +246,14 @@ def check_batch_progress(path, loop=False, default_filename="mixcr_analyze_batch
 
     while True:
         program_name, table = _read_batch_table(filename)
-        table = _sync_status_markers(filename, program_name, table)
+        table = _sync_slurm_status(filename, program_name, table)
         finished, failed, tasks = _status_counts(table)
         if not loop:
             print(table[["jobname", "sample_id", "backend", "job_id", "status", "returncode", "log_filename"]].to_string(index=False))
         print_progress_bar(finished + failed, tasks, program_name=program_name, object_name="task(s)")
         if not loop or finished + failed == tasks:
             break
-        sleep(0.5)
+        sleep(1)
 
 
 def _update_job_status(batch_filename, program_name, table, jobname, **updates):
@@ -174,21 +297,14 @@ def _parse_slurm_job_id(stdout):
     return match.group(1) if match else ""
 
 
-def _submit_slurm_command(job, cpus, time_estimate, memory, batch_filename):
+def _submit_slurm_command(job, cpus, time_estimate, memory):
     command = job["command"]
     jobname = job["jobname"]
     cwd = job["cwd"]
     log_filename = job["log_filename"]
-    status_filename = job["status_filename"]
     slurm_command = command
     if cwd is not None:
         slurm_command = f"cd {shlex.quote(cwd)} && {command}"
-    slurm_command += (
-        f'; status=$?; '
-        f'if [ "$status" -eq 0 ]; then echo finished > {shlex.quote(status_filename)}; '
-        f'else echo failed > {shlex.quote(status_filename)}; fi; '
-        f'exit "$status"'
-    )
     stdout, stderr = run_slurm_command_from_jupyter(
         slurm_command,
         jobname,
@@ -221,7 +337,6 @@ def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local", max_wor
                 cpus,
                 time_estimate,
                 memory,
-                batch_filename,
             )
             status = "submitted" if job_id else "submit_failed"
             _update_job_status(
@@ -246,8 +361,7 @@ def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local", max_wor
             print_progress_bar(done, len(jobs), program_name=program_name, object_name="task(s)")
 
     _, table = _read_batch_table(batch_filename)
-    logs_folder = os.path.dirname(jobs[0]["log_filename"]) if jobs else os.path.dirname(batch_filename)
-    table_filename = os.path.join(logs_folder, f"{os.path.splitext(os.path.basename(batch_filename))[0]}_jobs.csv")
+    table_filename = _write_result_table(batch_filename, table)
     _save_result_table(table, table_filename)
     return table.sort_values(by="jobname").reset_index(drop=True)
 
@@ -309,8 +423,6 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
     os.makedirs(output_folder, exist_ok=True)
     log_folder = os.path.join(output_folder, "logs")
     os.makedirs(log_folder, exist_ok=True)
-    status_folder = os.path.join(log_folder, "status")
-    os.makedirs(status_folder, exist_ok=True)
 
     memory = _normalize_memory(memory)
         
@@ -336,7 +448,6 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
             "command": command,
             "cwd": output_folder,
             "log_filename": os.path.join(log_folder, f"{jobname}.log"),
-            "status_filename": os.path.join(status_folder, f"{jobname}.status"),
         })
 
     return _run_mixcr_jobs(
@@ -382,8 +493,6 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
     os.makedirs(output_folder, exist_ok=True)
     log_folder = os.path.join(output_folder, "logs")
     os.makedirs(log_folder, exist_ok=True)
-    status_folder = os.path.join(log_folder, "status")
-    os.makedirs(status_folder, exist_ok=True)
 
     memory = _normalize_memory(memory)
         
@@ -430,7 +539,6 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
             "command": command,
             "cwd": output_folder,
             "log_filename": os.path.join(log_folder, f"{jobname}.log"),
-            "status_filename": os.path.join(status_folder, f"{jobname}.status"),
         })
 
     return _run_mixcr_jobs(
@@ -473,8 +581,6 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local", max_workers=1,
     os.makedirs(folder, exist_ok=True)
     log_folder = os.path.join(folder, "logs")
     os.makedirs(log_folder, exist_ok=True)
-    status_folder = os.path.join(log_folder, "status")
-    os.makedirs(status_folder, exist_ok=True)
     
     # clns_filenames = os.path.join(folder, "*.clns")
     # align_filename = os.path.join(folder, "alignQc.png")
@@ -510,7 +616,6 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local", max_workers=1,
             "command": command,
             "cwd": folder,
             "log_filename": os.path.join(log_folder, f"{jobname}.log"),
-            "status_filename": os.path.join(status_folder, f"{jobname}.status"),
         })
 
     return _run_mixcr_jobs(

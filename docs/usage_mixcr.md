@@ -81,7 +81,7 @@ jobs = mx.mixcr4_analyze_batch(
 )
 ```
 
-To check submitted-job progress from the batch file:
+To check submitted-job progress, pass the output folder. For SLURM runs, this polls SLURM once per second in loop mode and updates the job table.
 
 ```py
 mx.check_batch_progress(output_dir, loop=True)
