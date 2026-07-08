@@ -62,6 +62,13 @@ r = [
 tcrdist = [
   "tcrdist3",
 ]
+docs = [
+  "mkdocs-material",
+  "mkdocstrings-python",
+  "mkdocs-gen-files",
+  "mkdocs-literate-nav",
+  "mkdocs-section-index",
+]
 dev = [
   "build",
   "twine",

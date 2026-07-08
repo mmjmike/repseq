@@ -1,32 +1,35 @@
-# """Generate the code reference pages and navigation."""
+"""Generate API reference pages from package modules."""
 
-# from pathlib import Path
+from pathlib import Path
 
-# import mkdocs_gen_files
+import mkdocs_gen_files
 
-# nav = mkdocs_gen_files.Nav()
 
-# for path in sorted(Path("repseq").rglob("*.py")):
-#     module_path = path.relative_to("repseq").with_suffix("")
-#     doc_path = path.relative_to("repseq").with_suffix(".md")
-#     full_doc_path = Path("reference", doc_path)
+nav = mkdocs_gen_files.Nav()
 
-#     parts = tuple(module_path.parts)
+for path in sorted(Path("repseq").rglob("*.py")):
+    module_path = path.with_suffix("")
+    doc_path = Path("reference", module_path).with_suffix(".md")
+    parts = tuple(module_path.parts)
 
-#     if parts[-1] == "__init__":
-#         parts = parts[:-1]
-#         doc_path = doc_path.with_name("index.md")
-#         full_doc_path = full_doc_path.with_name("index.md")
-#     elif parts[-1] == "__main__":
-#         continue
+    if parts[-1] == "__init__":
+        doc_path = doc_path.with_name("index.md")
+        parts = parts[:-1]
+    elif parts[-1] == "__main__":
+        continue
 
-#     nav[parts] = doc_path.as_posix()  # 
+    if not parts:
+        continue
 
-#     with mkdocs_gen_files.open(full_doc_path, "w") as fd:
-#         ident = ".".join(parts)
-#         fd.write(f"::: {ident}")
+    nav[parts] = doc_path.relative_to("reference").as_posix()
 
-#     mkdocs_gen_files.set_edit_path(full_doc_path, Path("../") / path)
+    with mkdocs_gen_files.open(doc_path, "w") as fd:
+        fd.write(f"::: {'.'.join(parts)}\n")
+        fd.write("    options:\n")
+        fd.write("      show_root_heading: true\n")
+        fd.write("      show_source: true\n")
 
-# with mkdocs_gen_files.open("reference/SUMMARY.md", "w") as nav_file:  # 
-#     nav_file.writelines(nav.build_literate_nav())  # 
+    mkdocs_gen_files.set_edit_path(doc_path, Path("..") / path)
+
+with mkdocs_gen_files.open("reference/SUMMARY.md", "w") as nav_file:
+    nav_file.writelines(nav.build_literate_nav())

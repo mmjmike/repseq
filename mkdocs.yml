@@ -38,7 +38,7 @@ nav:
       - Clustering: usage_clustering.md
       - Differential expression: usage_diffexp.md
   - Functions: functions.md
-  # - Code Reference: reference/
+  - Code Reference: reference/
 
 
 
@@ -70,16 +70,20 @@ markdown_extensions:
 
 plugins:
   - search
-  # - gen-files:
-  #     scripts:
-  #       - docs/gen_ref_pages.py
-  # - literate-nav:
-  #     nav_file: SUMMARY.md
-  # - section-index
+  - gen-files:
+      scripts:
+        - docs/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
   - mkdocstrings:
         handlers:
           python:
-            paths: [./repseq]
+            paths: [., ./repseq]
+            options:
+              docstring_style: google
+              show_source: true
+              show_root_heading: true
             #     setup_commands:
             #         - import sys
             #         - sys.path.append('../')
