@@ -14,7 +14,7 @@ Create `sample_df` from dataset metadata in `.yaml` format (if it's in a tabular
 from repseq import mixcr as mx
 from repseq import io as repseqio
 
-sample_df = repseqio.read_yaml_metadata(RAW_DATA_DIR, filename=METADATA_FILENAME)
+sample_df = repseqio.read_ngsik_metadata(RAW_DATA_DIR, filename=METADATA_FILENAME)
 metadata = sample_df.prop(columns=['R1', 'R2'])
 output_dir = ...
 path_to_mixcr_binary = ...

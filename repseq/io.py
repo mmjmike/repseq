@@ -6,9 +6,11 @@ import json
 import zipfile
 import requests
 import io
+import warnings
 from .common_functions import extract_segment
 
-def read_yaml_metadata(folder, filename="metadata.yaml", verbose=True):
+
+def read_ngsik_metadata(folder, filename="metadata.yaml", verbose=True):
     
     """
     Reads NGSiK metadata from a given folder and converts to `pd.DataFrame`. By default 
@@ -57,6 +59,22 @@ def read_yaml_metadata(folder, filename="metadata.yaml", verbose=True):
         if verbose:
             print(f"Metadata file '{yaml_filename}' not found. Nothing to return")
         return pd.DataFrame()
+
+
+def read_yaml_metadata(folder, filename="metadata.yaml", verbose=True):
+    """
+    Deprecated alias for `read_ngsik_metadata`.
+
+    Use `read_ngsik_metadata` instead. This alias will be removed in a future
+    version.
+    """
+    warnings.warn(
+        "`read_yaml_metadata` is deprecated; use `read_ngsik_metadata` instead. "
+        "`read_yaml_metadata` will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return read_ngsik_metadata(folder, filename=filename, verbose=verbose)
 
 
 def read_clonoset(filename):

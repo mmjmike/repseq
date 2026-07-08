@@ -50,7 +50,7 @@ RAW_DATA_DIR = "/projects/cdr3_ngs/2023/11_room555_MiSeq_13112023/"
 SAMPLE_LIST_FILENAME = os.path.join(WORKING_DIR, "sample_table.csv")
 TABLE_REPORT_FILENAME = os.path.join(WORKING_DIR, "table_report.csv")
 
-sample_df = repseqio.read_yaml_metadata(RAW_DATA_DIR)[["sample_id", "R1", "R2"]].query('sample_id.str.contains("Rev05")')
+sample_df = repseqio.read_ngsik_metadata(RAW_DATA_DIR)[["sample_id", "R1", "R2"]].query('sample_id.str.contains("Rev05")')
 
 mx.mixcr4_analyze_batch(sample_df=sample_df, 
                         output_folder = MIXCR_DIR, 

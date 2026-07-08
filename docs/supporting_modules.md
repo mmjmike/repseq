@@ -2,7 +2,15 @@
 
 This module contains functions for input-output procedures
 
+## read_ngsik_metadata
+
+::: io.read_ngsik_metadata
+    options:
+          show_root_toc_entry: false
+
 ## read_yaml_metadata
+
+Deprecated alias for `read_ngsik_metadata`.
 
 ::: io.read_yaml_metadata
     options:
