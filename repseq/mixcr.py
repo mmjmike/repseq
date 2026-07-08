@@ -132,6 +132,10 @@ def _status_counts(table):
     return finished, failed, total
 
 
+def _terminal_statuses():
+    return ["finished", "failed", "submit_failed"]
+
+
 def _map_slurm_state(state):
     state = str(state).upper().split()[0]
     if state in ["PENDING", "CONFIGURING", "REQUEUED", "RESIZING", "SUSPENDED"]:
@@ -183,35 +187,38 @@ def _query_sacct(job_ids):
 
     statuses = {}
     for requested_job_id in job_ids:
-        command = [
-            "sacct",
-            "-n",
-            "-P",
-            "-X",
-            "-j",
-            str(requested_job_id),
-            "-o",
-            "JobID,State,ExitCode",
-        ]
-        try:
-            process = subprocess.run(command, capture_output=True, text=True, check=False)
-        except FileNotFoundError:
-            return statuses
-        if process.returncode != 0:
-            continue
-        for line in process.stdout.splitlines():
-            parts = line.split("|")
-            if len(parts) < 3:
+        for extra_args in [["-X"], []]:
+            command = [
+                "sacct",
+                "-n",
+                "-P",
+                *extra_args,
+                "-j",
+                str(requested_job_id),
+                "-o",
+                "JobID,State,ExitCode",
+            ]
+            try:
+                process = subprocess.run(command, capture_output=True, text=True, check=False)
+            except FileNotFoundError:
+                return statuses
+            if process.returncode != 0:
                 continue
-            raw_job_id, state, exit_code = [p.strip() for p in parts[:3]]
-            job_id = raw_job_id.split(".")[0]
-            if job_id != str(requested_job_id):
-                continue
-            status = _map_slurm_state(state)
-            if status not in ["finished", "failed"]:
-                continue
-            returncode = exit_code.split(":")[0] if exit_code else ""
-            statuses[job_id] = {"status": status, "returncode": returncode}
+            for line in process.stdout.splitlines():
+                parts = line.split("|")
+                if len(parts) < 3:
+                    continue
+                raw_job_id, state, exit_code = [p.strip() for p in parts[:3]]
+                job_id = raw_job_id.split(".")[0]
+                if job_id != str(requested_job_id):
+                    continue
+                status = _map_slurm_state(state)
+                if status not in ["finished", "failed"]:
+                    continue
+                returncode = exit_code.split(":")[0] if exit_code else ""
+                statuses[job_id] = {"status": status, "returncode": returncode}
+            if str(requested_job_id) in statuses:
+                break
     return statuses
 
 
@@ -240,7 +247,7 @@ def _sync_slurm_status(filename, program_name, table):
     active_mask = (
         (table["backend"] == "slurm")
         & (table["job_id"].astype(str) != "")
-        & (~table["status"].isin(["finished", "failed", "submit_failed"]))
+        & (~table["status"].isin(_terminal_statuses()))
     )
     job_ids = list(table.loc[active_mask, "job_id"].astype(str))
     if len(job_ids) == 0:
@@ -251,6 +258,8 @@ def _sync_slurm_status(filename, program_name, table):
     statuses.update(_query_sacct(missing_job_ids))
     missing_job_ids = [job_id for job_id in job_ids if job_id not in statuses]
     statuses.update(_query_scontrol(missing_job_ids))
+    missing_job_ids = [job_id for job_id in job_ids if job_id not in statuses]
+    statuses.update(_query_slurm_logs(table, missing_job_ids))
 
     for idx, row in table.loc[active_mask].iterrows():
         job_status = statuses.get(str(row["job_id"]))
@@ -266,6 +275,40 @@ def _sync_slurm_status(filename, program_name, table):
     return table
 
 
+def _query_slurm_logs(table, job_ids):
+    statuses = {}
+    for _, row in table.iterrows():
+        job_id = str(row.get("job_id", ""))
+        if job_id not in job_ids:
+            continue
+        log_filename = row.get("log_filename", "")
+        if not isinstance(log_filename, str) or not os.path.exists(log_filename):
+            continue
+        try:
+            with open(log_filename, "r", errors="replace") as f:
+                text = f.read()
+        except OSError:
+            continue
+        if "__REPSEQ_STATUS__:finished" in text:
+            statuses[job_id] = {"status": "finished", "returncode": "0"}
+        else:
+            failed_match = re.search(r"__REPSEQ_STATUS__:failed:([0-9]+)", text)
+            if failed_match is not None:
+                statuses[job_id] = {"status": "failed", "returncode": failed_match.group(1)}
+            elif "__REPSEQ_STATUS__:failed" in text:
+                statuses[job_id] = {"status": "failed", "returncode": "1"}
+    return statuses
+
+
+def _print_failed_jobs(table):
+    failed_table = table.loc[table["status"].isin(["failed", "submit_failed"])]
+    if len(failed_table) == 0:
+        return
+    print("\nFailed jobs:")
+    for _, row in failed_table.iterrows():
+        print(f"{row['jobname']}\t{row['job_id']}")
+
+
 def check_batch_progress(path, loop=False, default_filename="mixcr_analyze_batch.log"):
     filename = _resolve_batch_filename(path, default_filename=default_filename)
 
@@ -279,6 +322,7 @@ def check_batch_progress(path, loop=False, default_filename="mixcr_analyze_batch
         if not loop or finished + failed == tasks:
             break
         sleep(1)
+    _print_failed_jobs(table)
 
 
 def _update_job_status(batch_filename, program_name, table, jobname, **updates):
@@ -330,6 +374,13 @@ def _submit_slurm_command(job, cpus, time_estimate, memory):
     slurm_command = command
     if cwd is not None:
         slurm_command = f"cd {shlex.quote(cwd)} && {command}"
+    slurm_command = (
+        f"({slurm_command}); "
+        f"status=$?; "
+        f'if [ "$status" -eq 0 ]; then echo "__REPSEQ_STATUS__:finished"; '
+        f'else echo "__REPSEQ_STATUS__:failed:$status"; fi; '
+        f'exit "$status"'
+    )
     stdout, stderr = run_slurm_command_from_jupyter(
         slurm_command,
         jobname,
