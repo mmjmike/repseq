@@ -41,6 +41,14 @@ mixcr_race_command_template = "mixcr analyze milab-mouse-rna-tcr-umi-race -f r1 
 ```
 <br>
 
+If each sample needs its own tag pattern, store the exact MiXCR tag-pattern text in a column of `sample_df` and pass that column name with `custom_tag_pattern_column`. The value is passed to MiXCR as one shell-safe argument, so special characters such as `^`, `{}`, `()`, `*`, and backslashes are preserved.
+
+```py
+sample_df["tag_pattern"] = r"^N{0:2}tggtatcaacgcagagt(SMPL:N{5})(UMI:N{14})N{1}gctN{16}(R1:*)\^N{20}(R2:*)"
+```
+
+<br>
+
 ## Running `mixcr analyze` in batches locally
 
 Run MiXCR locally on Linux from a notebook. Local execution is sequential: one sample is processed at a time.
@@ -51,6 +59,7 @@ jobs = mx.mixcr4_analyze_batch(
     output_dir,
     command_template=mixcr_race_command_template,
     mixcr_path=path_to_mixcr_binary,
+    custom_tag_pattern_column="tag_pattern",
     backend="local",
 )
 ```

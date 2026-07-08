@@ -43,6 +43,19 @@ def _normalize_memory(memory, min_memory=16, max_memory=1500):
     return memory
 
 
+def _strip_mixcr_template_placeholders(command_template):
+    remove_list = {"mixcr", "r1", "r2", "output_prefix"}
+    return [token for token in shlex.split(command_template) if token not in remove_list]
+
+
+def _mixcr_analyze_command(mixcr_path, memory, command_template_parts, r1, r2, output_prefix, tag_pattern=None):
+    command_parts = [mixcr_path, f"-Xmx{memory}g", *command_template_parts]
+    if tag_pattern is not None:
+        command_parts.extend(["--tag-pattern", str(tag_pattern)])
+    command_parts.extend([str(r1), str(r2), str(output_prefix)])
+    return shlex.join(command_parts)
+
+
 def _job_table(jobs, backend):
     rows = []
     for job in jobs:
@@ -482,15 +495,14 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
         command_template = default_command_template
         
     # cut placeholders from command template
-    remove_list = ["mixcr", "r1", "r2", "output_prefix"]
-    command_template = ' '.join([w for w in command_template.split() if w not in remove_list])
+    command_template_parts = _strip_mixcr_template_placeholders(command_template)
 
     # check input for custom tag pattern
     custom_tag_pattern = False
     if isinstance(custom_tag_pattern_column, str):
         if custom_tag_pattern_column not in sample_df.columns:
             raise ValueError(f"Specified tag-pattern columns '{custom_tag_pattern_column}' is not present in sample_df")
-        if "--tag-pattern" in command_template.split():
+        if "--tag-pattern" in command_template_parts:
             raise ValueError(f"Please, remove '--tag-pattern' option from command_template, when you use custom tag-pattern")
         custom_tag_pattern = True
     
@@ -512,11 +524,20 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
         r2 = r["R2"]
     #   output_prefix = os.path.join(output_folder, sample_id)
         output_prefix = sample_id
+        tag_pattern = None
         if custom_tag_pattern:
             tag_pattern = r[custom_tag_pattern_column]
-            command = f'{mixcr_path} -Xmx{memory}g {command_template} --tag-pattern "{tag_pattern}" {r1} {r2} {output_prefix}'
-        else:
-            command = f'{mixcr_path} -Xmx{memory}g {command_template} {r1} {r2} {output_prefix}'
+            if pd.isna(tag_pattern):
+                raise ValueError(f"Empty tag pattern for sample '{sample_id}' in column '{custom_tag_pattern_column}'")
+        command = _mixcr_analyze_command(
+            mixcr_path,
+            memory,
+            command_template_parts,
+            r1,
+            r2,
+            output_prefix,
+            tag_pattern=tag_pattern,
+        )
         jobname = f"mixcr_analyze_{sample_id}"
         jobs.append({
             "jobname": jobname,
