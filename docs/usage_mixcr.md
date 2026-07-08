@@ -57,7 +57,7 @@ jobs = mx.mixcr4_analyze_batch(
 
 <br>
 
-The function returns a dataframe with commands, log filenames and local return codes. Logs and the saved job table are written to `logs/` inside the output folder.
+The function returns a dataframe with commands, log filenames and local return codes. Logs and the saved job table are written to `logs/` inside the output folder. If the same batch is rerun for a subset of samples, `mixcr_analyze_batch.log` is recreated for only the rerun jobs, while `logs/mixcr_analyze_batch_jobs.csv` keeps previous rows and replaces only the rerun jobs.
 
 To check the progress file:
 

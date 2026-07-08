@@ -61,6 +61,8 @@ def _job_table(jobs, backend):
 
 
 def _write_batch_table(filename, table, program_name=None):
+    if os.path.exists(filename):
+        os.remove(filename)
     with open(filename, "w") as f:
         if program_name is not None:
             f.write(f"# {program_name}\n")
@@ -75,8 +77,29 @@ def _result_table_filename(batch_filename):
 def _write_result_table(batch_filename, table):
     table_filename = _result_table_filename(batch_filename)
     os.makedirs(os.path.dirname(table_filename), exist_ok=True)
-    table.to_csv(table_filename, index=False)
+    existing_table = _read_result_table(batch_filename)
+    merged_table = _merge_result_table(existing_table, table)
+    merged_table.to_csv(table_filename, index=False)
     return table_filename
+
+
+def _read_result_table(batch_filename):
+    table_filename = _result_table_filename(batch_filename)
+    if not os.path.exists(table_filename):
+        return pd.DataFrame(columns=JOB_TABLE_COLUMNS)
+    table = pd.read_csv(table_filename, keep_default_na=False)
+    for column in JOB_TABLE_COLUMNS:
+        if column not in table.columns:
+            table[column] = ""
+    return table[JOB_TABLE_COLUMNS]
+
+
+def _merge_result_table(existing_table, update_table):
+    if len(existing_table) == 0:
+        return update_table[JOB_TABLE_COLUMNS].copy()
+    rerun_jobnames = set(update_table["jobname"])
+    kept_table = existing_table.loc[~existing_table["jobname"].isin(rerun_jobnames)]
+    return pd.concat([kept_table, update_table[JOB_TABLE_COLUMNS]], ignore_index=True)
 
 
 def _read_batch_table(filename):
@@ -157,36 +180,38 @@ def _query_squeue(job_ids):
 def _query_sacct(job_ids):
     if len(job_ids) == 0:
         return {}
-    command = [
-        "sacct",
-        "-n",
-        "-P",
-        "-j",
-        ",".join(job_ids),
-        "-o",
-        "JobID,State,ExitCode",
-    ]
-    try:
-        process = subprocess.run(command, capture_output=True, text=True, check=False)
-    except FileNotFoundError:
-        return {}
-    if process.returncode != 0:
-        return {}
 
     statuses = {}
-    for line in process.stdout.splitlines():
-        parts = line.split("|")
-        if len(parts) < 3:
+    for requested_job_id in job_ids:
+        command = [
+            "sacct",
+            "-n",
+            "-P",
+            "-X",
+            "-j",
+            str(requested_job_id),
+            "-o",
+            "JobID,State,ExitCode",
+        ]
+        try:
+            process = subprocess.run(command, capture_output=True, text=True, check=False)
+        except FileNotFoundError:
+            return statuses
+        if process.returncode != 0:
             continue
-        raw_job_id, state, exit_code = [p.strip() for p in parts[:3]]
-        job_id = raw_job_id.split(".")[0]
-        if job_id not in job_ids:
-            continue
-        status = _map_slurm_state(state)
-        if status not in ["finished", "failed"]:
-            continue
-        returncode = exit_code.split(":")[0] if exit_code else ""
-        statuses[job_id] = {"status": status, "returncode": returncode}
+        for line in process.stdout.splitlines():
+            parts = line.split("|")
+            if len(parts) < 3:
+                continue
+            raw_job_id, state, exit_code = [p.strip() for p in parts[:3]]
+            job_id = raw_job_id.split(".")[0]
+            if job_id != str(requested_job_id):
+                continue
+            status = _map_slurm_state(state)
+            if status not in ["finished", "failed"]:
+                continue
+            returncode = exit_code.split(":")[0] if exit_code else ""
+            statuses[job_id] = {"status": status, "returncode": returncode}
     return statuses
 
 
@@ -318,7 +343,6 @@ def _submit_slurm_command(job, cpus, time_estimate, memory):
 
 
 def _save_result_table(table, table_filename):
-    table.to_csv(table_filename, index=False)
     print(f"Logs folder: {os.path.dirname(table_filename)}")
     print(f"Job table: {table_filename}")
 
@@ -328,6 +352,7 @@ def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local", max_wor
     _validate_backend(backend)
     table = _job_table(jobs, backend)
     _write_batch_table(batch_filename, table, program_name=program_name)
+    _write_result_table(batch_filename, table)
 
     if backend == "slurm":
         for job in jobs:
