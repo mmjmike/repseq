@@ -1,6 +1,6 @@
 # Usage: working with MiXCR
 
-MiXCR is the leading software for generating clonoset tables from raw FastQ files. [MiXCR module](functions.md#mixcr) allows to run MiXCR 4.3+ batch analyses locally on Linux or through the SLURM queue manager.
+MiXCR is the leading software for generating clonoset tables from raw FastQ files. [MiXCR module](functions.md#mixcr) allows to run MiXCR 4 batch analyses locally on Linux or through the SLURM queue manager.
 
 !!! note "Setting up the environment"
     Before getting started, make sure that main_repseq environment is chosen. Otherwise, check the [installation guide](installation.md)

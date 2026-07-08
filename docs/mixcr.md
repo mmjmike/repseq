@@ -1,5 +1,5 @@
 
-# MiXCR4 functions for batch analysis in Jupyter. Uses SLURM on Aldan3 server
+# MiXCR 4 functions for batch analysis in Jupyter.
 
 ## mixcr4_analyze_batch 
 ::: mixcr.mixcr4_analyze_batch
@@ -21,11 +21,6 @@
     options:
           show_root_toc_entry: false
 
-## show_report_images
-::: mixcr.show_report_images
-    options:
-          show_root_toc_entry: false
-          
 ## show_report_images
 ::: mixcr.show_report_images
     options:

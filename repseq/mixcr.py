@@ -420,7 +420,7 @@ def _save_result_table(table, table_filename):
     print(f"Job table: {table_filename}")
 
 
-def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local", max_workers=1,
+def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local",
                     cpus=40, time_estimate=1.5, memory=32, save_result_table=True):
     _validate_backend(backend)
     table = _job_table(jobs, backend)
@@ -457,8 +457,6 @@ def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local", max_wor
                     print(f"{job['jobname']} stderr: {text.strip()}")
         print(f"{len(jobs)} tasks added to slurm queue")
     else:
-        if max_workers != 1:
-            print("Local backend runs sequentially; max_workers is ignored.")
         for done, job in enumerate(jobs, start=1):
             _run_local_command(job, program_name, batch_filename, table)
             print_progress_bar(done, len(jobs), program_name=program_name, object_name="task(s)")
@@ -475,8 +473,7 @@ def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local", max_wor
 
 def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
                          mixcr_path="mixcr", memory=32, time_estimate=1.5,
-                         custom_tag_pattern_column=None, backend="local",
-                         max_workers=1, cpus=40):
+                         custom_tag_pattern_column=None, backend="local", cpus=40):
     
     """
     Function for batch runs of MiXCR software.
@@ -498,7 +495,6 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
         time_estimate (numeric): time estimate in hours for the calculation. It
             is the limit for SLURM task
         backend (str): `local` or `slurm`
-        max_workers (int): ignored for local backend; local runs are sequential
         cpus (int): CPU request for SLURM jobs
 
     Returns:
@@ -570,7 +566,6 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
         program_name,
         batch_filename,
         backend=backend,
-        max_workers=max_workers,
         cpus=cpus,
         time_estimate=time_estimate,
         memory=memory,
@@ -578,7 +573,7 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
 
 
 def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=32,
-                           time_estimate=1.5, backend="local", max_workers=1, cpus=40):
+                           time_estimate=1.5, backend="local", cpus=40):
     """
     Function for batch runs of the MiXCR software using the `mixcr analyze` command and the `Human 7GENES DNA Multiplex` MiXCR built-in preset.
     Incomplete rearrangements obtained by this kit are also included. For each incomplete rearrangement, unaligned reads from the previous 
@@ -594,7 +589,6 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
         time_estimate (numeric): Time estimate in hours for the calculation; it 
             is the limit for the SLURM task.
         backend (str): `local` or `slurm`.
-        max_workers (int): ignored for local backend; local runs are sequential.
         cpus (int): CPU request for SLURM jobs.
 
     Returns:
@@ -661,14 +655,13 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
         program_name,
         batch_filename,
         backend=backend,
-        max_workers=max_workers,
         cpus=cpus,
         time_estimate=time_estimate,
         memory=memory,
     )
 
 
-def mixcr4_reports(folder, mixcr_path="mixcr", backend="local", max_workers=1,
+def mixcr4_reports(folder, mixcr_path="mixcr", backend="local",
                    cpus=40, time_estimate=1, memory=32):
     
     """
@@ -680,7 +673,6 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local", max_workers=1,
         folder (str): folder in which to run the `mixcr exportQc` commands
         mixcr_path (str): path to MiXCR binary
         backend (str): `local` or `slurm`
-        max_workers (int): ignored for local backend; local runs are sequential
         cpus (int): CPU request for SLURM jobs
         time_estimate (numeric): time estimate in hours for SLURM jobs
         memory (int): MiXCR memory in GB
@@ -690,7 +682,7 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local", max_workers=1,
     """
     _validate_backend(backend)
 
-    program_name="MIXCR4.3 Reports"
+    program_name="MIXCR4 Reports"
     memory = _normalize_memory(memory)
     folder = os.path.abspath(folder)
     os.makedirs(folder, exist_ok=True)
@@ -738,7 +730,6 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local", max_workers=1,
         program_name,
         batch_filename,
         backend=backend,
-        max_workers=max_workers,
         cpus=cpus,
         time_estimate=time_estimate,
         memory=memory,
@@ -855,15 +846,20 @@ def get_processing_table(folder, show_offtarget=False, offtarget_chain_threshold
 
 def show_report_images(folder):
     """
-    This function displays QC images `alignQc.svg` and `chainsQc.svg` in Jupyter Notebook.
-    This pictures may be generated by `mixcr4_reports` function.
-    In case there are no `.svg` images, the `.png` images are shown.
+    Display MiXCR QC report images in a Jupyter notebook.
+
+    The function looks for `alignQc.svg` and `chainsQc.svg` in `folder`.
+    If an SVG file is missing, it falls back to the corresponding PNG file:
+    `alignQc.png` or `chainsQc.png`. If neither image exists for a report,
+    a short message is printed and execution continues.
+
+    These images can be generated with `mixcr4_reports`.
 
     Args:
         folder (str): folder in which to look for QC images.
     
     Returns:
-        None
+        None.
 
     """
     try:
