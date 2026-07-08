@@ -7,6 +7,7 @@ import zipfile
 import requests
 import io
 import warnings
+from .clonoset import Clonoset, standardize_to_vdjtools_columns
 from .common_functions import extract_segment
 
 
@@ -77,7 +78,17 @@ def read_yaml_metadata(folder, filename="metadata.yaml", verbose=True):
     return read_ngsik_metadata(folder, filename=filename, verbose=verbose)
 
 
-def read_clonoset(filename):
+def read_clonoset(
+    filename,
+    *,
+    as_clonoset=False,
+    standardize=False,
+    chain=None,
+    sample_id=None,
+    metadata=None,
+    by_umi=False,
+    validate=True,
+):
     """
     Reads generic clonoset files. 
     Easyly reads `csv`, `tsv`, `txt` or `gz` files.
@@ -86,9 +97,24 @@ def read_clonoset(filename):
     
     Args:
         filename (str): path to clonoset file
+        as_clonoset (bool): If `True`, return a `Clonoset` object instead of
+            a plain pandas DataFrame. Defaults to `False` for backward
+            compatibility.
+        standardize (bool): If `True`, return a table with canonical
+            VDJtools-like column names (`freq`, `count`, `cdr3nt`, `cdr3aa`,
+            `v`, `d`, `j`). This is applied automatically when
+            `as_clonoset=True`.
+        chain (str, optional): Receptor chain metadata for `Clonoset`.
+        sample_id (str, optional): Sample identifier metadata for `Clonoset`.
+        metadata (dict, optional): Additional metadata for `Clonoset`.
+        by_umi (bool): If `True`, use UMI or molecule count/fraction columns
+            for canonical `count` and `freq` when standardizing.
+        validate (bool): If `True`, validate the minimal `Clonoset` schema
+            when `as_clonoset=True`.
 
     Returns:
-        clonoset (pd.DataFrame): DataFrame representation of clonoset in given file.
+        clonoset (pd.DataFrame or Clonoset): DataFrame representation of the
+            clonoset, or a `Clonoset` object when `as_clonoset=True`.
             Bioadaptive clonosets are converted to vdjtools-like format.
     """
     
@@ -146,6 +172,22 @@ def read_clonoset(filename):
     clonoset = pd.read_csv(filename, sep="\t", dtype=datatypes)
     if "nucleotide" in clonoset.columns and "aminoAcid" in clonoset.columns:
         clonoset = convert_bioadaptive_clonoset(clonoset)
+    if as_clonoset:
+        return Clonoset(
+            clonoset,
+            chain=chain,
+            sample_id=sample_id,
+            metadata=metadata or {},
+            standardize=True,
+            by_umi=by_umi,
+            validate=validate,
+        )
+    if standardize:
+        clonoset = standardize_to_vdjtools_columns(
+            clonoset,
+            by_umi=by_umi,
+            copy=False,
+        )
     return clonoset
 
 def read_json_report(sample_id, folder, report_type):
