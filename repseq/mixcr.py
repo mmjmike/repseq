@@ -87,7 +87,13 @@ def _result_table_filename(batch_filename):
     return os.path.join(logs_folder, f"{os.path.splitext(os.path.basename(batch_filename))[0]}_jobs.csv")
 
 
+def _uses_result_table(batch_filename):
+    return os.path.basename(batch_filename) != "mixcr_reports_slurm_batch.log"
+
+
 def _write_result_table(batch_filename, table):
+    if not _uses_result_table(batch_filename):
+        return None
     table_filename = _result_table_filename(batch_filename)
     os.makedirs(os.path.dirname(table_filename), exist_ok=True)
     existing_table = _read_result_table(batch_filename)
@@ -284,7 +290,8 @@ def _sync_slurm_status(filename, program_name, table):
                 changed = True
     if changed:
         _write_batch_table(filename, table, program_name=program_name)
-        _write_result_table(filename, table)
+        if _uses_result_table(filename):
+            _write_result_table(filename, table)
     return table
 
 
@@ -407,16 +414,23 @@ def _submit_slurm_command(job, cpus, time_estimate, memory):
 
 
 def _save_result_table(table, table_filename):
+    if table_filename is None:
+        return
     print(f"Logs folder: {os.path.dirname(table_filename)}")
     print(f"Job table: {table_filename}")
 
 
 def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local", max_workers=1,
-                    cpus=40, time_estimate=1.5, memory=32):
+                    cpus=40, time_estimate=1.5, memory=32, save_result_table=True):
     _validate_backend(backend)
     table = _job_table(jobs, backend)
     _write_batch_table(batch_filename, table, program_name=program_name)
-    _write_result_table(batch_filename, table)
+    if save_result_table:
+        _write_result_table(batch_filename, table)
+    else:
+        table_filename = _result_table_filename(batch_filename)
+        if os.path.exists(table_filename):
+            os.remove(table_filename)
 
     if backend == "slurm":
         for job in jobs:
@@ -450,8 +464,12 @@ def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local", max_wor
             print_progress_bar(done, len(jobs), program_name=program_name, object_name="task(s)")
 
     _, table = _read_batch_table(batch_filename)
-    table_filename = _write_result_table(batch_filename, table)
-    _save_result_table(table, table_filename)
+    if save_result_table:
+        table_filename = _write_result_table(batch_filename, table)
+        _save_result_table(table, table_filename)
+    else:
+        print(f"Logs folder: {os.path.dirname(jobs[0]['log_filename']) if jobs else os.path.dirname(batch_filename)}")
+        print(f"Batch log: {batch_filename}")
     return table.sort_values(by="jobname").reset_index(drop=True)
 
 
@@ -704,7 +722,7 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local", max_workers=1,
                }
     
 
-    batch_filename = os.path.join(folder, "mixcr_reports_batch.log")
+    batch_filename = os.path.join(folder, "mixcr_reports_slurm_batch.log")
     jobs = []
     for jobname, command in commands.items():
         jobs.append({
@@ -724,6 +742,7 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local", max_workers=1,
         cpus=cpus,
         time_estimate=time_estimate,
         memory=memory,
+        save_result_table=False,
     )
 
 

@@ -106,11 +106,11 @@ Make reports (combines `mixcr exportQc align`, `chainUsage` and `tags`) and get 
 * chainUsage — calculates chain usage across all clonotypes
 * tags — for samples with barcodes, provides barcode coverage statistics for every sample
 
-To see progress, use `check_batch_progress` as shown below.
+Report jobs use `mixcr_reports_slurm_batch.log` for status tracking and do not create an additional CSV job table. To see progress, use `check_batch_progress` as shown below.
 
 ```py
 mx.mixcr4_reports(output_dir, mixcr_path=path_to_mixcr_binary, backend="local")
-mx.check_batch_progress(output_dir, default_filename="mixcr_reports_batch.log", loop=True)
+mx.check_batch_progress(output_dir, default_filename="mixcr_reports_slurm_batch.log", loop=True)
 mx.show_report_images(output_dir)
 ```
 
