@@ -19,7 +19,7 @@ def partition_by_time(t):
     return partition
 
 
-def run_slurm_command_from_jupyter(command, jobname=None, cpus=40, time_estimate=1.5, memory=32, log_filename=None):
+def run_slurm_command_from_jupyter(command, jobname=None, cpus=40, time_estimate=1.5, memory=32, log_filename=None, verbose=True):
     # prepare task parameters and script name
     os.makedirs(ALDAN_TEMP_SLURM_DIR, exist_ok=True)
     if not isinstance(jobname, str) or jobname == "":
@@ -67,7 +67,8 @@ def run_slurm_command_from_jupyter(command, jobname=None, cpus=40, time_estimate
     # print(f"Added slurm command to batch: {run_slurm_command}")
     process = Popen(run_slurm_command, stdout=PIPE, stderr=PIPE, shell=True)
     stdout, stderr = process.communicate()
-    print(jobname, stdout, stderr)
+    if verbose:
+        print(jobname, stdout, stderr)
     return stdout, stderr
 
 

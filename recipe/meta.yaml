@@ -1,0 +1,53 @@
+{% set name = "repseq" %}
+{% set version = "0.1.0" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  path: ..
+
+build:
+  noarch: python
+  script: {{ PYTHON }} -m pip install . --no-deps --no-build-isolation -vv
+  number: 0
+
+requirements:
+  host:
+    - python >=3.9
+    - pip
+    - setuptools >=77
+    - wheel
+  run:
+    - python >=3.9
+    - numpy >=1.23
+    - pandas >=1.5
+    - scipy >=1.10
+    - matplotlib-base >=3.7
+    - seaborn >=0.13
+    - statsmodels
+    - networkx
+    - dill
+    - pyyaml
+    - requests
+
+test:
+  imports:
+    - repseq
+    - repseq.common_functions
+    - repseq.io
+  commands:
+    - pip check
+  requires:
+    - pip
+
+about:
+  home: https://github.com/mmjmike/repseq
+  summary: Python toolbox for bulk immune repertoire (TCR/BCR) sequencing analysis
+  license: BSD-3-Clause
+  license_file: LICENSE
+
+extra:
+  recipe-maintainers:
+    - mmjmike

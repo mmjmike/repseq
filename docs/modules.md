@@ -65,9 +65,8 @@ Easy filtering of clonosets by one Filter object, integrated with other analysis
 
 ## [MiXCR module](functions.md#mixcr)
 
-As MiXCR is the leading software for generating clonoset tables from raw FastQ files this module helps to run MiXCR 4.3+ batch analyses with SLURM queue manager.
+As MiXCR is the leading software for generating clonoset tables from raw FastQ files this module helps to run MiXCR 4 batch analyses locally or with the SLURM queue manager.
 <br>Easy accumulation of most sensible processing data from json-reports of MiXCR into one table.
-
 
 
 

@@ -19,7 +19,6 @@ import sys
 sys.path.append(REPSEQ_PATH)
 from repseq import io as repseqio
 from repseq import mixcr as mx
-from repseq import slurm
 from repseq import clonosets as cl
 from repseq import stats
 from repseq import clone_filter as clf
@@ -51,19 +50,20 @@ RAW_DATA_DIR = "/projects/cdr3_ngs/2023/11_room555_MiSeq_13112023/"
 SAMPLE_LIST_FILENAME = os.path.join(WORKING_DIR, "sample_table.csv")
 TABLE_REPORT_FILENAME = os.path.join(WORKING_DIR, "table_report.csv")
 
-sample_df = repseqio.read_yaml_metadata(RAW_DATA_DIR)[["sample_id", "R1", "R2"]].query('sample_id.str.contains("Rev05")')
+sample_df = repseqio.read_ngsik_metadata(RAW_DATA_DIR)[["sample_id", "R1", "R2"]].query('sample_id.str.contains("Rev05")')
 
 mx.mixcr4_analyze_batch(sample_df=sample_df, 
                         output_folder = MIXCR_DIR, 
                         command_template=None,
                         mixcr_path=MIXCR, 
                         memory=32, 
-                        time_estimate=1.5)
+                        time_estimate=1.5,
+                        backend="local")
 
 ```
 
 ``` py
-slurm.check_slurm_progress(os.path.join(MIXCR_DIR, "mixcr_analyze_slurm_batch.log"), loop=True)
+mx.check_batch_progress(MIXCR_DIR, loop=True)
 ```
 
 ```

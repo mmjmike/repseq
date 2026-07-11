@@ -1,6 +1,6 @@
 # Usage: working with MiXCR
 
-MiXCR is the leading software for generating clonoset tables from raw FastQ files. [MiXCR module](functions.md#mixcr) allows to run MiXCR 4.3+ batch analyses with SLURM queue manager.
+MiXCR is the leading software for generating clonoset tables from raw FastQ files. [MiXCR module](functions.md#mixcr) allows to run MiXCR 4 batch analyses locally on Linux or through the SLURM queue manager.
 
 !!! note "Setting up the environment"
     Before getting started, make sure that main_repseq environment is chosen. Otherwise, check the [installation guide](installation.md)
@@ -12,10 +12,9 @@ Create `sample_df` from dataset metadata in `.yaml` format (if it's in a tabular
 
 ``` py
 from repseq import mixcr as mx
-from repseq import slurm
 from repseq import io as repseqio
 
-sample_df = repseqio.read_yaml_metadata(RAW_DATA_DIR, filename=METADATA_FILENAME)
+sample_df = repseqio.read_ngsik_metadata(RAW_DATA_DIR, filename=METADATA_FILENAME)
 metadata = sample_df.prop(columns=['R1', 'R2'])
 output_dir = ...
 path_to_mixcr_binary = ...
@@ -42,23 +41,61 @@ mixcr_race_command_template = "mixcr analyze milab-mouse-rna-tcr-umi-race -f r1 
 ```
 <br>
 
-## Running `mixcr analyze` in batches using SLURM
-
-Run mixcr analyze in batches (Relevant only for servers using <b>SLURM</b>). This function generates a set of commands for each sample by creating a SLURM script for each command and submitting them to the SLURM queue. Scripts itself and .log files (contain std.out and std.error outputs) will be saved in `~/temp/SLURM`. 
+If each sample needs its own tag pattern, store the exact MiXCR tag-pattern text in a column of `sample_df` and pass that column name with `custom_tag_pattern_column`. The value is passed to MiXCR as one shell-safe argument, so special characters such as `^`, `{}`, `()`, `*`, and backslashes are preserved.
 
 ```py
-mx.mixcr4_analyze_batch(sample_df, output_dir, command_template=mixcr_race_command_template,
-                        path_to_mixcr_binary)
+sample_df["tag_pattern"] = r"^N{0:2}tggtatcaacgcagagt(SMPL:N{5})(UMI:N{14})N{1}gctN{16}(R1:*)\^N{20}(R2:*)"
 ```
 
 <br>
 
-To check the progress, use `check_slurm_progress`. `loop` set to `True` gives real-time updates with 0.5 s interval while `loop`=`False` shows current progress and runs in the background without blocking other cells. 
-<br>Currently, `check_slurm_progress` might be unreliable in some cases, thus it's recommended to check SLURM queue and .log files in `~/temp/SLURM` folder manually.
+## Running `mixcr analyze` in batches locally
+
+Run MiXCR locally on Linux from a notebook. Local execution is sequential: one sample is processed at a time.
 
 ```py
-slurm.check_slurm_progress(os.path.join(output_dir, "mixcr_analyze_slurm_batch.log"), loop=True)
+jobs = mx.mixcr4_analyze_batch(
+    sample_df,
+    output_dir,
+    command_template=mixcr_race_command_template,
+    mixcr_path=path_to_mixcr_binary,
+    custom_tag_pattern_column="tag_pattern",
+    backend="local",
+)
 ```
+
+<br>
+
+The function returns a dataframe with commands, log filenames and local return codes. Logs and the saved job table are written to `logs/` inside the output folder. If the same batch is rerun for a subset of samples, `mixcr_analyze_batch.log` is recreated for only the rerun jobs, while `logs/mixcr_analyze_batch_jobs.csv` keeps previous rows and replaces only the rerun jobs.
+
+To check the progress file:
+
+```py
+mx.check_batch_progress(output_dir)
+```
+
+## Running `mixcr analyze` in batches using SLURM
+
+On servers using <b>SLURM</b>, set `backend="slurm"`. This creates one SLURM script for each sample and submits it to the queue. SLURM scripts are saved by the SLURM helper, and job logs are written to `logs/` inside the output folder.
+
+```py
+jobs = mx.mixcr4_analyze_batch(
+    sample_df,
+    output_dir,
+    command_template=mixcr_race_command_template,
+    mixcr_path=path_to_mixcr_binary,
+    backend="slurm",
+    cpus=40,
+    memory=32,
+)
+```
+
+To check submitted-job progress, pass the output folder. For SLURM runs, this polls SLURM once per second in loop mode and updates the job table.
+
+```py
+mx.check_batch_progress(output_dir, loop=True)
+```
+
 <br>
 
 ## Making report images
@@ -69,12 +106,15 @@ Make reports (combines `mixcr exportQc align`, `chainUsage` and `tags`) and get 
 * chainUsage — calculates chain usage across all clonotypes
 * tags — for samples with barcodes, provides barcode coverage statistics for every sample
 
-To see progress, use `check_slurm_progress` as shown below
+Report jobs use `mixcr_reports_slurm_batch.log` for status tracking and do not create an additional CSV job table. To see progress, use `check_batch_progress` as shown below.
 
 ```py
-mx.mixcr4_reports(output_dir, mixcr_path=path_to_mixcr_binary)
-slurm.check_slurm_progress(os.path.join(output_dir, "mixcr_reports_slurm_batch.log"), loop=True)
+mx.mixcr4_reports(output_dir, mixcr_path=path_to_mixcr_binary, backend="local")
+mx.check_batch_progress(output_dir, default_filename="mixcr_reports_slurm_batch.log", loop=True)
 mx.show_report_images(output_dir)
+mx.show_qc_plot(output_dir, chart_type="align")
+mx.show_qc_plot(output_dir, chart_type="chains")
+mx.show_qc_plot(output_dir, chart_type="coverage")
 ```
 
 ![alignQc](images_docs/alignQc.svg)

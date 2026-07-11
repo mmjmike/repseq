@@ -1,26 +1,484 @@
 from .common_functions import print_progress_bar, filter_by_functionality
-from .constants import MIXCR
 import pandas as pd
 import numpy as np
 import os
-from .slurm import create_slurm_batch_file, run_slurm_command_from_jupyter
-from .io import read_json_report, read_clonoset
+import shlex
+import subprocess
+from time import sleep
+from .slurm import run_slurm_command_from_jupyter
+from .io import open_json_report, read_json_report, read_clonoset
 from .clonosets import find_all_exported_clonosets_in_folder
-from subprocess import Popen, PIPE
-from IPython.display import Image, display, SVG
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import seaborn as sns
 import re
+import warnings
+
+JOB_TABLE_COLUMNS = [
+    "jobname",
+    "sample_id",
+    "backend",
+    "job_id",
+    "status",
+    "returncode",
+    "cwd",
+    "log_filename",
+    "command",
+]
+
+
+def _validate_backend(backend):
+    if backend not in ["local", "slurm"]:
+        raise ValueError("backend must be either 'local' or 'slurm'")
+
+
+def _normalize_memory(memory, min_memory=16, max_memory=1500):
+    if not isinstance(memory, int):
+        raise TypeError("memory parameter must be an integer")
+    if memory < min_memory:
+        print(f"{memory} < than limit ({min_memory}), using {min_memory} GB")
+        return min_memory
+    if memory > max_memory:
+        print(f"{memory} > than limit ({max_memory}), using {max_memory} GB")
+        return max_memory
+    return memory
+
+
+def _strip_mixcr_template_placeholders(command_template):
+    remove_list = {"mixcr", "r1", "r2", "output_prefix"}
+    return [token for token in shlex.split(command_template) if token not in remove_list]
+
+
+def _mixcr_analyze_command(mixcr_path, memory, command_template_parts, r1, r2, output_prefix, tag_pattern=None):
+    command_parts = [mixcr_path, f"-Xmx{memory}g", *command_template_parts]
+    if tag_pattern is not None:
+        command_parts.extend(["--tag-pattern", str(tag_pattern)])
+    command_parts.extend([str(r1), str(r2), str(output_prefix)])
+    return shlex.join(command_parts)
+
+
+def _job_table(jobs, backend):
+    rows = []
+    for job in jobs:
+        rows.append({
+            "jobname": job["jobname"],
+            "sample_id": job.get("sample_id", ""),
+            "backend": backend,
+            "job_id": "",
+            "status": "pending",
+            "returncode": "",
+            "cwd": job["cwd"],
+            "log_filename": job["log_filename"],
+            "command": job["command"],
+        })
+    return pd.DataFrame(rows, columns=JOB_TABLE_COLUMNS)
+
+
+def _write_batch_table(filename, table, program_name=None):
+    if os.path.exists(filename):
+        os.remove(filename)
+    with open(filename, "w") as f:
+        if program_name is not None:
+            f.write(f"# {program_name}\n")
+        table.to_csv(f, sep="\t", index=False)
+
+
+def _result_table_filename(batch_filename):
+    logs_folder = os.path.join(os.path.dirname(batch_filename), "logs")
+    return os.path.join(logs_folder, f"{os.path.splitext(os.path.basename(batch_filename))[0]}_jobs.csv")
+
+
+def _uses_result_table(batch_filename):
+    return os.path.basename(batch_filename) != "mixcr_reports_slurm_batch.log"
+
+
+def _write_result_table(batch_filename, table):
+    if not _uses_result_table(batch_filename):
+        return None
+    table_filename = _result_table_filename(batch_filename)
+    os.makedirs(os.path.dirname(table_filename), exist_ok=True)
+    existing_table = _read_result_table(batch_filename)
+    merged_table = _merge_result_table(existing_table, table)
+    merged_table.to_csv(table_filename, index=False)
+    return table_filename
+
+
+def _read_result_table(batch_filename):
+    table_filename = _result_table_filename(batch_filename)
+    if not os.path.exists(table_filename):
+        return pd.DataFrame(columns=JOB_TABLE_COLUMNS)
+    table = pd.read_csv(table_filename, keep_default_na=False)
+    for column in JOB_TABLE_COLUMNS:
+        if column not in table.columns:
+            table[column] = ""
+    return table[JOB_TABLE_COLUMNS]
+
+
+def _merge_result_table(existing_table, update_table):
+    if len(existing_table) == 0:
+        return update_table[JOB_TABLE_COLUMNS].copy()
+    rerun_jobnames = set(update_table["jobname"])
+    kept_table = existing_table.loc[~existing_table["jobname"].isin(rerun_jobnames)]
+    return pd.concat([kept_table, update_table[JOB_TABLE_COLUMNS]], ignore_index=True)
+
+
+def _read_batch_table(filename):
+    with open(filename, "r") as f:
+        first_line = f.readline().rstrip("\n")
+    program_name = first_line[2:] if first_line.startswith("# ") else "MiXCR Batch"
+    table = pd.read_csv(filename, sep="\t", comment="#", keep_default_na=False)
+    return program_name, table
+
+
+def _resolve_batch_filename(path, default_filename="mixcr_analyze_batch.log"):
+    if os.path.isdir(path):
+        filename = os.path.join(path, default_filename)
+        if not os.path.exists(filename):
+            batch_files = [
+                os.path.join(path, f)
+                for f in os.listdir(path)
+                if f.startswith("mixcr_") and f.endswith("_batch.log")
+            ]
+            if len(batch_files) == 1:
+                filename = batch_files[0]
+        return filename
+    return path
+
+
+def _status_counts(table):
+    finished = int((table["status"] == "finished").sum())
+    failed = int(table["status"].isin(["failed", "submit_failed"]).sum())
+    total = len(table)
+    return finished, failed, total
+
+
+def _terminal_statuses():
+    return ["finished", "failed", "submit_failed"]
+
+
+def _map_slurm_state(state):
+    state = str(state).upper().split()[0]
+    if state in ["PENDING", "CONFIGURING", "REQUEUED", "RESIZING", "SUSPENDED"]:
+        return "pending"
+    if state in ["RUNNING", "COMPLETING", "STAGE_OUT", "SIGNALING", "STOPPED"]:
+        return "running"
+    if state == "COMPLETED":
+        return "finished"
+    if state in [
+        "BOOT_FAIL",
+        "CANCELLED",
+        "DEADLINE",
+        "FAILED",
+        "NODE_FAIL",
+        "OUT_OF_MEMORY",
+        "PREEMPTED",
+        "REVOKED",
+        "SPECIAL_EXIT",
+        "TIMEOUT",
+    ]:
+        return "failed"
+    return str(state).lower()
+
+
+def _query_squeue(job_ids):
+    if len(job_ids) == 0:
+        return {}
+    command = ["squeue", "-h", "-j", ",".join(job_ids), "-o", "%A\t%T"]
+    try:
+        process = subprocess.run(command, capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        return {}
+    if process.returncode != 0:
+        return {}
+
+    statuses = {}
+    for line in process.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) < 2:
+            continue
+        job_id, state = parts[0].strip(), parts[1].strip()
+        statuses[job_id] = {"status": _map_slurm_state(state), "returncode": ""}
+    return statuses
+
+
+def _query_sacct(job_ids):
+    if len(job_ids) == 0:
+        return {}
+
+    statuses = {}
+    for requested_job_id in job_ids:
+        for extra_args in [["-X"], []]:
+            command = [
+                "sacct",
+                "-n",
+                "-P",
+                *extra_args,
+                "-j",
+                str(requested_job_id),
+                "-o",
+                "JobID,State,ExitCode",
+            ]
+            try:
+                process = subprocess.run(command, capture_output=True, text=True, check=False)
+            except FileNotFoundError:
+                return statuses
+            if process.returncode != 0:
+                continue
+            for line in process.stdout.splitlines():
+                parts = line.split("|")
+                if len(parts) < 3:
+                    continue
+                raw_job_id, state, exit_code = [p.strip() for p in parts[:3]]
+                job_id = raw_job_id.split(".")[0]
+                if job_id != str(requested_job_id):
+                    continue
+                status = _map_slurm_state(state)
+                if status not in ["finished", "failed"]:
+                    continue
+                returncode = exit_code.split(":")[0] if exit_code else ""
+                statuses[job_id] = {"status": status, "returncode": returncode}
+            if str(requested_job_id) in statuses:
+                break
+    return statuses
+
+
+def _query_scontrol(job_ids):
+    statuses = {}
+    for job_id in job_ids:
+        command = ["scontrol", "show", "job", str(job_id)]
+        try:
+            process = subprocess.run(command, capture_output=True, text=True, check=False)
+        except FileNotFoundError:
+            return statuses
+        if process.returncode != 0:
+            continue
+        state_match = re.search(r"\bJobState=([A-Z_]+)", process.stdout)
+        exit_match = re.search(r"\bExitCode=([0-9]+):[0-9]+", process.stdout)
+        if state_match is None:
+            continue
+        status = _map_slurm_state(state_match.group(1))
+        returncode = exit_match.group(1) if exit_match else ""
+        statuses[str(job_id)] = {"status": status, "returncode": returncode}
+    return statuses
+
+
+def _sync_slurm_status(filename, program_name, table):
+    changed = False
+    active_mask = (
+        (table["backend"] == "slurm")
+        & (table["job_id"].astype(str) != "")
+        & (~table["status"].isin(_terminal_statuses()))
+    )
+    job_ids = list(table.loc[active_mask, "job_id"].astype(str))
+    if len(job_ids) == 0:
+        return table
+
+    statuses = _query_squeue(job_ids)
+    missing_job_ids = [job_id for job_id in job_ids if job_id not in statuses]
+    statuses.update(_query_sacct(missing_job_ids))
+    missing_job_ids = [job_id for job_id in job_ids if job_id not in statuses]
+    statuses.update(_query_scontrol(missing_job_ids))
+    missing_job_ids = [job_id for job_id in job_ids if job_id not in statuses]
+    statuses.update(_query_slurm_logs(table, missing_job_ids))
+
+    for idx, row in table.loc[active_mask].iterrows():
+        job_status = statuses.get(str(row["job_id"]))
+        if job_status is None:
+            continue
+        for key, value in job_status.items():
+            if str(table.loc[idx, key]) != str(value):
+                table.loc[idx, key] = value
+                changed = True
+    if changed:
+        _write_batch_table(filename, table, program_name=program_name)
+        if _uses_result_table(filename):
+            _write_result_table(filename, table)
+    return table
+
+
+def _query_slurm_logs(table, job_ids):
+    statuses = {}
+    for _, row in table.iterrows():
+        job_id = str(row.get("job_id", ""))
+        if job_id not in job_ids:
+            continue
+        log_filename = row.get("log_filename", "")
+        if not isinstance(log_filename, str) or not os.path.exists(log_filename):
+            continue
+        try:
+            with open(log_filename, "r", errors="replace") as f:
+                text = f.read()
+        except OSError:
+            continue
+        if "__REPSEQ_STATUS__:finished" in text:
+            statuses[job_id] = {"status": "finished", "returncode": "0"}
+        else:
+            failed_match = re.search(r"__REPSEQ_STATUS__:failed:([0-9]+)", text)
+            if failed_match is not None:
+                statuses[job_id] = {"status": "failed", "returncode": failed_match.group(1)}
+            elif "__REPSEQ_STATUS__:failed" in text:
+                statuses[job_id] = {"status": "failed", "returncode": "1"}
+    return statuses
+
+
+def _print_failed_jobs(table):
+    failed_table = table.loc[table["status"].isin(["failed", "submit_failed"])]
+    if len(failed_table) == 0:
+        return
+    print("\nFailed jobs:")
+    for _, row in failed_table.iterrows():
+        print(f"{row['jobname']}\t{row['job_id']}")
+
+
+def check_batch_progress(path, loop=False, default_filename="mixcr_analyze_batch.log"):
+    filename = _resolve_batch_filename(path, default_filename=default_filename)
+
+    while True:
+        program_name, table = _read_batch_table(filename)
+        table = _sync_slurm_status(filename, program_name, table)
+        finished, failed, tasks = _status_counts(table)
+        if not loop:
+            print(table[["jobname", "sample_id", "backend", "job_id", "status", "returncode", "log_filename"]].to_string(index=False))
+        print_progress_bar(finished + failed, tasks, program_name=program_name, object_name="task(s)")
+        if not loop or finished + failed == tasks:
+            break
+        sleep(1)
+    _print_failed_jobs(table)
+
+
+def _update_job_status(batch_filename, program_name, table, jobname, **updates):
+    idx = table.index[table["jobname"] == jobname]
+    if len(idx) != 1:
+        raise ValueError(f"Could not find job '{jobname}' in batch table")
+    for key, value in updates.items():
+        table.loc[idx[0], key] = value
+    _write_batch_table(batch_filename, table, program_name=program_name)
+
+
+def _run_local_command(job, program_name, batch_filename, table):
+    jobname = job["jobname"]
+    command = job["command"]
+    cwd = job["cwd"]
+    log_filename = job["log_filename"]
+    _update_job_status(batch_filename, program_name, table, jobname, status="running")
+    with open(log_filename, "w") as log:
+        process = subprocess.run(
+            command,
+            shell=True,
+            cwd=cwd,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    status = "finished" if process.returncode == 0 else "failed"
+    _update_job_status(
+        batch_filename,
+        program_name,
+        table,
+        jobname,
+        status=status,
+        returncode=process.returncode,
+    )
+
+
+def _parse_slurm_job_id(stdout):
+    text = stdout.decode(errors="replace") if isinstance(stdout, bytes) else str(stdout)
+    match = re.search(r"Submitted batch job\s+([0-9]+)", text)
+    return match.group(1) if match else ""
+
+
+def _submit_slurm_command(job, cpus, time_estimate, memory):
+    command = job["command"]
+    jobname = job["jobname"]
+    cwd = job["cwd"]
+    log_filename = job["log_filename"]
+    slurm_command = command
+    if cwd is not None:
+        slurm_command = f"cd {shlex.quote(cwd)} && {command}"
+    slurm_command = (
+        f"({slurm_command}); "
+        f"status=$?; "
+        f'if [ "$status" -eq 0 ]; then echo "__REPSEQ_STATUS__:finished"; '
+        f'else echo "__REPSEQ_STATUS__:failed:$status"; fi; '
+        f'exit "$status"'
+    )
+    stdout, stderr = run_slurm_command_from_jupyter(
+        slurm_command,
+        jobname,
+        cpus,
+        time_estimate,
+        memory,
+        log_filename=log_filename,
+        verbose=False,
+    )
+    return _parse_slurm_job_id(stdout), stdout, stderr
+
+
+def _save_result_table(table, table_filename):
+    if table_filename is None:
+        return
+    print(f"Logs folder: {os.path.dirname(table_filename)}")
+    print(f"Job table: {table_filename}")
+
+
+def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local",
+                    cpus=40, time_estimate=1.5, memory=32, save_result_table=True):
+    _validate_backend(backend)
+    table = _job_table(jobs, backend)
+    _write_batch_table(batch_filename, table, program_name=program_name)
+    if save_result_table:
+        _write_result_table(batch_filename, table)
+    else:
+        table_filename = _result_table_filename(batch_filename)
+        if os.path.exists(table_filename):
+            os.remove(table_filename)
+
+    if backend == "slurm":
+        for job in jobs:
+            _update_job_status(batch_filename, program_name, table, job["jobname"], status="submitting")
+            job_id, stdout, stderr = _submit_slurm_command(
+                job,
+                cpus,
+                time_estimate,
+                memory,
+            )
+            status = "submitted" if job_id else "submit_failed"
+            _update_job_status(
+                batch_filename,
+                program_name,
+                table,
+                job["jobname"],
+                job_id=job_id,
+                status=status,
+                returncode="" if job_id else 1,
+            )
+            if stderr:
+                text = stderr.decode(errors="replace") if isinstance(stderr, bytes) else str(stderr)
+                if text.strip():
+                    print(f"{job['jobname']} stderr: {text.strip()}")
+        print(f"{len(jobs)} tasks added to slurm queue")
+    else:
+        for done, job in enumerate(jobs, start=1):
+            _run_local_command(job, program_name, batch_filename, table)
+            print_progress_bar(done, len(jobs), program_name=program_name, object_name="task(s)")
+
+    _, table = _read_batch_table(batch_filename)
+    if save_result_table:
+        table_filename = _write_result_table(batch_filename, table)
+        _save_result_table(table, table_filename)
+    else:
+        print(f"Logs folder: {os.path.dirname(jobs[0]['log_filename']) if jobs else os.path.dirname(batch_filename)}")
+        print(f"Batch log: {batch_filename}")
+    return table.sort_values(by="jobname").reset_index(drop=True)
+
 
 def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
-                         mixcr_path="mixcr", memory=32, time_estimate=1.5, custom_tag_pattern_column=None):
+                         mixcr_path="mixcr", memory=32, time_estimate=1.5,
+                         custom_tag_pattern_column=None, backend="local", cpus=40):
     
     """
-    Function for batch runs of MiXCR software using SLURM.
-    For each record in the given `sample_df` this function creates a SLURM-script in
-    `~/temp/slurm` folder and adds them to SLURM-queue. All the `stdout` logs are also 
-    put to `~/temp/slurm` folder. In case of troubles check the latest logs in this folder. 
+    Function for batch runs of MiXCR software.
+    Runs commands locally by default and can also submit them to SLURM.
     By default this function uses `mixcr analyze` command for MiLab Hum RNA TCR Kit (with UMI). 
     To change the command template use `command_template` parameter
 
@@ -37,15 +495,14 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
         memory (int): required OOM in GB
         time_estimate (numeric): time estimate in hours for the calculation. It
             is the limit for SLURM task
+        backend (str): `local` or `slurm`
+        cpus (int): CPU request for SLURM jobs
 
     Returns:
-        None
+        pd.DataFrame: submitted or completed job records
     """
-    max_memory = 1500
-    min_memory = 16
-
+    _validate_backend(backend)
     program_name="MIXCR4 Analyze Batch"
-    samples_num = sample_df.shape[0]
 
     # by default use the most popular preset for MiLaboratory Human TCR UMI MULTIPLEX Kit
     default_command_template = "mixcr analyze milab-human-rna-tcr-umi-multiplex -f r1 r2 output_prefix"
@@ -53,37 +510,27 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
         command_template = default_command_template
         
     # cut placeholders from command template
-    remove_list = ["mixcr", "r1", "r2", "output_prefix"]
-    command_template = ' '.join([w for w in command_template.split() if w not in remove_list])
+    command_template_parts = _strip_mixcr_template_placeholders(command_template)
 
     # check input for custom tag pattern
     custom_tag_pattern = False
     if isinstance(custom_tag_pattern_column, str):
         if custom_tag_pattern_column not in sample_df.columns:
             raise ValueError(f"Specified tag-pattern columns '{custom_tag_pattern_column}' is not present in sample_df")
-        if "--tag-pattern" in command_template.split():
+        if "--tag-pattern" in command_template_parts:
             raise ValueError(f"Please, remove '--tag-pattern' option from command_template, when you use custom tag-pattern")
         custom_tag_pattern = True
     
     # Create output dir if does not exist
+    output_folder = os.path.abspath(output_folder)
     os.makedirs(output_folder, exist_ok=True)
+    log_folder = os.path.join(output_folder, "logs")
+    os.makedirs(log_folder, exist_ok=True)
 
-    # default mixcr analyze slurm parameters. They are quite excessive, works fine.
-    # time_estimate=1.5
-    cpus=40
-    if not isinstance(memory, int):
-        raise TypeError("memory parameter must be an integer")
-    if memory < min_memory:
-        print(f"{memory} < than limit ({min_memory}), using {min_memory} GB")
-        memory = min_memory
-    if memory > max_memory:
-        print(f"{memory} > than limit ({max_memory}), using {max_memory} GB")
-        memory = max_memory
+    memory = _normalize_memory(memory)
         
-    
-    # create slurm batch file for progress tracking
-    slurm_batch_filename = os.path.join(output_folder, "mixcr_analyze_slurm_batch.log")
-    create_slurm_batch_file(slurm_batch_filename, program_name, samples_num)
+    batch_filename = os.path.join(output_folder, "mixcr_analyze_batch.log")
+    jobs = []
     
     # main cycle by samples
     for i,r in sample_df.iterrows():
@@ -92,33 +539,47 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
         r2 = r["R2"]
     #   output_prefix = os.path.join(output_folder, sample_id)
         output_prefix = sample_id
+        tag_pattern = None
         if custom_tag_pattern:
             tag_pattern = r[custom_tag_pattern_column]
-            command = f'{mixcr_path} -Xmx{memory}g {command_template} --tag-pattern "{tag_pattern}" {r1} {r2} {output_prefix}'
-        else:
-            command = f'{mixcr_path} -Xmx{memory}g {command_template} {r1} {r2} {output_prefix}'
-        command = f"cd {output_folder}; " + command
+            if pd.isna(tag_pattern):
+                raise ValueError(f"Empty tag pattern for sample '{sample_id}' in column '{custom_tag_pattern_column}'")
+        command = _mixcr_analyze_command(
+            mixcr_path,
+            memory,
+            command_template_parts,
+            r1,
+            r2,
+            output_prefix,
+            tag_pattern=tag_pattern,
+        )
         jobname = f"mixcr_analyze_{sample_id}"
-        
-        # for batch task finish tracking:
-        command += f'; echo "{jobname} finished" >> {slurm_batch_filename}'
-        
-        # create slurm script and add job to queue, print stdout of sbatch
-        stdout, stderr = run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory)
-        print(stdout, stderr)
-    
-    print(f"{samples_num} tasks added to slurm queue\n")
-    print(f'To see running progress bar run this function in the next jupyter cell:\nslurm.check_slurm_progress("{slurm_batch_filename}", loop=True)')
-    print(f'To see current progress:\nslurm.check_slurm_progress("{slurm_batch_filename}")')
+        jobs.append({
+            "jobname": jobname,
+            "sample_id": sample_id,
+            "command": command,
+            "cwd": output_folder,
+            "log_filename": os.path.join(log_folder, f"{jobname}.log"),
+        })
+
+    return _run_mixcr_jobs(
+        jobs,
+        program_name,
+        batch_filename,
+        backend=backend,
+        cpus=cpus,
+        time_estimate=time_estimate,
+        memory=memory,
+    )
 
 
-def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=32, time_estimate=1.5):
+def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=32,
+                           time_estimate=1.5, backend="local", cpus=40):
     """
-    Function for batch runs of the MiXCR software using the SLURM `mixcr analyze` command and the `Human 7GENES DNA Multiplex` MiXCR built-in preset. 
+    Function for batch runs of the MiXCR software using the `mixcr analyze` command and the `Human 7GENES DNA Multiplex` MiXCR built-in preset.
     Incomplete rearrangements obtained by this kit are also included. For each incomplete rearrangement, unaligned reads from the previous 
     step are iteratively processed. Each output is stored in a subdirectory named after the corresponding rearrangement.
-    For each record in the given `sample_df`, this function creates a SLURM script in the `~/temp/slurm` folder and adds it to the SLURM queue. 
-    All `stdout` logs are also saved to the `~/temp/slurm` folder. In case of troubles, check the latest logs in this folder. 
+    Runs commands locally by default and can also submit them to SLURM.
 
     Args:
         sample_df (pd.DataFrame): DataFrame containing a 'sample_id' column and 
@@ -128,37 +589,28 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
         memory (int): Required OOM in GB.
         time_estimate (numeric): Time estimate in hours for the calculation; it 
             is the limit for the SLURM task.
+        backend (str): `local` or `slurm`.
+        cpus (int): CPU request for SLURM jobs.
 
     Returns:
-        None
+        pd.DataFrame: submitted or completed job records.
     """
-    # default mixcr analyze slurm parameters. They are quite excessive, works fine.
-    max_memory = 1500
-    min_memory = 16
-    cpus=40
-    
+    _validate_backend(backend)
     program_name="MIXCR4 Analyze 7genes Batch"
-    samples_num = sample_df.shape[0]
         
     # Create output dir if does not exist
+    output_folder = os.path.abspath(output_folder)
     os.makedirs(output_folder, exist_ok=True)
+    log_folder = os.path.join(output_folder, "logs")
+    os.makedirs(log_folder, exist_ok=True)
 
-    
-    if not isinstance(memory, int):
-        raise TypeError("memory parameter must be an integer")
-    if memory < min_memory:
-        print(f"{memory} < than limit ({min_memory}), using {min_memory} GB")
-        memory = min_memory
-    if memory > max_memory:
-        print(f"{memory} > than limit ({max_memory}), using {max_memory} GB")
-        memory = max_memory
+    memory = _normalize_memory(memory)
         
-    # create slurm batch file for progress tracking
-    slurm_batch_filename = os.path.join(output_folder, "mixcr_analyze_slurm_batch.log")
-    create_slurm_batch_file(slurm_batch_filename, program_name, samples_num)
+    batch_filename = os.path.join(output_folder, "mixcr_analyze_7genes_batch.log")
     
     list_of_incomplete_rearrangements = ["DJ_TRB", "VDD_TRD", "DDJ_TRD", "DD_TRD", "DJ_IGH", "VKDE_IGK", "CINTRON_KDE_IGK"]
 
+    jobs = []
     # main cycle by samples
     for i,r in sample_df.iterrows():
         sample_id = r["sample_id"]
@@ -169,8 +621,7 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
         R1na = f"{sample_id}_R1_not_aligned.fastq.gz"
         R2na = f"{sample_id}_R2_not_aligned.fastq.gz"
         
-        commands = [f"cd {output_folder}"]
-        
+        commands = []
         first_command = f'{mixcr_path} -Xmx{memory}g analyze milab-human-dna-xcr-7genes-multiplex -f --not-aligned-R1 {R1na} --not-aligned-R2 {R2na} {r1} {r2} {output_prefix}'
         commands.append(first_command)
         
@@ -190,22 +641,29 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
         
         jobname = f"mixcr_analyze_{sample_id}"
         
-        # for batch task finish tracking:
-        commands.append(f'echo "{jobname} finished" >> {slurm_batch_filename}')
-        
         # join commands by && so that next command runs if previous was finished without error and add new lines to the script
         command = " && \\ \n".join(commands)
-        
-        # create slurm script and add job to queue, print stdout of sbatch
-        stdout, stderr = run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory)
-        print(stdout, stderr)
-        # print(command)
-    print(f"{samples_num} tasks added to slurm queue\n")
-    print(f'To see running progress bar run this function in the next jupyter cell:\nslurm.check_slurm_progress("{slurm_batch_filename}", loop=True)')
-    print(f'To see current progress:\nslurm.check_slurm_progress("{slurm_batch_filename}")')
+        jobs.append({
+            "jobname": jobname,
+            "sample_id": sample_id,
+            "command": command,
+            "cwd": output_folder,
+            "log_filename": os.path.join(log_folder, f"{jobname}.log"),
+        })
+
+    return _run_mixcr_jobs(
+        jobs,
+        program_name,
+        batch_filename,
+        backend=backend,
+        cpus=cpus,
+        time_estimate=time_estimate,
+        memory=memory,
+    )
 
 
-def mixcr4_reports(folder, mixcr_path="mixcr"):
+def mixcr4_reports(folder, mixcr_path="mixcr", backend="local",
+                   cpus=40, time_estimate=1, memory=32):
     
     """
     runs `mixcr exportQc` commands - `align`, `chainUsage` and `tags` in a given folder 
@@ -215,16 +673,22 @@ def mixcr4_reports(folder, mixcr_path="mixcr"):
     Args:
         folder (str): folder in which to run the `mixcr exportQc` commands
         mixcr_path (str): path to MiXCR binary
+        backend (str): `local` or `slurm`
+        cpus (int): CPU request for SLURM jobs
+        time_estimate (numeric): time estimate in hours for SLURM jobs
+        memory (int): MiXCR memory in GB
     Returns:
-        None
+        pd.DataFrame: submitted or completed job records
 
     """
+    _validate_backend(backend)
 
-
-    program_name="MIXCR4.3 Reports"
-    time_estimate=1
-    cpus=40
-    memory=32
+    program_name="MiXCR 4 Reports"
+    memory = _normalize_memory(memory)
+    folder = os.path.abspath(folder)
+    os.makedirs(folder, exist_ok=True)
+    log_folder = os.path.join(folder, "logs")
+    os.makedirs(log_folder, exist_ok=True)
     
     # clns_filenames = os.path.join(folder, "*.clns")
     # align_filename = os.path.join(folder, "alignQc.png")
@@ -242,24 +706,36 @@ def mixcr4_reports(folder, mixcr_path="mixcr"):
     
 
     
-    commands = {"alignQc": f"cd {folder}; {mixcr_path} -Xmx32g exportQc align -f {clns_filenames} {align_filename}",
-                "chainUsage": f"cd {folder}; {mixcr_path} -Xmx32g exportQc chainUsage -f {clns_filenames} {chains_filename}",
-                "alignQcPDF": f"cd {folder}; {mixcr_path} -Xmx32g exportQc align -f {clns_filenames} {align_filename_pdf}",
-                "chainUsagePDF": f"cd {folder}; {mixcr_path} -Xmx32g exportQc chainUsage -f {clns_filenames} {chains_filename_pdf}",
-                "tagsQc": f"cd {folder}; {mixcr_path} -Xmx32g exportQc tags -f {clns_filenames} {tags_filename}"#,
-                #"postanalysis": f"{MIXCR} -Xmx32g postanalysis individual -f --default-downsampling none --default-weight-function umi --only-productive --tables {tables_filename} --preproc-tables {preproc_filename} {clns_filenames} {postanalysis_filename}"
+    commands = {"alignQc": f"{mixcr_path} -Xmx{memory}g exportQc align -f {clns_filenames} {align_filename}",
+                "chainUsage": f"{mixcr_path} -Xmx{memory}g exportQc chainUsage -f {clns_filenames} {chains_filename}",
+                "alignQcPDF": f"{mixcr_path} -Xmx{memory}g exportQc align -f {clns_filenames} {align_filename_pdf}",
+                "chainUsagePDF": f"{mixcr_path} -Xmx{memory}g exportQc chainUsage -f {clns_filenames} {chains_filename_pdf}",
+                "tagsQc": f"{mixcr_path} -Xmx{memory}g exportQc tags -f {clns_filenames} {tags_filename}"#,
+                #"postanalysis": f"{mixcr_path} -Xmx32g postanalysis individual -f --default-downsampling none --default-weight-function umi --only-productive --tables {tables_filename} --preproc-tables {preproc_filename} {clns_filenames} {postanalysis_filename}"
                }
     
 
-    commands_num = len(commands)
-    
-    slurm_batch_filename = os.path.join(folder, "mixcr_reports_slurm_batch.log")
-    create_slurm_batch_file(slurm_batch_filename, program_name, commands_num)
-    
+    batch_filename = os.path.join(folder, "mixcr_reports_slurm_batch.log")
+    jobs = []
     for jobname, command in commands.items():
-        command += f'; echo "{jobname} finished" >> {slurm_batch_filename}'
-        stdout, stderr = run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory)
-        print(stdout, stderr)
+        jobs.append({
+            "jobname": jobname,
+            "sample_id": "",
+            "command": command,
+            "cwd": folder,
+            "log_filename": os.path.join(log_folder, f"{jobname}.log"),
+        })
+
+    return _run_mixcr_jobs(
+        jobs,
+        program_name,
+        batch_filename,
+        backend=backend,
+        cpus=cpus,
+        time_estimate=time_estimate,
+        memory=memory,
+        save_result_table=False,
+    )
 
 
 def get_processing_table(folder, show_offtarget=False, offtarget_chain_threshold=0.01):
@@ -371,17 +847,29 @@ def get_processing_table(folder, show_offtarget=False, offtarget_chain_threshold
 
 def show_report_images(folder):
     """
-    This function displays QC images `alignQc.svg` and `chainsQc.svg` in Jupyter Notebook.
-    This pictures may be generated by `mixcr4_reports` function.
-    In case there are no `.svg` images, the `.png` images are shown.
+    Display MiXCR QC report images in a Jupyter notebook.
+
+    The function looks for `alignQc.svg` and `chainsQc.svg` in `folder`.
+    If an SVG file is missing, it falls back to the corresponding PNG file:
+    `alignQc.png` or `chainsQc.png`. If neither image exists for a report,
+    a short message is printed and execution continues.
+
+    These images can be generated with `mixcr4_reports`.
 
     Args:
-        folder (str): folder in which to look for QC images.
+        folder (str): folder in which to look for MiXCR JSON reports.
     
     Returns:
-        None
+        None.
 
     """
+    try:
+        from IPython.display import Image, display, SVG
+    except ImportError as exc:
+        raise ImportError(
+            "Displaying MiXCR report images requires IPython. "
+            "Install it with `pip install ipython`."
+        ) from exc
     
     svg_align_filename = os.path.join(folder, "alignQc.svg")
     svg_chain_filename = os.path.join(folder, "chainsQc.svg")
@@ -407,22 +895,164 @@ def show_report_images(folder):
         print("No chainQc image found (svg or png)")
 
 
-def show_report_images_new(folder, chart_type='summary', count_type='percent', output_file=None):
+def _qc_plot_sample_labels(table):
+    labels = table["sample_id"].astype(str)
+    if "extracted_chain" in table.columns and labels.duplicated(keep=False).any():
+        labels = labels + " (" + table["extracted_chain"].astype(str) + ")"
+    return labels
+
+
+def _coverage_table_from_refine_reports(folder):
+    rows = []
+    try:
+        filenames = os.listdir(folder)
+    except FileNotFoundError:
+        print("No such file or directory")
+        return pd.DataFrame(columns=["sample_id", "reads_per_umi", "overseq_threshold"])
+
+    for filename in filenames:
+        match = re.match(r"(.+)\.refine\.report\.json$", filename)
+        if match is None:
+            continue
+        sample_id = match.group(1)
+        report = open_json_report(os.path.join(folder, filename))
+        correction_report = report.get("correctionReport", {})
+        reads_after_filter = correction_report.get("outputRecords")
+        umi_after_filter = None
+        overseq_threshold = np.nan
+        filter_report = correction_report.get("filterReport")
+        if isinstance(filter_report, dict):
+            umi_after_filter = filter_report.get("numberOfGroupsAccepted")
+            try:
+                overseq_threshold = int(
+                    filter_report["operatorReports"][0]["operatorReport"]["threshold"]
+                )
+            except (KeyError, IndexError, TypeError, ValueError):
+                overseq_threshold = np.nan
+        if umi_after_filter is None:
+            try:
+                umi_after_filter = correction_report["steps"][0]["outputDiversity"]
+            except (KeyError, IndexError, TypeError):
+                umi_after_filter = None
+        if reads_after_filter is None or umi_after_filter in [None, 0]:
+            reads_per_umi = np.nan
+        else:
+            reads_per_umi = round(reads_after_filter / umi_after_filter, 2)
+        rows.append({
+            "sample_id": sample_id,
+            "reads_per_umi": reads_per_umi,
+            "overseq_threshold": overseq_threshold,
+        })
+    return pd.DataFrame(rows, columns=["sample_id", "reads_per_umi", "overseq_threshold"])
+
+
+def _plot_coverage_qc(folder, processing_table=None, output_file=None,
+                      show_offtarget=False, offtarget_chain_threshold=0.01):
+    del show_offtarget, offtarget_chain_threshold
+    if processing_table is None:
+        processing_table = _coverage_table_from_refine_reports(folder)
+    required_columns = {"sample_id", "reads_per_umi", "overseq_threshold"}
+    missing = required_columns - set(processing_table.columns)
+    if missing:
+        missing_text = ", ".join(sorted(missing))
+        raise ValueError(f"Coverage plot requires columns: {missing_text}")
+
+    plot_data = processing_table.copy()
+    plot_data = plot_data.dropna(subset=["reads_per_umi"])
+    if len(plot_data) == 0:
+        print("No coverage data found")
+        return
+    plot_data = plot_data.sort_values(by="sample_id", ascending=False).reset_index(drop=True)
+    plot_data.index = _qc_plot_sample_labels(plot_data)
+
+    size = plot_data.shape[0]
+    bar_height = 0.85
+    min_size = 7
+    min_size_2 = 10
+    plot_rows = max(size, min_size)
+    if size > min_size:
+        plot_rows = max(size, min_size_2)
+    fig, ax = plt.subplots(figsize=(9, plot_rows * bar_height * 0.5), dpi=100, constrained_layout=True)
+    y = np.arange(len(plot_data))
+    ax.barh(
+        y=y,
+        width=plot_data["reads_per_umi"].values,
+        height=bar_height,
+        color="#d8c3a5",
+        label="Reads per UMI",
+    )
+    marker_labeled = False
+    for i, threshold in enumerate(plot_data["overseq_threshold"]):
+        if pd.isna(threshold):
+            continue
+        ax.vlines(
+            float(threshold) - 1,
+            i - bar_height / 2,
+            i + bar_height / 2,
+            color="#d62728",
+            linewidth=2,
+            label="Overseq threshold - 1" if not marker_labeled else None,
+        )
+        marker_labeled = True
+    ax.set_yticks(y)
+    ax.set_yticklabels(plot_data.index)
+    ax.set_ylim(-0.5, len(plot_data) - 0.5)
+    ax.set_xlabel("reads per UMI")
+    fig.legend(loc="outside upper center", title="Coverage", ncol=2, frameon=False)
+    sns.despine(left=True, bottom=True)
+    plt.show()
+    if output_file is not None:
+        ax.get_figure().savefig(output_file, bbox_inches="tight")
+
+
+def show_qc_plot(folder, chart_type='align', count_type='percent', output_file=None,
+                 processing_table=None, show_offtarget=False,
+                 offtarget_chain_threshold=0.01):
     """
     Shows quality control reports in MiXCR-like style
 
     Args:
         folder (str): folder in which to look for QC images.
-        chart_type (str): Possible values are `summary` (corresponds to `mixcr exportQc align`, 
-            `chains` (`mixcr exportQc chainUsage`)
+        chart_type (str): Possible values are `align` (corresponds to
+            `mixcr exportQc align`), `chains` (plots `clonalChainUsage` from
+            `*.assemble.report.json` files), or `coverage` (plots
+            `reads_per_umi` and `overseq_threshold - 1` directly from
+            `*.refine.report.json` files). Deprecated alias `summary` is
+            accepted as `align`.
         count_type (str): possible values are: `percent`, `abs`
         output_file (str): filename ending with '.png' to save an output plot to
+        processing_table (pd.DataFrame): optional precomputed processing table
+            for `chart_type="coverage"`.
+        show_offtarget (bool): ignored for coverage plots, kept for backwards
+            compatibility.
+        offtarget_chain_threshold (float): ignored for coverage plots, kept for
+            backwards compatibility.
 
     Returns:
         None
 
     """
-    CHAIN_VARIANTS = ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRD', 'TRL']
+    if chart_type == "summary":
+        warnings.warn(
+            "`chart_type='summary'` is deprecated; use `chart_type='align'` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        chart_type = "align"
+    if chart_type not in ["align", "chains", "coverage"]:
+        raise ValueError("chart_type must be one of: 'align', 'chains', 'coverage'")
+    if count_type not in ["percent", "abs"]:
+        raise ValueError("count_type must be either 'percent' or 'abs'")
+    if chart_type == "coverage":
+        return _plot_coverage_qc(
+            folder,
+            processing_table=processing_table,
+            output_file=output_file,
+            show_offtarget=show_offtarget,
+            offtarget_chain_threshold=offtarget_chain_threshold,
+        )
+
+    CHAIN_VARIANTS = ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRD', 'TRG']
     files = []
     try:
         all_files = os.listdir(folder)
@@ -438,14 +1068,14 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', o
     except FileNotFoundError:
         print('No such file or directory')
     df_list = []
+    expected_report_type = 'align' if chart_type == 'align' else 'assemble'
     for file in files:
         report_type = file[1]
-        if report_type == 'align':
+        if report_type == expected_report_type:
             json_report_contents = read_json_report(file[0], folder, report_type=report_type)
-            align_data = json_report_contents['notAlignedReasons']
-            chain_usage_data = json_report_contents['chainUsage']['chains']
             
-            if chart_type == 'summary':
+            if chart_type == 'align':
+                align_data = json_report_contents['notAlignedReasons']
                 renaming_dict = {'NoHits': 'No hits (not TCR/IG?)',
                                 'NoCDR3Parts': 'No CDR3 parts',
                                 'NoVHits': 'No V hits',
@@ -462,17 +1092,22 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', o
                 df_list.append(pd.DataFrame(align_df, index=[file[0]])) 
                 
             elif chart_type == 'chains':
+                chain_usage_data = json_report_contents['clonalChainUsage']['chains']
                 align_df = {}
                 for chain, data in chain_usage_data.items(): 
                     align_df.update({chain: data['total'] - data['nonFunctional'],
-                                f'{chain} (stops)': data['hasStops'],
-                                f'{chain} (OOF)': data['isOOF']})
+                                f'{chain} (OOF)': data['isOOF'],
+                                f'{chain} (stops)': data['hasStops']})
                 df_list.append(pd.DataFrame(align_df, index=[file[0]]))
+    if len(df_list) == 0:
+        print(f"No {chart_type} report data found")
+        return
     results = pd.concat(df_list)
     results = results.sort_index(ascending=False)
+    results = results.fillna(0)
     if count_type == 'percent':
         results =  results.div(results.sum(axis=1), axis=0) * 100
-    if chart_type == 'summary':
+    if chart_type == 'align':
         order = ['Successfully aligned', 
                  'No hits (not TCR/IG?)', 
                  'No CDR3 parts', 
@@ -485,14 +1120,33 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', o
         colormap = ListedColormap(colors=colors,
                                     name='mixcr')
     elif chart_type == 'chains':
-        order = sorted(results.columns)
-        colors = ['#c26a27', '#ff9429', '#ffcb8f', '#a324b2', '#e553e5', '#faaafa', '#ad3757', '#f05670', '#ffadba', 
-                                  '#105bcc', '#2d93fa', '#99ccff', '#198020', '#42b842', '#99e099', '#068a94', '#27c2c2', '#90e0e0', 
-                                '#5f31cc', '#845cff', '#c1adff']
-        all_variants = ['IGH', 'IGH (stops)', 'IGH (OOF)', 'IGK', 'IGK (stops)', 'IGK (OOF)', 'IGL', 'IGL (stops)', 'IGL (OOF)', 'TRA', 'TRA (stops)', 'TRA (OOF)', 'TRB', 'TRB (stops)', 'TRB (OOF)', 'TRD', 'TRD (stops)', 'TRD (OOF)', 'TRG', 'TRG (stops)', 'TRG (OOF)']
-        # colormap = ListedColormap(colors=[colors[i] for i in range(len(colors)) if all_variants[i] in results.columns],
-                                    #   name='mixcr')        
-        colors = [colors[i] for i in range(len(colors)) if all_variants[i] in results.columns]
+        column_chains = sorted({column.split(" ")[0] for column in results.columns})
+        chains_found = [chain for chain in CHAIN_VARIANTS if chain in column_chains]
+        chains_found += [chain for chain in column_chains if chain not in chains_found]
+        order = []
+        for chain in chains_found:
+            order += [
+                column for column in [chain, f"{chain} (stops)", f"{chain} (OOF)"]
+                if column in results.columns
+            ]
+        chain_color_map = {
+            'IGH': ('#c26a27', '#ffcb8f', '#ff9429'),
+            'IGK': ('#a324b2', '#faaafa', '#e553e5'),
+            'IGL': ('#ad3757', '#ffadba', '#f05670'),
+            'TRA': ('#105bcc', '#99ccff', '#2d93fa'),
+            'TRB': ('#198020', '#99e099', '#42b842'),
+            'TRD': ('#068a94', '#90e0e0', '#27c2c2'),
+            'TRG': ('#5f31cc', '#c1adff', '#845cff'),
+        }
+        colors = []
+        for column in order:
+            chain = column.split(" ")[0]
+            color_index = 0
+            if "(OOF)" in column:
+                color_index = 1
+            elif "(stops)" in column:
+                color_index = 2
+            colors.append(chain_color_map.get(chain, ('#808080', '#c0c0c0', '#a0a0a0'))[color_index])
     results = results[order]
     size = results.shape[0]
     # ax = results.plot.barh(width=0.85, figsize=(9, size * 0.5),  stacked=True, colormap=colormap)
@@ -520,13 +1174,27 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', o
         ax.set_xlabel('%')
     else:
         ax.set_xlabel('read count')
-    if chart_type == 'summary':
-        fig.legend(loc='outside upper center',  title='Alignments rate', ncol=3, frameon=False)
+    if chart_type == 'align':
+        fig.legend(loc='outside upper center',  title='Alignments rate', ncol=2, frameon=False)
     elif chart_type == 'chains':
-        fig.legend(loc='outside upper center',  title='Clonal chain usage', ncol=3, frameon=False)
+        fig.legend(loc='outside upper center',  title='Clonal chain usage', ncol=max(1, len(chains_found)), frameon=False)
     # plt.tight_layout()
     sns.despine(left=True, bottom=True)
     plt.show()
     if output_file is not None:
         ax.get_figure().savefig(output_file, bbox_inches='tight')
     return
+
+
+def show_report_images_new(*args, **kwargs):
+    """
+    Deprecated alias for `show_qc_plot`.
+
+    Use `show_qc_plot` instead. This alias will be removed in a future version.
+    """
+    warnings.warn(
+        "`show_report_images_new` is deprecated; use `show_qc_plot` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return show_qc_plot(*args, **kwargs)
