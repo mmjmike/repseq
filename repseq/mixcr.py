@@ -71,7 +71,7 @@ def _job_table(jobs, backend):
             "log_filename": job["log_filename"],
             "command": job["command"],
         })
-    return pd.DataFrame(rows, columns=JOB_TABLE_COLUMNS)
+    return pd.DataFrame(rows, columns=JOB_TABLE_COLUMNS).astype(object)
 
 
 def _write_batch_table(filename, table, program_name=None):

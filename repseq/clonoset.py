@@ -70,7 +70,7 @@ def standardize_to_vdjtools_columns(
         if source is not None and source != target and target not in clonoset.columns
     }
     if rename_dict:
-        clonoset = clonoset.rename(columns=rename_dict, copy=False)
+        clonoset = clonoset.rename(columns=rename_dict)
 
     for column in ("cdr3aa", "cdr3nt"):
         if column in clonoset.columns:

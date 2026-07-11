@@ -97,7 +97,10 @@ def round_down_to_2_significant(x):
     return math.floor(x) * 10 ** divisions
 
 def center_5(string):
-    return string[math.ceil(len(string)/2)-3:math.ceil(len(string)/2)+2]
+    if len(string) <= 5:
+        return string
+    start = max(0, math.ceil(len(string) / 2) - 3)
+    return string[start:start + 5]
 
 def calc_insert_size(vend,dstart,dend,jstart):
     if dstart == -1:
@@ -215,10 +218,10 @@ def filter_by_functionality(clonoset_in, colnames=None, functional=True):
         colnames = get_column_names_from_clonoset(clonoset)
     cdr3aa_column = colnames["cdr3aa_column"]
     if functional:
-        clonoset = clonoset.loc[~clonoset[cdr3aa_column].str.contains("\*|_", na=False)]
+        clonoset = clonoset.loc[~clonoset[cdr3aa_column].str.contains(r"\*|_", na=False)]
         clonoset = clonoset.loc[clonoset[cdr3aa_column] != ""]
     else:
-        clonoset = clonoset.loc[(clonoset[cdr3aa_column].str.contains("\*|_", na=False)) | (clonoset[cdr3aa_column] == "")]
+        clonoset = clonoset.loc[(clonoset[cdr3aa_column].str.contains(r"\*|_", na=False)) | (clonoset[cdr3aa_column] == "")]
 
     return clonoset
 
