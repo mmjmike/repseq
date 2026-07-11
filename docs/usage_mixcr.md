@@ -112,6 +112,9 @@ Report jobs use `mixcr_reports_slurm_batch.log` for status tracking and do not c
 mx.mixcr4_reports(output_dir, mixcr_path=path_to_mixcr_binary, backend="local")
 mx.check_batch_progress(output_dir, default_filename="mixcr_reports_slurm_batch.log", loop=True)
 mx.show_report_images(output_dir)
+mx.show_qc_plot(output_dir, chart_type="align")
+mx.show_qc_plot(output_dir, chart_type="chains")
+mx.show_qc_plot(output_dir, chart_type="coverage")
 ```
 
 ![alignQc](images_docs/alignQc.svg)

@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import seaborn as sns
 import re
+import warnings
 
 JOB_TABLE_COLUMNS = [
     "jobname",
@@ -682,7 +683,7 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local",
     """
     _validate_backend(backend)
 
-    program_name="MIXCR4 Reports"
+    program_name="MiXCR 4 Reports"
     memory = _normalize_memory(memory)
     folder = os.path.abspath(folder)
     os.makedirs(folder, exist_ok=True)
@@ -856,7 +857,7 @@ def show_report_images(folder):
     These images can be generated with `mixcr4_reports`.
 
     Args:
-        folder (str): folder in which to look for QC images.
+        folder (str): folder in which to look for MiXCR JSON reports.
     
     Returns:
         None.
@@ -894,22 +895,122 @@ def show_report_images(folder):
         print("No chainQc image found (svg or png)")
 
 
-def show_report_images_new(folder, chart_type='summary', count_type='percent', output_file=None):
+def _qc_plot_sample_labels(table):
+    labels = table["sample_id"].astype(str)
+    if "extracted_chain" in table.columns and labels.duplicated(keep=False).any():
+        labels = labels + " (" + table["extracted_chain"].astype(str) + ")"
+    return labels
+
+
+def _plot_coverage_qc(folder, processing_table=None, output_file=None,
+                      show_offtarget=False, offtarget_chain_threshold=0.01):
+    if processing_table is None:
+        processing_table = get_processing_table(
+            folder,
+            show_offtarget=show_offtarget,
+            offtarget_chain_threshold=offtarget_chain_threshold,
+        )
+    required_columns = {"sample_id", "reads_per_umi", "overseq_threshold"}
+    missing = required_columns - set(processing_table.columns)
+    if missing:
+        missing_text = ", ".join(sorted(missing))
+        raise ValueError(f"Coverage plot requires columns: {missing_text}")
+
+    plot_data = processing_table.copy()
+    plot_data = plot_data.dropna(subset=["reads_per_umi"])
+    if len(plot_data) == 0:
+        print("No coverage data found")
+        return
+    plot_data = plot_data.sort_values(by="sample_id", ascending=False).reset_index(drop=True)
+    plot_data.index = _qc_plot_sample_labels(plot_data)
+
+    size = plot_data.shape[0]
+    bar_height = 0.85
+    min_size = 7
+    min_size_2 = 10
+    plot_rows = max(size, min_size)
+    if size > min_size:
+        plot_rows = max(size, min_size_2)
+    fig, ax = plt.subplots(figsize=(9, plot_rows * bar_height * 0.5), dpi=100, constrained_layout=True)
+    y = np.arange(len(plot_data))
+    ax.barh(
+        y=y,
+        width=plot_data["reads_per_umi"].values,
+        height=bar_height,
+        color="#d8c3a5",
+        label="Reads per UMI",
+    )
+    marker_labeled = False
+    for i, threshold in enumerate(plot_data["overseq_threshold"]):
+        if pd.isna(threshold):
+            continue
+        ax.vlines(
+            float(threshold) - 1,
+            i - bar_height / 2,
+            i + bar_height / 2,
+            color="#d62728",
+            linewidth=2,
+            label="Overseq threshold - 1" if not marker_labeled else None,
+        )
+        marker_labeled = True
+    ax.set_yticks(y)
+    ax.set_yticklabels(plot_data.index)
+    ax.set_ylim(-0.5, len(plot_data) - 0.5)
+    ax.set_xlabel("reads per UMI")
+    fig.legend(loc="outside upper center", title="Coverage", ncol=2, frameon=False)
+    sns.despine(left=True, bottom=True)
+    plt.show()
+    if output_file is not None:
+        ax.get_figure().savefig(output_file, bbox_inches="tight")
+
+
+def show_qc_plot(folder, chart_type='align', count_type='percent', output_file=None,
+                 processing_table=None, show_offtarget=False,
+                 offtarget_chain_threshold=0.01):
     """
     Shows quality control reports in MiXCR-like style
 
     Args:
         folder (str): folder in which to look for QC images.
-        chart_type (str): Possible values are `summary` (corresponds to `mixcr exportQc align`, 
-            `chains` (`mixcr exportQc chainUsage`)
+        chart_type (str): Possible values are `align` (corresponds to
+            `mixcr exportQc align`), `chains` (`mixcr exportQc chainUsage`),
+            or `coverage` (plots `reads_per_umi` and `overseq_threshold - 1`
+            from `get_processing_table` output). Deprecated alias `summary`
+            is accepted as `align`.
         count_type (str): possible values are: `percent`, `abs`
         output_file (str): filename ending with '.png' to save an output plot to
+        processing_table (pd.DataFrame): optional precomputed processing table
+            for `chart_type="coverage"`.
+        show_offtarget (bool): passed to `get_processing_table` for coverage
+            plots when `processing_table` is not provided.
+        offtarget_chain_threshold (float): passed to `get_processing_table`
+            for coverage plots when `processing_table` is not provided.
 
     Returns:
         None
 
     """
-    CHAIN_VARIANTS = ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRD', 'TRL']
+    if chart_type == "summary":
+        warnings.warn(
+            "`chart_type='summary'` is deprecated; use `chart_type='align'` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        chart_type = "align"
+    if chart_type not in ["align", "chains", "coverage"]:
+        raise ValueError("chart_type must be one of: 'align', 'chains', 'coverage'")
+    if count_type not in ["percent", "abs"]:
+        raise ValueError("count_type must be either 'percent' or 'abs'")
+    if chart_type == "coverage":
+        return _plot_coverage_qc(
+            folder,
+            processing_table=processing_table,
+            output_file=output_file,
+            show_offtarget=show_offtarget,
+            offtarget_chain_threshold=offtarget_chain_threshold,
+        )
+
+    CHAIN_VARIANTS = ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRD', 'TRG']
     files = []
     try:
         all_files = os.listdir(folder)
@@ -932,7 +1033,7 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', o
             align_data = json_report_contents['notAlignedReasons']
             chain_usage_data = json_report_contents['chainUsage']['chains']
             
-            if chart_type == 'summary':
+            if chart_type == 'align':
                 renaming_dict = {'NoHits': 'No hits (not TCR/IG?)',
                                 'NoCDR3Parts': 'No CDR3 parts',
                                 'NoVHits': 'No V hits',
@@ -952,14 +1053,17 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', o
                 align_df = {}
                 for chain, data in chain_usage_data.items(): 
                     align_df.update({chain: data['total'] - data['nonFunctional'],
-                                f'{chain} (stops)': data['hasStops'],
-                                f'{chain} (OOF)': data['isOOF']})
+                                f'{chain} (OOF)': data['isOOF'],
+                                f'{chain} (stops)': data['hasStops']})
                 df_list.append(pd.DataFrame(align_df, index=[file[0]]))
+    if len(df_list) == 0:
+        print("No align report data found")
+        return
     results = pd.concat(df_list)
     results = results.sort_index(ascending=False)
     if count_type == 'percent':
         results =  results.div(results.sum(axis=1), axis=0) * 100
-    if chart_type == 'summary':
+    if chart_type == 'align':
         order = ['Successfully aligned', 
                  'No hits (not TCR/IG?)', 
                  'No CDR3 parts', 
@@ -972,14 +1076,33 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', o
         colormap = ListedColormap(colors=colors,
                                     name='mixcr')
     elif chart_type == 'chains':
-        order = sorted(results.columns)
-        colors = ['#c26a27', '#ff9429', '#ffcb8f', '#a324b2', '#e553e5', '#faaafa', '#ad3757', '#f05670', '#ffadba', 
-                                  '#105bcc', '#2d93fa', '#99ccff', '#198020', '#42b842', '#99e099', '#068a94', '#27c2c2', '#90e0e0', 
-                                '#5f31cc', '#845cff', '#c1adff']
-        all_variants = ['IGH', 'IGH (stops)', 'IGH (OOF)', 'IGK', 'IGK (stops)', 'IGK (OOF)', 'IGL', 'IGL (stops)', 'IGL (OOF)', 'TRA', 'TRA (stops)', 'TRA (OOF)', 'TRB', 'TRB (stops)', 'TRB (OOF)', 'TRD', 'TRD (stops)', 'TRD (OOF)', 'TRG', 'TRG (stops)', 'TRG (OOF)']
-        # colormap = ListedColormap(colors=[colors[i] for i in range(len(colors)) if all_variants[i] in results.columns],
-                                    #   name='mixcr')        
-        colors = [colors[i] for i in range(len(colors)) if all_variants[i] in results.columns]
+        column_chains = sorted({column.split(" ")[0] for column in results.columns})
+        chains_found = [chain for chain in CHAIN_VARIANTS if chain in column_chains]
+        chains_found += [chain for chain in column_chains if chain not in chains_found]
+        order = []
+        for chain in chains_found:
+            order += [
+                column for column in [chain, f"{chain} (OOF)", f"{chain} (stops)"]
+                if column in results.columns
+            ]
+        chain_color_map = {
+            'IGH': ('#c26a27', '#ffcb8f', '#ff9429'),
+            'IGK': ('#a324b2', '#faaafa', '#e553e5'),
+            'IGL': ('#ad3757', '#ffadba', '#f05670'),
+            'TRA': ('#105bcc', '#99ccff', '#2d93fa'),
+            'TRB': ('#198020', '#99e099', '#42b842'),
+            'TRD': ('#068a94', '#90e0e0', '#27c2c2'),
+            'TRG': ('#5f31cc', '#c1adff', '#845cff'),
+        }
+        colors = []
+        for column in order:
+            chain = column.split(" ")[0]
+            color_index = 0
+            if "(OOF)" in column:
+                color_index = 1
+            elif "(stops)" in column:
+                color_index = 2
+            colors.append(chain_color_map.get(chain, ('#808080', '#c0c0c0', '#a0a0a0'))[color_index])
     results = results[order]
     size = results.shape[0]
     # ax = results.plot.barh(width=0.85, figsize=(9, size * 0.5),  stacked=True, colormap=colormap)
@@ -1007,13 +1130,27 @@ def show_report_images_new(folder, chart_type='summary', count_type='percent', o
         ax.set_xlabel('%')
     else:
         ax.set_xlabel('read count')
-    if chart_type == 'summary':
-        fig.legend(loc='outside upper center',  title='Alignments rate', ncol=3, frameon=False)
+    if chart_type == 'align':
+        fig.legend(loc='outside upper center',  title='Alignments rate', ncol=2, frameon=False)
     elif chart_type == 'chains':
-        fig.legend(loc='outside upper center',  title='Clonal chain usage', ncol=3, frameon=False)
+        fig.legend(loc='outside upper center',  title='Clonal chain usage', ncol=max(1, len(chains_found)), frameon=False)
     # plt.tight_layout()
     sns.despine(left=True, bottom=True)
     plt.show()
     if output_file is not None:
         ax.get_figure().savefig(output_file, bbox_inches='tight')
     return
+
+
+def show_report_images_new(*args, **kwargs):
+    """
+    Deprecated alias for `show_qc_plot`.
+
+    Use `show_qc_plot` instead. This alias will be removed in a future version.
+    """
+    warnings.warn(
+        "`show_report_images_new` is deprecated; use `show_qc_plot` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return show_qc_plot(*args, **kwargs)

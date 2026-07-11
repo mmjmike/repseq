@@ -25,3 +25,8 @@
 ::: mixcr.show_report_images
     options:
           show_root_toc_entry: false
+
+## show_qc_plot
+::: mixcr.show_qc_plot
+    options:
+          show_root_toc_entry: false

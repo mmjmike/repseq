@@ -1,9 +1,11 @@
 import inspect
+import json
 import shlex
 import sys
 import types
 
 import pandas as pd
+from matplotlib.figure import Figure
 
 from repseq import mixcr
 
@@ -49,7 +51,9 @@ def test_mixcr4_reports_uses_batch_log_without_csv_table(tmp_path):
     jobs = mixcr.mixcr4_reports(str(tmp_path), mixcr_path="echo", backend="local", memory=16)
 
     assert set(jobs["status"]) == {"finished"}
-    assert (tmp_path / "mixcr_reports_slurm_batch.log").exists()
+    batch_log = tmp_path / "mixcr_reports_slurm_batch.log"
+    assert batch_log.exists()
+    assert batch_log.read_text().splitlines()[0] == "# MiXCR 4 Reports"
     assert not (tmp_path / "logs" / "mixcr_reports_slurm_batch_jobs.csv").exists()
 
 
@@ -137,3 +141,87 @@ def test_show_report_images_reports_missing_images(tmp_path, monkeypatch, capsys
     captured = capsys.readouterr().out
     assert "No alignQc image found" in captured
     assert "No chainQc image found" in captured
+
+
+def _write_align_report(folder, sample_id, chains):
+    report = {
+        "totalReadsProcessed": 100,
+        "aligned": 80,
+        "overlappedAligned": 70,
+        "notAlignedReasons": {
+            "NoHits": 10,
+            "NoCDR3Parts": 2,
+            "NoVHits": 1,
+            "NoJHits": 1,
+            "VAndJOnDifferentTargets": 1,
+            "LowTotalScore": 1,
+            "NoBarcode": 4,
+        },
+        "chainUsage": {"chains": chains},
+    }
+    (folder / f"{sample_id}.align.report.json").write_text(json.dumps(report) + "\n")
+
+
+def test_show_qc_plot_align_uses_two_legend_columns(tmp_path, monkeypatch):
+    _write_align_report(
+        tmp_path,
+        "sample1",
+        {"TRB": {"total": 80, "nonFunctional": 5, "hasStops": 2, "isOOF": 3}},
+    )
+    legend_calls = []
+    monkeypatch.setattr(mixcr.plt, "show", lambda: None)
+
+    def fake_legend(*args, **kwargs):
+        legend_calls.append(kwargs)
+
+    monkeypatch.setattr(Figure, "legend", fake_legend)
+
+    mixcr.show_qc_plot(str(tmp_path), chart_type="align")
+
+    assert legend_calls[-1]["ncol"] == 2
+
+
+def test_show_qc_plot_chains_uses_chain_count_legend_columns(tmp_path, monkeypatch):
+    _write_align_report(
+        tmp_path,
+        "sample1",
+        {
+            "TRA": {"total": 40, "nonFunctional": 5, "hasStops": 2, "isOOF": 3},
+            "TRB": {"total": 60, "nonFunctional": 6, "hasStops": 4, "isOOF": 2},
+        },
+    )
+    legend_calls = []
+    monkeypatch.setattr(mixcr.plt, "show", lambda: None)
+
+    def fake_legend(*args, **kwargs):
+        legend_calls.append(kwargs)
+
+    monkeypatch.setattr(Figure, "legend", fake_legend)
+
+    mixcr.show_qc_plot(str(tmp_path), chart_type="chains")
+
+    assert legend_calls[-1]["ncol"] == 2
+
+
+def test_show_qc_plot_coverage_accepts_processing_table(monkeypatch):
+    processing_table = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample1",
+                "extracted_chain": "TRB",
+                "reads_per_umi": 4.5,
+                "overseq_threshold": 7,
+            }
+        ]
+    )
+    legend_calls = []
+    monkeypatch.setattr(mixcr.plt, "show", lambda: None)
+
+    def fake_legend(*args, **kwargs):
+        legend_calls.append(kwargs)
+
+    monkeypatch.setattr(Figure, "legend", fake_legend)
+
+    mixcr.show_qc_plot(".", chart_type="coverage", processing_table=processing_table)
+
+    assert legend_calls[-1]["title"] == "Coverage"
