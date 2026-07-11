@@ -225,3 +225,37 @@ def test_show_qc_plot_coverage_accepts_processing_table(monkeypatch):
     mixcr.show_qc_plot(".", chart_type="coverage", processing_table=processing_table)
 
     assert legend_calls[-1]["title"] == "Coverage"
+
+
+def test_show_qc_plot_coverage_reads_refine_reports_directly(tmp_path, monkeypatch):
+    report = {
+        "correctionReport": {
+            "outputRecords": 45,
+            "steps": [{"outputDiversity": 12}],
+            "filterReport": {
+                "numberOfGroupsAccepted": 10,
+                "operatorReports": [
+                    {"operatorReport": {"threshold": 7}},
+                ],
+            },
+        }
+    }
+    (tmp_path / "sample1.refine.report.json").write_text(json.dumps(report) + "\n")
+    legend_calls = []
+    monkeypatch.setattr(mixcr.plt, "show", lambda: None)
+    monkeypatch.setattr(
+        mixcr,
+        "get_processing_table",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("coverage plot should not build full processing table")
+        ),
+    )
+
+    def fake_legend(*args, **kwargs):
+        legend_calls.append(kwargs)
+
+    monkeypatch.setattr(Figure, "legend", fake_legend)
+
+    mixcr.show_qc_plot(str(tmp_path), chart_type="coverage")
+
+    assert legend_calls[-1]["title"] == "Coverage"

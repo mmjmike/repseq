@@ -6,7 +6,7 @@ import shlex
 import subprocess
 from time import sleep
 from .slurm import run_slurm_command_from_jupyter
-from .io import read_json_report, read_clonoset
+from .io import open_json_report, read_json_report, read_clonoset
 from .clonosets import find_all_exported_clonosets_in_folder
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
@@ -902,14 +902,55 @@ def _qc_plot_sample_labels(table):
     return labels
 
 
+def _coverage_table_from_refine_reports(folder):
+    rows = []
+    try:
+        filenames = os.listdir(folder)
+    except FileNotFoundError:
+        print("No such file or directory")
+        return pd.DataFrame(columns=["sample_id", "reads_per_umi", "overseq_threshold"])
+
+    for filename in filenames:
+        match = re.match(r"(.+)\.refine\.report\.json$", filename)
+        if match is None:
+            continue
+        sample_id = match.group(1)
+        report = open_json_report(os.path.join(folder, filename))
+        correction_report = report.get("correctionReport", {})
+        reads_after_filter = correction_report.get("outputRecords")
+        umi_after_filter = None
+        overseq_threshold = np.nan
+        filter_report = correction_report.get("filterReport")
+        if isinstance(filter_report, dict):
+            umi_after_filter = filter_report.get("numberOfGroupsAccepted")
+            try:
+                overseq_threshold = int(
+                    filter_report["operatorReports"][0]["operatorReport"]["threshold"]
+                )
+            except (KeyError, IndexError, TypeError, ValueError):
+                overseq_threshold = np.nan
+        if umi_after_filter is None:
+            try:
+                umi_after_filter = correction_report["steps"][0]["outputDiversity"]
+            except (KeyError, IndexError, TypeError):
+                umi_after_filter = None
+        if reads_after_filter is None or umi_after_filter in [None, 0]:
+            reads_per_umi = np.nan
+        else:
+            reads_per_umi = round(reads_after_filter / umi_after_filter, 2)
+        rows.append({
+            "sample_id": sample_id,
+            "reads_per_umi": reads_per_umi,
+            "overseq_threshold": overseq_threshold,
+        })
+    return pd.DataFrame(rows, columns=["sample_id", "reads_per_umi", "overseq_threshold"])
+
+
 def _plot_coverage_qc(folder, processing_table=None, output_file=None,
                       show_offtarget=False, offtarget_chain_threshold=0.01):
+    del show_offtarget, offtarget_chain_threshold
     if processing_table is None:
-        processing_table = get_processing_table(
-            folder,
-            show_offtarget=show_offtarget,
-            offtarget_chain_threshold=offtarget_chain_threshold,
-        )
+        processing_table = _coverage_table_from_refine_reports(folder)
     required_columns = {"sample_id", "reads_per_umi", "overseq_threshold"}
     missing = required_columns - set(processing_table.columns)
     if missing:
@@ -975,16 +1016,16 @@ def show_qc_plot(folder, chart_type='align', count_type='percent', output_file=N
         chart_type (str): Possible values are `align` (corresponds to
             `mixcr exportQc align`), `chains` (`mixcr exportQc chainUsage`),
             or `coverage` (plots `reads_per_umi` and `overseq_threshold - 1`
-            from `get_processing_table` output). Deprecated alias `summary`
-            is accepted as `align`.
+            directly from `*.refine.report.json` files). Deprecated alias
+            `summary` is accepted as `align`.
         count_type (str): possible values are: `percent`, `abs`
         output_file (str): filename ending with '.png' to save an output plot to
         processing_table (pd.DataFrame): optional precomputed processing table
             for `chart_type="coverage"`.
-        show_offtarget (bool): passed to `get_processing_table` for coverage
-            plots when `processing_table` is not provided.
-        offtarget_chain_threshold (float): passed to `get_processing_table`
-            for coverage plots when `processing_table` is not provided.
+        show_offtarget (bool): ignored for coverage plots, kept for backwards
+            compatibility.
+        offtarget_chain_threshold (float): ignored for coverage plots, kept for
+            backwards compatibility.
 
     Returns:
         None
