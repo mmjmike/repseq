@@ -1014,10 +1014,11 @@ def show_qc_plot(folder, chart_type='align', count_type='percent', output_file=N
     Args:
         folder (str): folder in which to look for QC images.
         chart_type (str): Possible values are `align` (corresponds to
-            `mixcr exportQc align`), `chains` (`mixcr exportQc chainUsage`),
-            or `coverage` (plots `reads_per_umi` and `overseq_threshold - 1`
-            directly from `*.refine.report.json` files). Deprecated alias
-            `summary` is accepted as `align`.
+            `mixcr exportQc align`), `chains` (plots `clonalChainUsage` from
+            `*.assemble.report.json` files), or `coverage` (plots
+            `reads_per_umi` and `overseq_threshold - 1` directly from
+            `*.refine.report.json` files). Deprecated alias `summary` is
+            accepted as `align`.
         count_type (str): possible values are: `percent`, `abs`
         output_file (str): filename ending with '.png' to save an output plot to
         processing_table (pd.DataFrame): optional precomputed processing table
@@ -1067,14 +1068,14 @@ def show_qc_plot(folder, chart_type='align', count_type='percent', output_file=N
     except FileNotFoundError:
         print('No such file or directory')
     df_list = []
+    expected_report_type = 'align' if chart_type == 'align' else 'assemble'
     for file in files:
         report_type = file[1]
-        if report_type == 'align':
+        if report_type == expected_report_type:
             json_report_contents = read_json_report(file[0], folder, report_type=report_type)
-            align_data = json_report_contents['notAlignedReasons']
-            chain_usage_data = json_report_contents['chainUsage']['chains']
             
             if chart_type == 'align':
+                align_data = json_report_contents['notAlignedReasons']
                 renaming_dict = {'NoHits': 'No hits (not TCR/IG?)',
                                 'NoCDR3Parts': 'No CDR3 parts',
                                 'NoVHits': 'No V hits',
@@ -1091,6 +1092,7 @@ def show_qc_plot(folder, chart_type='align', count_type='percent', output_file=N
                 df_list.append(pd.DataFrame(align_df, index=[file[0]])) 
                 
             elif chart_type == 'chains':
+                chain_usage_data = json_report_contents['clonalChainUsage']['chains']
                 align_df = {}
                 for chain, data in chain_usage_data.items(): 
                     align_df.update({chain: data['total'] - data['nonFunctional'],
@@ -1098,7 +1100,7 @@ def show_qc_plot(folder, chart_type='align', count_type='percent', output_file=N
                                 f'{chain} (stops)': data['hasStops']})
                 df_list.append(pd.DataFrame(align_df, index=[file[0]]))
     if len(df_list) == 0:
-        print("No align report data found")
+        print(f"No {chart_type} report data found")
         return
     results = pd.concat(df_list)
     results = results.sort_index(ascending=False)

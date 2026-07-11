@@ -5,6 +5,7 @@ import sys
 import types
 
 import pandas as pd
+from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from repseq import mixcr
@@ -162,6 +163,15 @@ def _write_align_report(folder, sample_id, chains):
     (folder / f"{sample_id}.align.report.json").write_text(json.dumps(report) + "\n")
 
 
+def _write_assemble_report(folder, sample_id, chains):
+    report = {
+        "type": "assemblerReport",
+        "totalReadsProcessed": 100,
+        "clonalChainUsage": {"type": "chainUsage", "chains": chains},
+    }
+    (folder / f"{sample_id}.assemble.report.json").write_text(json.dumps(report) + "\n")
+
+
 def test_show_qc_plot_align_uses_two_legend_columns(tmp_path, monkeypatch):
     _write_align_report(
         tmp_path,
@@ -182,7 +192,7 @@ def test_show_qc_plot_align_uses_two_legend_columns(tmp_path, monkeypatch):
 
 
 def test_show_qc_plot_chains_uses_chain_count_legend_columns(tmp_path, monkeypatch):
-    _write_align_report(
+    _write_assemble_report(
         tmp_path,
         "sample1",
         {
@@ -201,6 +211,43 @@ def test_show_qc_plot_chains_uses_chain_count_legend_columns(tmp_path, monkeypat
     mixcr.show_qc_plot(str(tmp_path), chart_type="chains")
 
     assert legend_calls[-1]["ncol"] == 2
+
+
+def test_show_qc_plot_chains_reads_clonal_chain_usage_from_assemble_report(tmp_path, monkeypatch):
+    _write_align_report(
+        tmp_path,
+        "sample1",
+        {"IGH": {"total": 100, "nonFunctional": 0, "hasStops": 0, "isOOF": 0}},
+    )
+    _write_assemble_report(
+        tmp_path,
+        "sample1",
+        {"TRB": {"total": 60, "nonFunctional": 6, "hasStops": 4, "isOOF": 2}},
+    )
+    plotted_columns = []
+    monkeypatch.setattr(mixcr.plt, "show", lambda: None)
+
+    def fake_barh(*args, **kwargs):
+        plotted_columns.append(kwargs["label"])
+
+    monkeypatch.setattr(Axes, "barh", fake_barh)
+
+    mixcr.show_qc_plot(str(tmp_path), chart_type="chains")
+
+    assert plotted_columns == ["TRB", "TRB (OOF)", "TRB (stops)"]
+
+
+def test_show_qc_plot_chains_requires_assemble_report(tmp_path, monkeypatch, capsys):
+    _write_align_report(
+        tmp_path,
+        "sample1",
+        {"TRB": {"total": 60, "nonFunctional": 6, "hasStops": 4, "isOOF": 2}},
+    )
+    monkeypatch.setattr(mixcr.plt, "show", lambda: None)
+
+    mixcr.show_qc_plot(str(tmp_path), chart_type="chains")
+
+    assert "No chains report data found" in capsys.readouterr().out
 
 
 def test_show_qc_plot_coverage_accepts_processing_table(monkeypatch):
