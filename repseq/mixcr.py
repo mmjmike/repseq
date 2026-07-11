@@ -1104,6 +1104,7 @@ def show_qc_plot(folder, chart_type='align', count_type='percent', output_file=N
         return
     results = pd.concat(df_list)
     results = results.sort_index(ascending=False)
+    results = results.fillna(0)
     if count_type == 'percent':
         results =  results.div(results.sum(axis=1), axis=0) * 100
     if chart_type == 'align':
@@ -1125,7 +1126,7 @@ def show_qc_plot(folder, chart_type='align', count_type='percent', output_file=N
         order = []
         for chain in chains_found:
             order += [
-                column for column in [chain, f"{chain} (OOF)", f"{chain} (stops)"]
+                column for column in [chain, f"{chain} (stops)", f"{chain} (OOF)"]
                 if column in results.columns
             ]
         chain_color_map = {

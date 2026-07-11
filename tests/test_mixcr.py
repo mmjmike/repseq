@@ -234,7 +234,7 @@ def test_show_qc_plot_chains_reads_clonal_chain_usage_from_assemble_report(tmp_p
 
     mixcr.show_qc_plot(str(tmp_path), chart_type="chains")
 
-    assert plotted_columns == ["TRB", "TRB (OOF)", "TRB (stops)"]
+    assert plotted_columns == ["TRB", "TRB (stops)", "TRB (OOF)"]
 
 
 def test_show_qc_plot_chains_requires_assemble_report(tmp_path, monkeypatch, capsys):
@@ -248,6 +248,34 @@ def test_show_qc_plot_chains_requires_assemble_report(tmp_path, monkeypatch, cap
     mixcr.show_qc_plot(str(tmp_path), chart_type="chains")
 
     assert "No chains report data found" in capsys.readouterr().out
+
+
+def test_show_qc_plot_chains_plots_samples_missing_some_chain_columns(tmp_path, monkeypatch):
+    _write_assemble_report(
+        tmp_path,
+        "sample_TRA_TRB",
+        {
+            "TRA": {"total": 40, "nonFunctional": 5, "hasStops": 2, "isOOF": 3},
+            "TRB": {"total": 60, "nonFunctional": 6, "hasStops": 4, "isOOF": 2},
+        },
+    )
+    _write_assemble_report(
+        tmp_path,
+        "sample_TRB_only",
+        {"TRB": {"total": 15562, "nonFunctional": 569, "hasStops": 42, "isOOF": 527}},
+    )
+    plotted = []
+    monkeypatch.setattr(mixcr.plt, "show", lambda: None)
+
+    def fake_barh(*args, **kwargs):
+        plotted.append((kwargs["label"], list(kwargs["width"])))
+
+    monkeypatch.setattr(Axes, "barh", fake_barh)
+
+    mixcr.show_qc_plot(str(tmp_path), chart_type="chains", count_type="abs")
+
+    trb_widths = dict(plotted)["TRB"]
+    assert trb_widths == [14993.0, 54.0]
 
 
 def test_show_qc_plot_coverage_accepts_processing_table(monkeypatch):
