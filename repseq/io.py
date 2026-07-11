@@ -223,10 +223,31 @@ def open_json_report(filename):
     """
     Supporting function for `read_json_report`. Reads the last record from json file.
     """
-    
-    with open(filename) as data_file:    
-        for jsonObj in data_file:
-            report = json.loads(jsonObj)
+
+    with open(filename) as data_file:
+        contents = data_file.read()
+
+    decoder = json.JSONDecoder()
+    report = None
+    index = 0
+    while index < len(contents):
+        while index < len(contents) and contents[index].isspace():
+            index += 1
+        if index >= len(contents):
+            break
+
+        try:
+            report, index = decoder.raw_decode(contents, index)
+        except json.JSONDecodeError:
+            next_object = contents.find("{", index + 1)
+            next_array = contents.find("[", index + 1)
+            next_positions = [pos for pos in [next_object, next_array] if pos != -1]
+            if len(next_positions) == 0:
+                break
+            index = min(next_positions)
+
+    if report is None:
+        raise json.JSONDecodeError("Expecting JSON value", contents, 0)
     return report
 
 
