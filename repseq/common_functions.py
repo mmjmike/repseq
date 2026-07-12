@@ -6,6 +6,9 @@ import math
 from collections import OrderedDict
 
 def print_progress_bar(samples_done, samples_total, program_name="", object_name="sample(s)"):
+    if samples_total == 0:
+        print(f"{program_name} |{'-' * 50}| 0/0 {object_name} processed")
+        return
     total_steps = 50
     done = int(samples_done/samples_total*total_steps)
     bar = '#'*done + '-'*(total_steps-done)
@@ -20,9 +23,14 @@ def run_parallel_calculation(function, tasks, program_name, object_name="tasks",
     tasks_total = len(tasks)
     tasks_done = 0
     if verbose:
+        if cpu == 1:
+            print("Using 1 core")
+        elif cpu is None:
+            print("Using default number of worker processes")
+        else:
+            print(f"Using {cpu} cores")
         print_progress_bar(tasks_done, tasks_total, program_name, object_name=object_name)
     if cpu == 1:
-        print(f"Using {cpu} cores")
         for task in tasks:
             result = function(task)
             result_list.append(result)
@@ -30,7 +38,6 @@ def run_parallel_calculation(function, tasks, program_name, object_name="tasks",
             if verbose:
                 print_progress_bar(tasks_done, tasks_total, program_name, object_name=object_name)
     else:
-        print(f"Using {cpu} cores")
         with concurrent.futures.ProcessPoolExecutor(max_workers=cpu) as executor:
             for result in executor.map(function, tasks):
                 result_list.append(result)
