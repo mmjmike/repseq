@@ -18,7 +18,7 @@ REPSEQ_PATH = os.path.join(os.path.expanduser("~"), "soft", "repseq")
 AA_PROPS_PATH = os.path.join(REPSEQ_PATH, "repseq", "resourses", "aa_property_table.txt")
 
 
-def calc_clonoset_stats(clonosets_df, cl_filter=None, verbose=True):
+def calc_clonoset_stats(clonosets_df, cl_filter=None, verbose=True, cpu=None):
     """
     Calculates statistics for clonosets regarding clonotype, read and UMI counts.
     Also gives counts for functional clonotypes and non-singletons: clonotypes, 
@@ -29,12 +29,23 @@ def calc_clonoset_stats(clonosets_df, cl_filter=None, verbose=True):
         clonosets_df (pd.DataFrame): dataframe, containing two required columns: 
             `sample_id` and `filename`. Also recommended to have `chain` column in this DF.
         cl_filter (Filter): clonoset filter - object from `clone_filter.py` module.
+        verbose (bool): if `True`, show progress information.
+        cpu (int, optional): number of worker processes. Use `1` to run
+            sequentially in a for-loop for easier debugging. `None` uses the
+            default `ProcessPoolExecutor` worker count.
 
     Returns:
         pd.DataFrame: dataframe with clonotype statistics for each sample in clonosets_df
     """
 
-    df = generic_calculation(clonosets_df, calculate_clonoset_stats_cl, clonoset_filter=cl_filter, program_name="CalcClonosetStats", verbose=verbose)
+    df = generic_calculation(
+        clonosets_df,
+        calculate_clonoset_stats_cl,
+        clonoset_filter=cl_filter,
+        program_name="CalcClonosetStats",
+        verbose=verbose,
+        cpu=cpu,
+    )
     convert_dict = {"clones": int,
                     "clones_func": int,
                     "clones_func_singletons": int,
@@ -181,7 +192,7 @@ def calculate_clonoset_stats_cl(clonoset):
     clones_num = len(clonoset)
     read_num = clonoset[count_column].sum()
     umi_count = None
-    if colnames["umi"] is not None:
+    if colnames["umi"]:
         umi_count = clonoset[umi_column].sum()
 
     # stats for functional clones
@@ -191,7 +202,7 @@ def calculate_clonoset_stats_cl(clonoset):
     func_umi_count = None
     umi_nonfunc = None
     umi_nonfunc_freq = None
-    if colnames["umi"] is not None:
+    if colnames["umi"]:
         func_umi_count = clonoset[umi_column].sum()
         func_singletons = len(clonoset.loc[clonoset[umi_column] == 1])
         umi_nonfunc = umi_count-func_umi_count
@@ -307,7 +318,7 @@ def calculate_diversity_stats_cl(clonoset_in, colnames=None):
 
 def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, program_name="Calculation",
                          iterations=1, seed=None, drop_small_samples=False, verbose=True,
-                         skip_checks=False, **kwargs):
+                         skip_checks=False, cpu=None, **kwargs):
     '''
     Main function that applies batch calculations for multiple clonosets
     using a `calc_function`. It checks inputs, checks if clonotype counts are 
@@ -334,6 +345,9 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
             because of lack of counts/clonotypes will be dropped before the calculation.
             `False` - small samples will be taken into account, but with fewer counts/clonotypes 
             than those with enough counts/clonotypes.
+        cpu (int, optional): number of worker processes. Use `1` to run
+            sequentially in a for-loop for easier debugging. `None` uses the
+            default `ProcessPoolExecutor` worker count.
 
     Returns:
         df (pd.DataFrame): resulting DataFrame, with `sample_id` and `chain` columns and properties
@@ -391,7 +405,7 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
             need_top = True
         if need_downsample or need_top:
             print("Calcultating stats for original clonosets\n" + "_"*41)
-            stats = calc_clonoset_stats(clonosets_df, verbose=verbose)
+            stats = calc_clonoset_stats(clonosets_df, verbose=verbose, cpu=cpu)
             downsample_column = count_column_by_umi_and_functionality[clonoset_filter.by_umi][clonoset_filter.functionality]
             read_column = count_column_by_umi_and_functionality[False][clonoset_filter.functionality]
             top_column = clone_column_by_functionality[clonoset_filter.functionality]
@@ -455,7 +469,14 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
             task = (sample_id, filename, calc_function, None, iterations, seed, program_name, random_filter, kwargs)
         tasks.append(task)
     
-    results = run_parallel_calculation(perform_generic_calculation_mp, tasks, program_name, object_name="calcultaion(s)", verbose=verbose)
+    results = run_parallel_calculation(
+        perform_generic_calculation_mp,
+        tasks,
+        program_name,
+        object_name="calcultaion(s)",
+        verbose=verbose,
+        cpu=cpu,
+    )
     clonosets_df = clonosets_df[columns_retain]
     df = clonosets_df.merge(pd.DataFrame(results), how="left")
     if split_chain_after_calculation:
@@ -501,5 +522,3 @@ def perform_generic_calculation_mp(args):
     clonoset_result.update(pd.DataFrame(clonoset_results).mean().to_dict())
     
     return clonoset_result
-
-
