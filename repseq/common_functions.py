@@ -47,21 +47,57 @@ def run_parallel_calculation(function, tasks, program_name, object_name="tasks",
     return result_list
 
 def diversity_metrics(list_of_numbers):
-    list_of_numbers = list(list_of_numbers)
-    total_size = sum(list_of_numbers)
-    freqs = [s/total_size for s in list_of_numbers]
-    diversity = len(list_of_numbers)
-    sw = -sum([f*np.log(f) for f in freqs])
-    sw_norm = sw/np.log(diversity)
-    clonality = 1 - sw_norm
-    chao1 = calc_chao1_index(list_of_numbers)
+    counts = np.asarray(list(list_of_numbers), dtype=np.float64)
+    counts = counts[counts > 0]
+    total_size = counts.sum()
+    diversity = int(len(counts))
 
-    results = {"shannon_wiener": sw,
+    if diversity == 0 or total_size == 0:
+        return {
+            "diversity": 0,
+            "norm_shannon_wiener": np.nan,
+            "clonality": np.nan,
+            "shannon_wiener": np.nan,
+            "chao1": np.nan,
+            "richness": 0,
+            "ace": np.nan,
+            "goods_coverage": np.nan,
+            "d50": np.nan,
+            "simpson": np.nan,
+            "inverse_simpson": np.nan,
+            "gini_simpson": np.nan,
+            "berger_parker": np.nan,
+            "gini_coefficient": np.nan,
+        }
+
+    freqs = counts / total_size
+    sw = -np.sum(freqs * np.log(freqs))
+    sw_norm = sw / np.log(diversity) if diversity > 1 else 0
+    clonality = 1 - sw_norm
+    chao1 = calc_chao1_index(counts)
+    ace = calc_ace_index(counts)
+    goods_coverage = calc_goods_coverage(counts)
+    simpson = np.sum(freqs ** 2)
+    inverse_simpson = 1 / simpson if simpson > 0 else np.nan
+    gini_simpson = 1 - simpson
+    berger_parker = np.max(freqs)
+    gini_coefficient = calc_gini_coefficient(counts)
+    d50 = calc_d50(counts)
+
+    results = {"diversity": diversity,
                "norm_shannon_wiener": sw_norm,
-               "diversity": diversity,
                "clonality": clonality,
-               "chao1": chao1
-               }
+               "shannon_wiener": sw,
+               "chao1": chao1,
+               "richness": diversity,
+               "ace": ace,
+               "goods_coverage": goods_coverage,
+               "d50": d50,
+               "simpson": simpson,
+               "inverse_simpson": inverse_simpson,
+               "gini_simpson": gini_simpson,
+               "berger_parker": berger_parker,
+               "gini_coefficient": gini_coefficient}
 
     return results
 
@@ -77,6 +113,72 @@ def calc_chao1_index(counts):
         chao1 = S_obs + (f1 * (f1 - 1)) / (2 * f2)
     
     return chao1
+
+
+def calc_ace_index(counts, rare_threshold=10):
+    counts = np.asarray(counts, dtype=np.float64)
+    counts = counts[counts > 0]
+    abundant = counts > rare_threshold
+    rare = counts <= rare_threshold
+    s_abundant = np.sum(abundant)
+    s_rare = np.sum(rare)
+    n_rare = np.sum(counts[rare])
+    if s_rare == 0:
+        return float(s_abundant)
+    if n_rare == 0:
+        return np.nan
+    f1 = np.sum(counts == 1)
+    c_ace = 1 - f1 / n_rare
+    if c_ace <= 0:
+        return np.nan
+    if n_rare <= 1:
+        gamma_sq_ace = 0
+    else:
+        rare_counts = counts[rare]
+        freqs = np.array([np.sum(rare_counts == i) for i in range(1, rare_threshold + 1)])
+        i_values = np.arange(1, rare_threshold + 1)
+        gamma_sq_ace = (
+            s_rare
+            / c_ace
+            * np.sum(i_values * (i_values - 1) * freqs)
+            / (n_rare * (n_rare - 1))
+            - 1
+        )
+        gamma_sq_ace = max(gamma_sq_ace, 0)
+    return s_abundant + s_rare / c_ace + f1 / c_ace * gamma_sq_ace
+
+
+def calc_goods_coverage(counts):
+    counts = np.asarray(counts, dtype=np.float64)
+    counts = counts[counts > 0]
+    total = counts.sum()
+    if total == 0:
+        return np.nan
+    f1 = np.sum(counts == 1)
+    return 1 - f1 / total
+
+
+def calc_d50(counts):
+    counts = np.asarray(counts, dtype=np.float64)
+    counts = counts[counts > 0]
+    if len(counts) == 0:
+        return np.nan
+    ordered = np.sort(counts)[::-1]
+    dominant_clones = np.searchsorted(np.cumsum(ordered), ordered.sum() * 0.5, side="left") + 1
+    return dominant_clones / len(ordered)
+
+
+def calc_gini_coefficient(counts):
+    counts = np.sort(np.asarray(counts, dtype=np.float64))
+    counts = counts[counts > 0]
+    n = len(counts)
+    if n == 0:
+        return np.nan
+    total = counts.sum()
+    if total == 0:
+        return np.nan
+    index = np.arange(1, n + 1)
+    return (2 * np.sum(index * counts)) / (n * total) - (n + 1) / n
 
 
 def extract_segment(s):

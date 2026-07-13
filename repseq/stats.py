@@ -264,12 +264,17 @@ def calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=
 def calc_diversity_stats(clonosets_df, cl_filter=None, iterations=3, seed=None,
                          drop_small_samples=False, cpu=None, verbose=True):
     """
-    Calculates `observed diversity`, `Shannon-Wiener` and `normalized Shannon-Wiener` index for
-    each clonoset in `clonosets_df`.
-    `observed diversity` - total number of unique clonotypes in a given clonoset
-    `Shannon-Wiener` - mixed evenness and diversity metric
-    `normalized Shannon-Wiener` - evenness metric.
-    It is highly recommnded to use equal downsampling for all input clonosets for 
+    Calculates richness, diversity, evenness, and dominance metrics for each
+    clonoset in `clonosets_df`.
+
+    The first metric columns are `diversity`, `norm_shannon_wiener`,
+    `clonality`, `shannon_wiener`, and `chao1`. Additional columns include
+    `richness`, `ace`, `goods_coverage`, `d50`, `simpson`,
+    `inverse_simpson`, `gini_simpson`, `berger_parker`, and
+    `gini_coefficient`.
+
+    It is highly recommended to use equal downsampling for all input clonosets
+    before comparing diversity metrics.
     
     Args:
         clonosets_df (pd.DataFrame): dataframe, containing two required columns: 

@@ -110,17 +110,37 @@ cdr3_properties = stats.calc_cdr3_properties(clonosets, cl_filter=func_filter)
 |  1 | sample2_nCD4_1_TRB | TRB     |           42.6894 |            5.45495 |          0.0937428 |      7.90164e-06 |            -3.63854 |               -3.7497  |       -0.070658 |           -0.65764 |           2.52354 |              7.43611 |         453.382 |            1376.69 |          0.954769 |              4.53017 |          -14.1263 |             -43.5042 |      1.95697 |         1.73002 |     -2.96411 |        -5.37987 |   -0.189644  |       -1.12346  |     0.76061  |       -0.362696 |    -0.959487 |        -2.87697 |     -1.19542 |        -1.66914 |     0.654523 |        0.440107 |      1.30386 |        0.341753 |     -1.90955 |      -0.0793168 |      0.297878 |         -1.35161 |     0.306715 |        0.760597 |         0.310945 |            0.791057 |       5.87189 |          14.8052 |        4.49732 |           14.0927 |       4.81489 |          13.9093 |      0.289834 |         0.766072 |           2.2879  |              2.64048 |
 |  2 | sample3_nCD4_1_TRB | TRB     |           43.1306 |            5.53264 |          0.109455  |      1.54835e-05 |            -3.5389  |               -3.36705 |        0.226643 |           -0.13198 |           2.45753 |              7.38413 |         463.875 |            1401.24 |          1.01215  |              4.64907 |          -14.3082 |             -44.2336 |      1.88087 |         1.95313 |     -2.68089 |        -5.22143 |    0.141751  |       -0.455098 |     0.772542 |       -0.446082 |    -1.0089   |        -2.85593 |     -1.24996 |        -1.84142 |     0.968762 |        0.771571 |      1.23777 |        0.206734 |     -1.78501 |       0.0142436 |      0.431144 |         -1.00567 |     0.302192 |        0.761093 |         0.305975 |            0.791293 |       5.76219 |          14.8705 |        4.50163 |           14.148  |       4.8573  |          14.1363 |      0.29094  |         0.777235 |           2.11711 |              2.3694  |
 
-<br>Calculating [diversity](https://mixcr.com/mixcr/reference/mixcr-postanalysis/#diversity-measures) stats. It includes observed diversity, Shannon-Wiener, normalized Shannon-Wiener and chao1 index for each clonoset in clonosets_df. Here, a top_n filter is applied.
+<br>Calculating [diversity](https://mixcr.com/mixcr/reference/mixcr-postanalysis/#diversity-measures) stats. Here, a top_n filter is applied.
 
 ```py
 diversity_stats = stats.calc_diversity_stats(clonosets, cl_filter=downsample_filter, seed=123)
 ```
 
-|    | sample_id          | chain   |   shannon_wiener |   norm_shannon_wiener |   diversity |   clonality |    chao1 |
-|---:|:-------------------|:--------|-----------------:|----------------------:|------------:|------------:|---------:|
-|  0 | sample1_nCD4_1_TRB | TRB     |          9.53229 |              0.997617 |       14116 |  0.00238349 | 125744   |
-|  1 | sample2_nCD4_1_TRB | TRB     |          9.52557 |              0.997336 |       14059 |  0.00266397 | 121758   |
-|  2 | sample3_nCD4_1_TRB | TRB     |          9.43915 |              0.994989 |       13183 |  0.005011   |  61315.5 |
+The first diversity columns are kept in this order for backwards-compatible
+summary tables: `diversity`, `norm_shannon_wiener`, `clonality`,
+`shannon_wiener`, `chao1`. Additional richness, evenness, and dominance
+metrics are appended after them.
+
+| metric | description | formula |
+|:--|:--|:--|
+| `diversity` | Observed richness; number of clonotypes with non-zero count. | `S_obs` |
+| `norm_shannon_wiener` | Normalized Shannon-Wiener evenness. | `H / ln(S_obs)` |
+| `clonality` | Shannon-based clonality. Values near 1 indicate dominance by few clonotypes. | `1 - H / ln(S_obs)` |
+| `shannon_wiener` | Shannon-Wiener entropy. | `H = -sum(p_i ln p_i)` |
+| `chao1` | Bias-corrected Chao1 richness estimator. | `S_obs + f1 * (f1 - 1) / (2 * (f2 + 1))` |
+| `richness` | Alias of observed richness. | `S_obs` |
+| `ace` | Abundance-based Coverage Estimator using rare clonotypes with count <= 10. | `S_abund + S_rare / C_ACE + f1 * gamma_ACE^2 / C_ACE` |
+| `goods_coverage` | Good's coverage, estimated sampled repertoire coverage. | `1 - f1 / N` |
+| `d50` | Fraction of clonotypes needed to account for at least 50% of counts. | `min(k: sum_{i=1..k} n_i >= N/2) / S_obs`, counts sorted descending |
+| `simpson` | Simpson dominance index. | `sum(p_i^2)` |
+| `inverse_simpson` | Effective diversity from Simpson index. | `1 / sum(p_i^2)` |
+| `gini_simpson` | Gini-Simpson diversity index. | `1 - sum(p_i^2)` |
+| `berger_parker` | Berger-Parker dominance index. | `max(p_i)` |
+| `gini_coefficient` | Inequality of clonotype counts. | `(2 * sum(i * n_i)) / (S_obs * N) - (S_obs + 1) / S_obs`, counts sorted ascending |
+
+Here `n_i` is a clonotype count, `p_i = n_i / N`, `N = sum(n_i)`,
+`S_obs` is observed richness, `f1` is the number of singleton clonotypes, and
+`f2` is the number of doubletons.
 
 
 <br>Calculating convergence (=the number of unique CDR3 nucleotide sequences that code for the same amino acid sequence) for each clonoset in clonosets_df. 
