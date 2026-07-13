@@ -62,7 +62,8 @@ def calc_clonoset_stats(clonosets_df, cl_filter=None, verbose=True, cpu=None):
     df = df.astype(convert_dict)
     return df
 
-def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long", by_count=False):
+def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long", by_count=False,
+                       cpu=None, drop_small_samples=False, verbose=True):
     """
     Calculates segment (`V`, `J`, or `C`) usage for several samples. By default outputs
     'long' table with four columns: segment name, `usage`, `sample_id` and `chain`.
@@ -75,6 +76,10 @@ def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long", 
         segment (str, optional): possible values are `v`, `j` or `c`. Defaults to "v".
         cl_filter (Filter, optional): clonoset filter - object from `clone_filter.py` module.
         table (str, optional): table type - `long` or `wide`. Defaults to "long".
+        cpu (int, optional): number of worker processes.
+        drop_small_samples (bool): if `True`, drop samples that are smaller
+            than `cl_filter.top` or `cl_filter.downsample`.
+        verbose (bool): if `True`, show progress information.
 
 
     Returns:
@@ -95,7 +100,17 @@ def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long", 
     segment = segment.lower()
     if segment not in possible_segments:
         raise ValueError(f"Wrong segment value. Possible values: {', '.join(possible_segments)}")
-    df = generic_calculation(clonosets_df, calc_segment_usage_cl, clonoset_filter=cl_filter, program_name="CalcSegmentUsage", segment=segment, by_count=by_count)
+    df = generic_calculation(
+        clonosets_df,
+        calc_segment_usage_cl,
+        clonoset_filter=cl_filter,
+        program_name="CalcSegmentUsage",
+        segment=segment,
+        by_count=by_count,
+        cpu=cpu,
+        drop_small_samples=drop_small_samples,
+        verbose=verbose,
+    )
     df = df.fillna(0)
     if table == "wide":
         return df
@@ -112,6 +127,7 @@ def cdr3_length_distributions(
     table="long",
     zero_fill=True,
     verbose=True,
+    drop_small_samples=False,
 ):
     """
     Calculate CDR3 length distributions for multiple clonosets.
@@ -133,6 +149,8 @@ def cdr3_length_distributions(
             lengths found in other samples but absent from a given sample. Wide
             tables are always zero-filled.
         verbose (bool): if `True`, show progress information.
+        drop_small_samples (bool): if `True`, drop samples that are smaller
+            than `cl_filter.top` or `cl_filter.downsample`.
 
     Returns:
         pd.DataFrame: long table with `sample_id`, optional `chain`,
@@ -154,6 +172,7 @@ def cdr3_length_distributions(
         program_name="CalcCDR3LengthDistribution",
         verbose=verbose,
         cpu=cpu,
+        drop_small_samples=drop_small_samples,
         count_by_freq=count_by_freq,
         seq_type=seq_type,
     )
@@ -242,7 +261,8 @@ def calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=
     result = clonoset[[freq_column] + columns_to_join].groupby(columns_to_join).sum().to_dict()[freq_column]
     return result
 
-def calc_diversity_stats(clonosets_df, cl_filter=None, iterations=3, seed=None, drop_small_samples=True):
+def calc_diversity_stats(clonosets_df, cl_filter=None, iterations=3, seed=None,
+                         drop_small_samples=False, cpu=None, verbose=True):
     """
     Calculates `observed diversity`, `Shannon-Wiener` and `normalized Shannon-Wiener` index for
     each clonoset in `clonosets_df`.
@@ -264,14 +284,33 @@ def calc_diversity_stats(clonosets_df, cl_filter=None, iterations=3, seed=None, 
             the function description. If 'wide' - then it has all possible segments in 
             column names, sample_id's - in rows and usage in each cell in the table.
     """
-    df = generic_calculation(clonosets_df, calculate_diversity_stats_cl, clonoset_filter=cl_filter,
-                             program_name="CalcDiversityStats", iterations=iterations, seed=seed, drop_small_samples=drop_small_samples)
+    df = generic_calculation(
+        clonosets_df,
+        calculate_diversity_stats_cl,
+        clonoset_filter=cl_filter,
+        program_name="CalcDiversityStats",
+        iterations=iterations,
+        seed=seed,
+        drop_small_samples=drop_small_samples,
+        cpu=cpu,
+        verbose=verbose,
+    )
     return df
 
 
-def calc_convergence(clonosets_df, cl_filter=None, iterations=1, seed=None, drop_small_samples=True):
-    df = generic_calculation(clonosets_df, calculate_convergence_cl, clonoset_filter=cl_filter,
-                             program_name="CalcConvergence", iterations=iterations, seed=seed, drop_small_samples=drop_small_samples)
+def calc_convergence(clonosets_df, cl_filter=None, iterations=1, seed=None,
+                     drop_small_samples=False, cpu=None, verbose=True):
+    df = generic_calculation(
+        clonosets_df,
+        calculate_convergence_cl,
+        clonoset_filter=cl_filter,
+        program_name="CalcConvergence",
+        iterations=iterations,
+        seed=seed,
+        drop_small_samples=drop_small_samples,
+        cpu=cpu,
+        verbose=verbose,
+    )
     return df
 
 
@@ -526,11 +565,12 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
                                         (stats[read_column] < clonoset_filter.downsample_size) & (stats.sample_id.isin(count_by_reads_samples))]
             if len(not_enough_count_df) > 0:
                 not_enough_count_samples = list(not_enough_count_df.sample_id)
-                if not drop_small_samples:
-                    print(f"WARNING! Following samples have not enough downsample counts ('{downsample_column}' < {clonoset_filter.downsample_size}): {', '.join(not_enough_count_samples)}")
+                print(f"WARNING! downsample={clonoset_filter.downsample_size} exceeds available counts for samples: {', '.join(not_enough_count_samples)}")
+                if drop_small_samples:
                     print("These samples will be excluded from further calculations.")
-                    print("To suppress the warnings set drop_small_samples=True")
-                exclude_samples.update(not_enough_count_samples)
+                    exclude_samples.update(not_enough_count_samples)
+                else:
+                    print("These samples will be kept and calculated without downsampling.")
         if need_top:
             if stats[downsample_column].isnull().any().any():
                 nan_downsample_samples = list(stats[stats[downsample_column].isna()].sample_id)
@@ -543,11 +583,12 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
             not_enough_clones_df = stats[stats[top_column] < clonoset_filter.top]
             if len(not_enough_clones_df) > 0:
                 not_enough_clones_samples = list(not_enough_clones_df.sample_id)
-                if not drop_small_samples:
-                    print(f"WARNING! Following samples have not enough clonotypes ('{top_column}' < {clonoset_filter.top}): {', '.join(not_enough_clones_samples)}")
+                print(f"WARNING! top={clonoset_filter.top} exceeds available clonotypes for samples: {', '.join(not_enough_clones_samples)}")
+                if drop_small_samples:
                     print("These samples will be excluded from further calculations.")
-                    print("To suppress the warnings set drop_small_samples=True")
-                exclude_samples.update(not_enough_clones_samples)
+                    exclude_samples.update(not_enough_clones_samples)
+                else:
+                    print("These samples will be kept and calculated without top filtering.")
 
 
         if isinstance(clonoset_filter.downsample_size, int) or (isinstance(clonoset_filter.top, int) and clonoset_filter.mix_tails):
@@ -565,7 +606,10 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
         if sample_id in exclude_samples:
             continue
         if clonoset_filter is not None:
-            task = (sample_id, filename, calc_function, clonoset_filter.spawn(), iterations, seed, program_name, random_filter, kwargs)
+            task_filter = clonoset_filter.spawn()
+            if not drop_small_samples:
+                task_filter.ignore_small_clonosets = True
+            task = (sample_id, filename, calc_function, task_filter, iterations, seed, program_name, random_filter, kwargs)
         else:
             task = (sample_id, filename, calc_function, None, iterations, seed, program_name, random_filter, kwargs)
         tasks.append(task)

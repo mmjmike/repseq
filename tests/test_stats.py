@@ -1,6 +1,7 @@
 import pandas as pd
 
 from repseq import stats
+from repseq.clone_filter import Filter
 
 
 def _write_clonoset(path, rows):
@@ -198,3 +199,91 @@ def test_cdr3_length_distributions_nt_lengths(tmp_path):
 
     assert result.loc[0, "cdr3_length"] == 6
     assert result.loc[0, "freq"] == 1.0
+
+
+def test_calc_diversity_stats_passes_cpu_to_generic_calculation(monkeypatch):
+    seen = {}
+
+    def fake_generic_calculation(*args, **kwargs):
+        seen["cpu"] = kwargs["cpu"]
+        return pd.DataFrame([{"sample_id": "sample1", "diversity": 1}])
+
+    monkeypatch.setattr(stats, "generic_calculation", fake_generic_calculation)
+
+    result = stats.calc_diversity_stats(
+        pd.DataFrame([{"sample_id": "sample1", "filename": "sample.tsv"}]),
+        cpu=1,
+        verbose=False,
+    )
+
+    assert seen["cpu"] == 1
+    assert result.loc[0, "diversity"] == 1
+
+
+def test_generic_calculation_warns_and_keeps_small_samples_by_default(tmp_path, capsys):
+    small_file = tmp_path / "small.tsv"
+    large_file = tmp_path / "large.tsv"
+    _write_clonoset(
+        small_file,
+        [{"count": 1, "freq": 1.0, "cdr3nt": "TGT", "cdr3aa": "CAS", "v": "TRBV1", "d": ".", "j": "TRBJ1"}],
+    )
+    _write_clonoset(
+        large_file,
+        [
+            {"count": 1, "freq": 0.5, "cdr3nt": "TGT", "cdr3aa": "CAS", "v": "TRBV1", "d": ".", "j": "TRBJ1"},
+            {"count": 1, "freq": 0.5, "cdr3nt": "TGTGCC", "cdr3aa": "CASS", "v": "TRBV2", "d": ".", "j": "TRBJ2"},
+        ],
+    )
+    clonosets = pd.DataFrame(
+        [
+            {"sample_id": "small", "filename": str(small_file)},
+            {"sample_id": "large", "filename": str(large_file)},
+        ]
+    )
+
+    result = stats.calc_diversity_stats(
+        clonosets,
+        cl_filter=Filter(top=2),
+        cpu=1,
+        verbose=False,
+    )
+
+    captured = capsys.readouterr().out
+    assert "WARNING! top=2 exceeds available clonotypes for samples: small" in captured
+    assert "kept and calculated without top filtering" in captured
+    assert result.loc[result["sample_id"] == "small", "diversity"].iloc[0] == 1
+
+
+def test_generic_calculation_warns_and_drops_small_samples_when_requested(tmp_path, capsys):
+    small_file = tmp_path / "small.tsv"
+    large_file = tmp_path / "large.tsv"
+    _write_clonoset(
+        small_file,
+        [{"count": 1, "freq": 1.0, "cdr3nt": "TGT", "cdr3aa": "CAS", "v": "TRBV1", "d": ".", "j": "TRBJ1"}],
+    )
+    _write_clonoset(
+        large_file,
+        [
+            {"count": 1, "freq": 0.5, "cdr3nt": "TGT", "cdr3aa": "CAS", "v": "TRBV1", "d": ".", "j": "TRBJ1"},
+            {"count": 1, "freq": 0.5, "cdr3nt": "TGTGCC", "cdr3aa": "CASS", "v": "TRBV2", "d": ".", "j": "TRBJ2"},
+        ],
+    )
+    clonosets = pd.DataFrame(
+        [
+            {"sample_id": "small", "filename": str(small_file)},
+            {"sample_id": "large", "filename": str(large_file)},
+        ]
+    )
+
+    result = stats.calc_diversity_stats(
+        clonosets,
+        cl_filter=Filter(top=2),
+        drop_small_samples=True,
+        cpu=1,
+        verbose=False,
+    )
+
+    captured = capsys.readouterr().out
+    assert "WARNING! top=2 exceeds available clonotypes for samples: small" in captured
+    assert "excluded from further calculations" in captured
+    assert pd.isna(result.loc[result["sample_id"] == "small", "diversity"].iloc[0])
