@@ -220,6 +220,25 @@ def test_calc_diversity_stats_passes_cpu_to_generic_calculation(monkeypatch):
     assert result.loc[0, "diversity"] == 1
 
 
+def test_calc_cdr3_properties_passes_cpu_to_generic_calculation(monkeypatch):
+    seen = {}
+
+    def fake_generic_calculation(*args, **kwargs):
+        seen["cpu"] = kwargs["cpu"]
+        return pd.DataFrame([{"sample_id": "sample1", "mean_cdr3nt_len": 6}])
+
+    monkeypatch.setattr(stats, "generic_calculation", fake_generic_calculation)
+
+    result = stats.calc_cdr3_properties(
+        pd.DataFrame([{"sample_id": "sample1", "filename": "sample.tsv"}]),
+        cpu=1,
+        verbose=False,
+    )
+
+    assert seen["cpu"] == 1
+    assert result.loc[0, "mean_cdr3nt_len"] == 6
+
+
 def test_generic_calculation_warns_and_keeps_small_samples_by_default(tmp_path, capsys):
     small_file = tmp_path / "small.tsv"
     large_file = tmp_path / "large.tsv"

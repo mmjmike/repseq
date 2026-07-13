@@ -51,7 +51,8 @@ def test_run_parallel_calculation_prints_worker_message_before_progress(monkeypa
     captured = capsys.readouterr().out
     assert result == [1, 2]
     assert "Using None cores" not in captured
-    assert captured.startswith("Using default number of worker processes\nTestProgram")
+    assert "Set cpu=1 or another integer to change this." in captured
+    assert captured.startswith("Using all available worker processes by default.")
 
 
 def test_diversity_metrics_include_expected_metrics_and_order():

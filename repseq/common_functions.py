@@ -26,7 +26,7 @@ def run_parallel_calculation(function, tasks, program_name, object_name="tasks",
         if cpu == 1:
             print("Using 1 core")
         elif cpu is None:
-            print("Using default number of worker processes")
+            print("Using all available worker processes by default. Set cpu=1 or another integer to change this.")
         else:
             print(f"Using {cpu} cores")
         print_progress_bar(tasks_done, tasks_total, program_name, object_name=object_name)
