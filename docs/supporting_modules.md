@@ -36,6 +36,12 @@ Deprecated alias for `read_ngsik_metadata`.
     options:
           show_root_toc_entry: false
 
+## save_to_vdjtools
+
+::: io.save_to_vdjtools
+    options:
+          show_root_toc_entry: false
+
 ## read_json_report
 
 ::: io.read_json_report

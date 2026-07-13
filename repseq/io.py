@@ -190,6 +190,77 @@ def read_clonoset(
         )
     return clonoset
 
+
+def _vdjtools_filename(row, has_chain):
+    sample_id = row["sample_id"]
+    if has_chain:
+        return f"vdjtools.{sample_id}.{row['chain']}.txt"
+    return f"vdjtools.{sample_id}.txt"
+
+
+def save_to_vdjtools(samples_df, output_folder, cl_filter=None, force_overwrite=False):
+    """
+    Save clonosets in VDJtools-like format and write VDJtools metadata.
+
+    Args:
+        samples_df (pd.DataFrame): table with `sample_id` and `filename`
+            columns. If a `chain` column is present, output filenames are
+            written as `vdjtools.{sample_id}.{chain}.txt`; otherwise they are
+            written as `vdjtools.{sample_id}.txt`.
+        output_folder (str): folder in which to save converted clonosets and
+            `metadata.txt`.
+        cl_filter (Filter, optional): filter used to convert and filter each
+            clonoset. Defaults to `Filter()`.
+        force_overwrite (bool): if `False`, check all target filenames before
+            writing. If any target already exists, print a warning and do not
+            write any files. Set to `True` to overwrite existing files.
+
+    Returns:
+        pd.DataFrame or None: VDJtools metadata table when files are written,
+            otherwise `None` if conflicting files were found.
+    """
+    from .clone_filter import Filter
+
+    if "sample_id" not in samples_df.columns:
+        raise ValueError("samples_df must contain 'sample_id' column")
+    if "filename" not in samples_df.columns:
+        raise ValueError("samples_df must contain 'filename' column")
+    if cl_filter is None:
+        cl_filter = Filter()
+
+    os.makedirs(output_folder, exist_ok=True)
+    has_chain = "chain" in samples_df.columns
+    metadata_list = []
+    targets = []
+
+    for _, row in samples_df.iterrows():
+        new_filename = _vdjtools_filename(row, has_chain)
+        new_path = os.path.join(output_folder, new_filename)
+        targets.append(new_path)
+        metadata_list.append([new_filename, row["sample_id"]])
+
+    metadata_filename = os.path.join(output_folder, "metadata.txt")
+    targets.append(metadata_filename)
+    conflicts = [filename for filename in targets if os.path.exists(filename)]
+    if conflicts and not force_overwrite:
+        print("WARNING! The following output files already exist:")
+        for filename in conflicts:
+            print(filename)
+        print("No files were written. Set force_overwrite=True to overwrite existing files.")
+        return None
+
+    for (_, row), new_path in zip(samples_df.iterrows(), targets[:-1]):
+        clonoset = read_clonoset(row["filename"])
+        clonoset = cl_filter.apply(clonoset)
+        clonoset.to_csv(new_path, index=False, sep="\t")
+
+    metadata = pd.DataFrame(metadata_list, columns=["#file.name", "sample.id"])
+    metadata.to_csv(metadata_filename, index=False, sep="\t")
+    print(f"Saved {len(metadata)} clonosets to: {output_folder}")
+    print(f"Saved sample list to: {metadata_filename}")
+    return metadata
+
+
 def read_json_report(sample_id, folder, report_type):
     """
     Reads MiXCR4 json reports into a Python mixed data structure.

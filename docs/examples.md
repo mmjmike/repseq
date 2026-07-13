@@ -25,7 +25,6 @@ from repseq import clone_filter as clf
 from repseq import intersections
 from repseq import clustering
 from repseq import logo
-from repseq import vdjtools
 ```
 
 ``` py

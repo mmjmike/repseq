@@ -10,7 +10,6 @@ from repseq import clonosets as cl
 from repseq import stats
 from repseq import clone_filter as clf
 from repseq import io as repseqio
-from repseq import vdjtools
 
 clonosets_dir_or_dirs = '/home/user/sample/mixcr'
 clonosets = cl.find_all_mixcr_clonosets(clonosets_dir_or_dirs).sort_values(by="sample_id").reset_index(drop=True)
@@ -30,7 +29,7 @@ Output table example:
 <br>To convert clonosets (in a form of a dataframe) to VDJtools format, use:
 
 ```py
-vdjtools.save_to_vdjtools(clonosets, "/home/user/samples/vdjtools_folder/")
+repseqio.save_to_vdjtools(clonosets, "/home/user/samples/vdjtools_folder/")
 ```
 
 ## Reading a single clonoset into pd.DataFrame
