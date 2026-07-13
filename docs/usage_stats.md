@@ -3,7 +3,7 @@
 
 ## Working with clonosets
 
-To read all clonosets (.tsv format, MiXCR3/4 typical output names, VDJtools or Bioadaptive formats) in a directory or several directories, use `find_all_exported_clonosets`. 
+To read all clonosets (.tsv format, MiXCR3/4 typical output names, VDJtools or Bioadaptive formats) in a directory or several directories, use `find_all_mixcr_clonosets`. 
 
 ```py
 from repseq import clonosets as cl
@@ -13,7 +13,7 @@ from repseq import io as repseqio
 from repseq import vdjtools
 
 clonosets_dir_or_dirs = '/home/user/sample/mixcr'
-clonosets = cl.find_all_exported_clonosets(clonosets_dir_or_dirs).sort_values(by="sample_id").reset_index(drop=True)
+clonosets = cl.find_all_mixcr_clonosets(clonosets_dir_or_dirs).sort_values(by="sample_id").reset_index(drop=True)
 ```
 
 Output table example:
@@ -197,7 +197,7 @@ def find_caits_cl(clonoset_in, colnames=None):
     
     return result_dict
 
-tra_clonosets = cl.find_all_exported_clonosets("/projects/cdr3_common/repseq_demo/custom_stats_clonosets/")
+tra_clonosets = cl.find_all_mixcr_clonosets("/projects/cdr3_common/repseq_demo/custom_stats_clonosets/")
 clonoset_caits = find_caits(tra_clonosets, cl_filter=func_filter)
 ```
 

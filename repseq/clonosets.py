@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 import re
+import warnings
 from .io import read_clonoset
 from .clone_filter import Filter
 from .common_functions import get_column_names_from_clonoset
@@ -21,19 +22,20 @@ CHAIN_VARIANTS = {"TRA": {"TRAD", "TRA"},
                   "BCR": {"IGH", "IGK", "IGL", "IGKL"},
                   "IR": {"IR"}}
 
-def find_all_exported_clonosets(folders, chain=None, show_offtarget=True, offtarget_threshold=0.01):
+def find_all_mixcr_clonosets(folders, chain=None, show_offtarget=True, offtarget_threshold=0.01):
     """
-    Main method of the Filter object - application of it to a clonoset
+    Find MiXCR clonotype tables exported into one or more folders.
 
     Args:
-        folders (path or list of paths): clonoset in the form of Pandas DataFrame in
-            MiXCR(3 or 4+ version), VDJtools or Bioadaptive formats.
-        colnames (dict, optional): Dictionary of available specific column names.
-            Defaults to None - colnames imputed automatically.
+        folders (str or list): folder or folders in which to find MiXCR
+            exported clonoset tables.
+        chain (str, optional): receptor chain to retain.
+        show_offtarget (bool): if `False`, remove likely off-target chains.
+        offtarget_threshold (float): minimum chain read fraction retained when
+            `show_offtarget=False`.
 
     Returns:
-        clonoset (pd.DataFrame): clonoset after converting to common (VDJtools-like)
-            format and applying functionality filtration and downsampling or taking top
+        pd.DataFrame: table with `sample_id`, `chain`, and `filename` columns.
 
     """
     if isinstance(folders, str):
@@ -42,6 +44,27 @@ def find_all_exported_clonosets(folders, chain=None, show_offtarget=True, offtar
     for folder in folders:
         clonosets_dfs.append(find_all_exported_clonosets_in_folder(folder, chain=chain, show_offtarget=show_offtarget, offtarget_threshold=offtarget_threshold))
     return pd.concat(clonosets_dfs)
+
+
+def find_all_exported_clonosets(folders, chain=None, show_offtarget=True, offtarget_threshold=0.01):
+    """
+    Deprecated alias for `find_all_mixcr_clonosets`.
+
+    Use `find_all_mixcr_clonosets` instead. This alias will be removed in a
+    future version.
+    """
+    warnings.warn(
+        "`find_all_exported_clonosets` is deprecated; use "
+        "`find_all_mixcr_clonosets` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return find_all_mixcr_clonosets(
+        folders,
+        chain=chain,
+        show_offtarget=show_offtarget,
+        offtarget_threshold=offtarget_threshold,
+    )
    
 def find_all_exported_clonosets_in_folder(folder, chain=None, show_offtarget=True, offtarget_threshold=0.01):
     result_columns = ["sample_id", "chain", "filename"]
@@ -53,13 +76,13 @@ def find_all_exported_clonosets_in_folder(folder, chain=None, show_offtarget=Tru
     all_files = os.listdir(folder)
     files = []
     for f in all_files:
-        old_match = re.match("(\S+)\.clonotypes\.([A-Z]+)(?:\W\S+)*\.txt", f)
+        old_match = re.match(r"(\S+)\.clonotypes\.([A-Z]+)(?:\W\S+)*\.txt", f)
         if old_match is not None:
             sample_id = old_match.group(1)
             sample_chain = old_match.group(2)
             # print(f"{f}: old_match")
         else:
-            new_match = re.match("(\S+)\.clones_([A-Z]+)(?:\W\S+)*\.tsv", f)
+            new_match = re.match(r"(\S+)\.clones_([A-Z]+)(?:\W\S+)*\.tsv", f)
             if new_match is not None:
                 sample_id = new_match.group(1)
                 sample_chain = new_match.group(2)
@@ -451,4 +474,3 @@ def annotate_clonotypes_with_vdjdb(clonotypes_df, drop_method=True, drop_meta=Tr
     vdjdb_whole = vdjdb_whole.sort_values(by='score', ascending=False).drop_duplicates(subset=['v', 'j', 'cdr3aa', 'epitope', 'epitope_gene', 'epitope_species'])
     annotated_clonotypes = pd.merge(clonotypes_df_copy, vdjdb_whole, on=['cdr3aa', 'v', 'j'], how='left')
     return annotated_clonotypes
-

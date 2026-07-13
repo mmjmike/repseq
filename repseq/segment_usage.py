@@ -1,6 +1,6 @@
 from .common_functions import print_progress_bar, combine_metadata_from_folders
 from .processing_stats import pool_metadata
-from .clonosets import (find_all_exported_clonosets, filter_clonosets_by_sample_list,
+from .clonosets import (find_all_mixcr_clonosets, filter_clonosets_by_sample_list,
                         filter_nonfunctional_clones, recount_fractions_for_clonoset,
                         get_column_names_from_clonoset)
 from .io import read_mixcr_clonoset
@@ -18,7 +18,7 @@ def calculate_segment_usage_batch(folders, segment="V", only_functional=True, by
     if isinstance(folders, pd.DataFrame):
         clonosets_df = folders
     else:
-        clonosets_df = find_all_exported_clonosets(folders)
+        clonosets_df = find_all_mixcr_clonosets(folders)
         clonosets_df = filter_clonosets_by_sample_list(clonosets_df, samples_list)
     
     print(f"\nCalculating {segment}-usage for {len(clonosets_df)} sample(s)\n"+"-"*50)
@@ -96,4 +96,3 @@ def determine_chain_for_samples(df):
         chain = get_chain(df.loc[df.sample_id == sample], segment)
         sample_chains.append((sample, chain))
     return pd.DataFrame(sample_chains, columns=["sample_id", "chain"])
-
