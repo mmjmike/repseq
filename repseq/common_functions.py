@@ -211,7 +211,7 @@ def decide_count_and_frac_columns(colnames, by_umi, suppress_warnings=False):
     count_column = colnames["count_column"]
     fraction_column = colnames["fraction_column"]
     if by_umi:
-        if colnames["umi"] is not None:
+        if colnames["umi"]:
             count_column = colnames["umi_column"]
             fraction_column = colnames["umi_fraction_column"]
         elif not suppress_warnings:
