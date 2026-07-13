@@ -102,6 +102,107 @@ def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long", 
     else:
         return df.melt(id_vars=["sample_id", "chain"]).rename(columns={"value":"usage", "variable":segment})
 
+
+def cdr3_length_distributions(
+    clonosets_df,
+    cl_filter=None,
+    cpu=None,
+    count_by_freq=True,
+    seq_type="aa",
+    table="long",
+    zero_fill=True,
+    verbose=True,
+):
+    """
+    Calculate CDR3 length distributions for multiple clonosets.
+
+    Args:
+        clonosets_df (pd.DataFrame): dataframe containing `sample_id` and
+            `filename` columns. If `chain` is present, it is retained in the
+            result.
+        cl_filter (Filter, optional): clonoset filter from `clone_filter.py`.
+        cpu (int, optional): number of worker processes. Use `1` to run
+            sequentially in a for-loop for easier debugging. `None` uses the
+            default `ProcessPoolExecutor` worker count.
+        count_by_freq (bool): if `True`, sum clonotype frequencies. If
+            `False`, sum clonotype counts.
+        seq_type (str): `aa` for amino-acid CDR3 lengths or `nt` for
+            nucleotide CDR3 lengths.
+        table (str): `long` or `wide`.
+        zero_fill (bool): in long tables, include zero-valued rows for CDR3
+            lengths found in other samples but absent from a given sample. Wide
+            tables are always zero-filled.
+        verbose (bool): if `True`, show progress information.
+
+    Returns:
+        pd.DataFrame: long table with `sample_id`, optional `chain`,
+            `cdr3_length`, and `freq`/`count`; or wide table with one column
+            per CDR3 length.
+    """
+    table_options = ["long", "wide"]
+    if table not in table_options:
+        raise ValueError(f"Unknown value for 'table' parameter. Possible options: {', '.join(table_options)}")
+    seq_type_options = ["aa", "nt"]
+    seq_type = seq_type.lower()
+    if seq_type not in seq_type_options:
+        raise ValueError(f"Unknown value for 'seq_type' parameter. Possible options: {', '.join(seq_type_options)}")
+
+    df = generic_calculation(
+        clonosets_df,
+        calc_cdr3_length_distribution_cl,
+        clonoset_filter=cl_filter,
+        program_name="CalcCDR3LengthDistribution",
+        verbose=verbose,
+        cpu=cpu,
+        count_by_freq=count_by_freq,
+        seq_type=seq_type,
+    )
+    id_vars = ["sample_id"]
+    if "chain" in df.columns:
+        id_vars.append("chain")
+    length_columns = sorted([column for column in df.columns if column not in id_vars])
+    df = df[id_vars + length_columns]
+    value_column = "freq" if count_by_freq else "count"
+
+    if table == "wide":
+        return df.fillna(0)
+
+    if zero_fill:
+        df = df.fillna(0)
+    result = df.melt(
+        id_vars=id_vars,
+        value_vars=length_columns,
+        var_name="cdr3_length",
+        value_name=value_column,
+    )
+    if not zero_fill:
+        result = result.dropna(subset=[value_column])
+    result["cdr3_length"] = result["cdr3_length"].astype(int)
+    sort_columns = id_vars + ["cdr3_length"]
+    return result.sort_values(by=sort_columns).reset_index(drop=True)
+
+
+def calc_cdr3_length_distribution_cl(clonoset_in, colnames=None, count_by_freq=True, seq_type="aa"):
+    if colnames is None:
+        colnames = get_column_names_from_clonoset(clonoset_in)
+    if seq_type == "aa":
+        sequence_column = colnames["cdr3aa_column"]
+    elif seq_type == "nt":
+        sequence_column = colnames["cdr3nt_column"]
+    else:
+        raise ValueError("seq_type must be either 'aa' or 'nt'")
+    if sequence_column is None:
+        raise ValueError(f"Could not find CDR3 {seq_type} sequence column")
+
+    weight_column = colnames["fraction_column"] if count_by_freq else colnames["count_column"]
+    if weight_column is None:
+        raise ValueError("Could not find clonotype frequency column" if count_by_freq else "Could not find clonotype count column")
+
+    clonoset = clonoset_in.copy()
+    clonoset["cdr3_length"] = clonoset[sequence_column].fillna("").apply(len)
+    return clonoset[[weight_column, "cdr3_length"]].groupby("cdr3_length").sum().to_dict()[weight_column]
+
+
 def calc_segment_usage_cl(clonoset_in, segment="v", colnames=None, by_count=False):
     if segment == "vj":
         return calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=False, by_count=by_count)

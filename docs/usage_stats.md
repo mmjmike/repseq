@@ -145,6 +145,20 @@ The resulting dataframe can be in either `long` or `wide` format:
 v_usage = stats.calc_segment_usage(clonosets, segment="v", cl_filter=func_filter, table="long")
 ```
 
+<br>CDR3 length distributions can be calculated for amino-acid or nucleotide
+sequences. By default, clonotype frequencies are summed; set
+`count_by_freq=False` to sum counts instead.
+
+```py
+cdr3_lengths = stats.cdr3_length_distributions(
+    clonosets,
+    cl_filter=func_filter,
+    seq_type="aa",
+    table="long",
+    cpu=1,
+)
+```
+
 ## Custom stats
 
 Stats module has a special function `generic_calculation` which performs multiple individual clonoset statistic calculation. It runs all individual clonoset calculations in parallel.
