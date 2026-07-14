@@ -143,16 +143,24 @@ Here `n_i` is a clonotype count, `p_i = n_i / N`, `N = sum(n_i)`,
 `f2` is the number of doubletons.
 
 
-<br>Calculating convergence (=the number of unique CDR3 nucleotide sequences that code for the same amino acid sequence) for each clonoset in clonosets_df. 
+<br>Calculating convergence for each clonoset in `clonosets_df`. For the
+most honest comparison, use equal downsampling across samples; this is preferred
+to top-N filtering and much preferred to calculations without normalization.
+The output includes:
+
+- `convergence`: unique CDR3 nucleotide sequences divided by unique CDR3 amino-acid sequences.
+- `convergence_v`: unique CDR3 nucleotide + V combinations divided by unique CDR3 amino-acid + V combinations.
+- `convergence_vj`: unique CDR3 nucleotide + V + J combinations divided by unique CDR3 amino-acid + V + J combinations.
+
 ```py
 convergence = stats.calc_convergence(clonosets, cl_filter=top_filter)
 ```
 
-|    | sample_id          | chain   |   convergence |
-|---:|:-------------------|:--------|--------------:|
-|  0 | sample1_nCD4_1_TRB | TRB     |       1.01114 |
-|  1 | sample2_nCD4_1_TRB | TRB     |       1.03426 |
-|  2 | sample3_nCD4_1_TRB | TRB     |       1.02362 |
+|    | sample_id          | chain   |   convergence |   convergence_v |   convergence_vj |
+|---:|:-------------------|:--------|--------------:|----------------:|-----------------:|
+|  0 | sample1_nCD4_1_TRB | TRB     |       1.01114 |         1.01001 |          1.00851 |
+|  1 | sample2_nCD4_1_TRB | TRB     |       1.03426 |         1.03084 |          1.02803 |
+|  2 | sample3_nCD4_1_TRB | TRB     |       1.02362 |         1.02115 |          1.01972 |
 
 <br>Segment usage (combined frequency of segments) can be calculated for V/J/C-segments. All possible options are ["v", "j", "c", "vj", "vlen", "vjlen"]. `vj` - usage of combinations of `v` and `j` segments. `vlen` and `vjlen` options also take the length of amimo acid CDR3 length into account and calculate usage for particular combination.
 

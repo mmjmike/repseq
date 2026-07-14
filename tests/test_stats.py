@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from repseq import stats
 from repseq.clone_filter import Filter
@@ -237,6 +238,65 @@ def test_calc_cdr3_properties_passes_cpu_to_generic_calculation(monkeypatch):
 
     assert seen["cpu"] == 1
     assert result.loc[0, "mean_cdr3nt_len"] == 6
+
+
+def test_calc_convergence_returns_cdr3_v_and_vj_convergence(tmp_path):
+    filename = tmp_path / "sample.tsv"
+    _write_clonoset(
+        filename,
+        [
+            {"count": 1, "freq": 0.25, "cdr3nt": "AAA", "cdr3aa": "CAS", "v": "TRBV1", "d": ".", "j": "TRBJ1"},
+            {"count": 1, "freq": 0.25, "cdr3nt": "AAT", "cdr3aa": "CAS", "v": "TRBV1", "d": ".", "j": "TRBJ1"},
+            {"count": 1, "freq": 0.25, "cdr3nt": "AAC", "cdr3aa": "CAS", "v": "TRBV2", "d": ".", "j": "TRBJ1"},
+            {"count": 1, "freq": 0.25, "cdr3nt": "AAG", "cdr3aa": "CAT", "v": "TRBV2", "d": ".", "j": "TRBJ2"},
+        ],
+    )
+    clonosets = pd.DataFrame([{"sample_id": "sample1", "filename": str(filename)}])
+
+    result = stats.calc_convergence(clonosets, cpu=1, verbose=False)
+
+    assert result.loc[0, "convergence"] == 2
+    assert result.loc[0, "convergence_v"] == pytest.approx(4 / 3)
+    assert result.loc[0, "convergence_vj"] == pytest.approx(4 / 3)
+
+
+def test_calc_convergence_defaults_to_three_iterations_and_prints_settings(monkeypatch, capsys):
+    seen = {}
+
+    def fake_generic_calculation(*args, **kwargs):
+        seen["iterations"] = kwargs["iterations"]
+        return pd.DataFrame([{"sample_id": "sample1", "convergence": 1}])
+
+    monkeypatch.setattr(stats, "generic_calculation", fake_generic_calculation)
+
+    stats.calc_convergence(
+        pd.DataFrame([{"sample_id": "sample1", "filename": "sample.tsv"}]),
+        cl_filter=Filter(downsample=100),
+        seed=123,
+    )
+
+    captured = capsys.readouterr().out
+    assert seen["iterations"] == 3
+    assert "equal downsampling for all samples" in captured
+    assert "seed=123, downsample=100, top=None, iterations=3" in captured
+
+
+def test_calc_diversity_stats_prints_normalization_settings(monkeypatch, capsys):
+    def fake_generic_calculation(*args, **kwargs):
+        return pd.DataFrame([{"sample_id": "sample1", "diversity": 1}])
+
+    monkeypatch.setattr(stats, "generic_calculation", fake_generic_calculation)
+
+    stats.calc_diversity_stats(
+        pd.DataFrame([{"sample_id": "sample1", "filename": "sample.tsv"}]),
+        cl_filter=Filter(top=50),
+        seed=7,
+        iterations=5,
+    )
+
+    captured = capsys.readouterr().out
+    assert "equal downsampling for all samples" in captured
+    assert "seed=7, downsample=None, top=50, iterations=5" in captured
 
 
 def test_generic_calculation_warns_and_keeps_small_samples_by_default(tmp_path, capsys):

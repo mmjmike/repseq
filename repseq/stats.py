@@ -261,6 +261,20 @@ def calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=
     result = clonoset[[freq_column] + columns_to_join].groupby(columns_to_join).sum().to_dict()[freq_column]
     return result
 
+def _print_normalization_message(function_name, cl_filter, seed, iterations):
+    downsample = None if cl_filter is None else cl_filter.downsample_size
+    top = None if cl_filter is None else cl_filter.top
+    print(
+        f"{function_name}: for the most honest comparison, use a filter with "
+        "equal downsampling for all samples. This is preferred to top=N filters "
+        "and much preferred to calculations without normalization."
+    )
+    print(
+        f"{function_name} settings: seed={seed}, downsample={downsample}, "
+        f"top={top}, iterations={iterations}"
+    )
+
+
 def calc_diversity_stats(clonosets_df, cl_filter=None, iterations=3, seed=None,
                          drop_small_samples=False, cpu=None, verbose=True):
     """
@@ -289,6 +303,8 @@ def calc_diversity_stats(clonosets_df, cl_filter=None, iterations=3, seed=None,
             the function description. If 'wide' - then it has all possible segments in 
             column names, sample_id's - in rows and usage in each cell in the table.
     """
+    if verbose:
+        _print_normalization_message("CalcDiversityStats", cl_filter, seed, iterations)
     df = generic_calculation(
         clonosets_df,
         calculate_diversity_stats_cl,
@@ -303,8 +319,10 @@ def calc_diversity_stats(clonosets_df, cl_filter=None, iterations=3, seed=None,
     return df
 
 
-def calc_convergence(clonosets_df, cl_filter=None, iterations=1, seed=None,
+def calc_convergence(clonosets_df, cl_filter=None, iterations=3, seed=None,
                      drop_small_samples=False, cpu=None, verbose=True):
+    if verbose:
+        _print_normalization_message("CalcConvergence", cl_filter, seed, iterations)
     df = generic_calculation(
         clonosets_df,
         calculate_convergence_cl,
@@ -452,12 +470,31 @@ def calculate_convergence_cl(clonoset_in, colnames=None):
     if colnames is None:
         colnames = get_column_names_from_clonoset(clonoset)
 
-    nt_unique = len(clonoset[colnames["cdr3nt_column"]].unique())
-    aa_unique = len(clonoset[colnames["cdr3aa_column"]].unique())
-    convergernce = round(nt_unique/aa_unique, 8)
-    result = {"convergence": convergernce}
+    cdr3nt_column = colnames["cdr3nt_column"]
+    cdr3aa_column = colnames["cdr3aa_column"]
+    v_column = colnames["v_column"]
+    j_column = colnames["j_column"]
+
+    convergence = _unique_tuple_ratio(clonoset, [cdr3nt_column], [cdr3aa_column])
+    convergence_v = _unique_tuple_ratio(clonoset, [cdr3nt_column, v_column], [cdr3aa_column, v_column])
+    convergence_vj = _unique_tuple_ratio(clonoset, [cdr3nt_column, v_column, j_column], [cdr3aa_column, v_column, j_column])
+    result = {
+        "convergence": convergence,
+        "convergence_v": convergence_v,
+        "convergence_vj": convergence_vj,
+    }
     
     return result
+
+
+def _unique_tuple_ratio(clonoset, numerator_columns, denominator_columns):
+    if any(column is None for column in numerator_columns + denominator_columns):
+        return np.nan
+    numerator = len(clonoset[numerator_columns].drop_duplicates())
+    denominator = len(clonoset[denominator_columns].drop_duplicates())
+    if denominator == 0:
+        return np.nan
+    return round(numerator / denominator, 8)
 
 def calculate_diversity_stats_cl(clonoset_in, colnames=None):
     clonoset = clonoset_in.copy()
