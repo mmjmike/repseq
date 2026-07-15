@@ -138,3 +138,73 @@ def test_two_split_columns_create_interaction_columns():
     titles = [ax.get_title() for ax in grid.axes.flat]
     assert any("treated | b1" in title for title in titles)
     assert any("control | b2" in title for title in titles)
+
+
+def test_single_group_does_not_pass_new_seaborn_legend_argument(monkeypatch):
+    metadata = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "TRA", "condition": "treated"},
+            {"sample_id": "sample2", "chain": "TRB", "condition": "control"},
+        ]
+    )
+    original_boxplot = rsplot.sns.boxplot
+    original_stripplot = rsplot.sns.stripplot
+
+    def compatible_boxplot(*args, **kwargs):
+        assert "legend" not in kwargs
+        return original_boxplot(*args, **kwargs)
+
+    def compatible_stripplot(*args, **kwargs):
+        assert "legend" not in kwargs
+        return original_stripplot(*args, **kwargs)
+
+    monkeypatch.setattr(rsplot.sns, "boxplot", compatible_boxplot)
+    monkeypatch.setattr(rsplot.sns, "stripplot", compatible_stripplot)
+
+    grid = rsplot.plot_stats(
+        _stats_df(),
+        metadata=metadata,
+        properties=["diversity"],
+        group="condition",
+    )
+
+    assert grid.axes.flat[0].legend_ is None
+
+
+def test_split_panels_only_show_samples_from_their_subset():
+    stats_df = pd.concat(
+        [
+            _stats_df(),
+            pd.DataFrame(
+                [
+                    {
+                        "sample_id": "sample3",
+                        "chain": "TRA",
+                        "diversity": 30,
+                    }
+                ]
+            ),
+        ],
+        ignore_index=True,
+    )
+    metadata = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "TRA", "condition": "treated"},
+            {"sample_id": "sample2", "chain": "TRB", "condition": "control"},
+            {"sample_id": "sample3", "chain": "TRA", "condition": "treated"},
+        ]
+    )
+
+    grid = rsplot.plot_stats(
+        stats_df,
+        metadata=metadata,
+        properties=["diversity"],
+        split="condition",
+    )
+
+    labels_by_panel = {
+        ax.get_title(): [tick.get_text() for tick in ax.get_xticklabels()]
+        for ax in grid.axes.flat
+    }
+    assert labels_by_panel["treated"] == ["sample1", "sample3"]
+    assert labels_by_panel["control"] == ["sample2"]

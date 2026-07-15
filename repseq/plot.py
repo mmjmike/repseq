@@ -245,7 +245,6 @@ def _draw_category_panel(
             palette=palette,
             dodge=False,
             showfliers=False,
-            legend=False,
             ax=ax,
         )
         sns.stripplot(
@@ -261,9 +260,10 @@ def _draw_category_panel(
             linewidth=0.3,
             edgecolor="black",
             alpha=0.75,
-            legend=False,
             ax=ax,
         )
+        if ax.legend_ is not None:
+            ax.legend_.remove()
         return
 
     sns.boxplot(
@@ -291,7 +291,6 @@ def _draw_category_panel(
         linewidth=0.3,
         edgecolor="black",
         alpha=0.75,
-        legend=False,
         ax=ax,
     )
 
@@ -395,6 +394,7 @@ def plot_stats(
         row=row,
         col=col,
         col_wrap=col_wrap,
+        sharex=not (panel_column is not None and not group_columns),
         sharey=False,
         height=height,
         aspect=aspect,
