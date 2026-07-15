@@ -76,6 +76,108 @@ downsample_filter = clf.Filter(functionality="f", downsample=15000, by_umi=True,
 count_threshold_filter = clf.Filter(functionality="f", count_threshold=3, by_umi=True)
 ```
 
+### White-list and black-list clonotype rules
+
+`white_list` keeps only matching clonotypes. `black_list` removes matching
+clonotypes. If both are provided, `white_list` is applied first and
+`black_list` second.
+
+Rules can use the old tuple syntax:
+
+```py
+# exact CDR3 amino-acid sequence
+clf.Filter(white_list=[("CASSLGQETQYF",)])
+
+# exact CDR3 amino-acid sequence + V
+clf.Filter(white_list=[("CASSLGQETQYF", "TRBV7-8")])
+
+# exact CDR3 amino-acid sequence + V + J
+clf.Filter(white_list=[("CASSLGQETQYF", "TRBV7-8", "TRBJ2-5")])
+```
+
+Tuple positions can be ignored with `None` or an empty string. The positions are
+always interpreted as `(cdr3aa, v, j)`.
+
+```py
+# only exact V
+clf.Filter(white_list=[(None, "TRBV7-8")])
+
+# exact V + J, any CDR3 amino-acid sequence
+clf.Filter(white_list=[(None, "TRBV7-8", "TRBJ2-5")])
+
+# exact CDR3 amino-acid sequence + J, any V
+clf.Filter(white_list=[("CASSLGQETQYF", None, "TRBJ2-5")])
+```
+
+New dictionary rules are more flexible. Keys are clonoset columns such as
+`cdr3aa`, `cdr3nt`, `v`, `d`, `j`, `c`, `count`, or `freq`. Conditions inside
+one dictionary are combined with AND; separate dictionaries in the list are
+combined with OR.
+
+Exact V segment:
+
+```py
+clf.Filter(white_list=[{"v": "TRBV7-8"}])
+```
+
+Several exact V segments:
+
+```py
+clf.Filter(white_list=[{"v": ["TRBV7-8", "TRBV7-3"]}])
+```
+
+V family by substring:
+
+```py
+clf.Filter(white_list=[{"v": {"contains": "TRBV7"}}])
+```
+
+Wildcard matching:
+
+```py
+clf.Filter(white_list=[{"v": "TRBV7*"}])
+clf.Filter(white_list=[{"cdr3aa": "CASS*QYF"}])
+```
+
+Regular expressions and PSI-BLAST-like bracket expressions:
+
+```py
+clf.Filter(white_list=[{"cdr3aa": {"regex": r"CASS[A-Z]{2,5}QYF"}}])
+clf.Filter(white_list=[{"cdr3aa": {"pattern": r"CASS[ST]G[DE]QYF"}}])
+```
+
+Combined CDR3 nucleotide + V:
+
+```py
+clf.Filter(white_list=[{"cdr3nt": "TGTGCCAGCAGC", "v": "TRBV7-8"}])
+```
+
+Combined CDR3 amino-acid + V + J:
+
+```py
+clf.Filter(white_list=[{"cdr3aa": "CASSLGQETQYF", "v": "TRBV7-8", "j": "TRBJ2-5"}])
+```
+
+V family plus CDR3 amino-acid pattern:
+
+```py
+clf.Filter(
+    white_list=[
+        {
+            "v": {"contains": "TRBV7"},
+            "cdr3aa": {"regex": r"CASS.*QYF"},
+        }
+    ]
+)
+```
+
+Black-list rules use the same syntax:
+
+```py
+clf.Filter(black_list=[{"v": {"contains": "TRBV7"}}])
+clf.Filter(black_list=[{"cdr3aa": "CASS*"}])
+```
+
 <br> Filtering a clonoset:
 ```py
 filtered_clonoset_df = top_filter.apply(clonoset_df)

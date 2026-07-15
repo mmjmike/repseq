@@ -7,7 +7,9 @@ from .common_functions import (get_column_names_from_clonoset,
 
 from collections.abc import Hashable
 
+import fnmatch
 import random
+import re
 
 class Filter:
     
@@ -41,11 +43,19 @@ class Filter:
             (downsampling or top with mix-tails). Default=None.
         unweight (bool): each clonotype counts (either reads or UMIs) are set to 1
         recount_fractions (bool): if `True`, clonotype fractions are recalculated after filtration
-        white_list (list of tuples): If specified, only clonotypes matching those listed will be retained. Either `aa`, `aaV` or `aaVJ` 
-            formats can be used to list clonotypes, e.g. [(“CASSS..”)], [(“CASSS..”, “TRBV2”)] or [(“CASSS..”, “TRBV2”, “TRBJ1”)]. 
-            It is applied before `black_list`
-        black_list (list of tuples): If specified, only clonotypes not listed will be retained. Either `aa`, `aaV` or `aaVJ` 
-            formats can be used to list clonotypes, e.g. [(“CASSS..”)], [(“CASSS..”, “TRBV2”)] or [(“CASSS..”, “TRBV2”, “TRBJ1”)]
+        white_list (list): If specified, only clonotypes matching at least one
+            listed rule are retained. Backward-compatible tuple rules can list
+            `(cdr3aa,)`, `(cdr3aa, v)` or `(cdr3aa, v, j)`. Use `None` or
+            an empty string in a tuple position to ignore that field, for
+            example `(None, "TRBV7-8")`, `(None, "TRBV7-8", "TRBJ2-5")` or
+            `("CASSLGQYF", None, "TRBJ2-5")`. Dictionary rules can match any
+            combination of columns, for example
+            `{"v": "TRBV7-8"}`, `{"v": {"contains": "TRBV7"}}`,
+            `{"cdr3aa": "CASS*QYF"}`, or
+            `{"cdr3nt": "TGTGCC", "v": "TRBV7-8"}`. It is applied before
+            `black_list`.
+        black_list (list): If specified, clonotypes matching any listed rule
+            are removed. Supports the same rule formats as `white_list`.
         pool_clonoset_by (str): possible values are ["", "aa", "aaV", "aaVJ, "nt", "ntV", "ntVJ"]. Clones with identical parameters are merged, 
             keeping the largest one, while their counts are summed.
         convert (bool): By default, columns are added to the clonotype set to convert 
@@ -543,21 +553,67 @@ class Filter:
 #     return clonotypes_list
      
     def _compare_clonoset_row_with_clonotype(self, row, clonotype):
+        if isinstance(clonotype, dict):
+            return self._compare_clonoset_row_with_rule(row, clonotype)
+        if isinstance(clonotype, str):
+            return self._match_filter_condition(row.get("cdr3aa"), clonotype)
         c_len = len(clonotype)
         if c_len == 1:
-            if row["cdr3aa"] == clonotype[0]:
-                return True
+            return self._match_tuple_field(row, "cdr3aa", clonotype[0])
         elif c_len == 2:
-            if row["cdr3aa"] == clonotype[0] and row["v"] == clonotype[1]:
-                return True
+            return (
+                self._match_tuple_field(row, "cdr3aa", clonotype[0])
+                and self._match_tuple_field(row, "v", clonotype[1])
+            )
         elif c_len == 3:
-            if row["cdr3aa"] == clonotype[0] and row["v"] == clonotype[1] and row["j"] == clonotype[2]:
-                return True
+            return (
+                self._match_tuple_field(row, "cdr3aa", clonotype[0])
+                and self._match_tuple_field(row, "v", clonotype[1])
+                and self._match_tuple_field(row, "j", clonotype[2])
+            )
         else:
             # need to write better explanation for error
             raise ValueError("clonotypes must contain from 1 to 3 values")
-            
-        return False
+
+    def _match_tuple_field(self, row, column, condition):
+        if condition is None or condition == "":
+            return True
+        return row[column] == condition
+
+    def _compare_clonoset_row_with_rule(self, row, rule):
+        for column, condition in rule.items():
+            if column not in row.index:
+                raise ValueError(f"Unknown clonotype filter column '{column}'")
+            if not self._match_filter_condition(row[column], condition):
+                return False
+        return True
+
+    def _match_filter_condition(self, value, condition):
+        value = "" if value is None else str(value)
+        if isinstance(condition, dict):
+            if "exact" in condition:
+                return self._match_filter_condition(value, condition["exact"])
+            if "contains" in condition:
+                contains = condition["contains"]
+                if isinstance(contains, (list, tuple, set)):
+                    return any(str(item) in value for item in contains)
+                return str(contains) in value
+            if "wildcard" in condition:
+                return fnmatch.fnmatchcase(value, str(condition["wildcard"]))
+            if "regex" in condition:
+                return re.fullmatch(str(condition["regex"]), value) is not None
+            if "pattern" in condition:
+                return re.fullmatch(str(condition["pattern"]), value) is not None
+            raise ValueError(
+                "Filter condition dictionaries must contain one of: "
+                "'exact', 'contains', 'wildcard', 'regex', 'pattern'"
+            )
+        if isinstance(condition, (list, tuple, set)):
+            return any(self._match_filter_condition(value, item) for item in condition)
+        condition = str(condition)
+        if any(char in condition for char in ["*", "?"]):
+            return fnmatch.fnmatchcase(value, condition)
+        return value == condition
 
     def _compare_clonoset_list_row_with_clonotype(self, row, clonotypes_list):
         for clonotype in clonotypes_list:
