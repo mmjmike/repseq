@@ -350,6 +350,78 @@ clonoset_caits = find_caits(tra_clonosets, cl_filter=func_filter)
 |  1 | sample2_nCD4_1_TRB | TRA     |                 1 | 3.55821e-05 |       0.0360803 |      0.00170794 |
 |  2 | sample3_nCD4_1_TRB | TRA     |                 5 | 0.000124894 |       0.0386671 |      0.002348   |
 
+## Plotting statistics in Python
+
+The `plot` module provides matplotlib/seaborn wrappers for common statistics
+tables. Import it as:
+
+```py
+from repseq import plot as rsplot
+```
+
+Each plotting function takes a statistics table and, optionally, a metadata
+table. Metadata must contain `sample_id`; if both tables contain `chain`, the
+merge uses `sample_id` + `chain`. Grouping and split columns are taken from the
+metadata table. If metadata contains fewer samples than the statistics table, a
+warning is shown and only the matched subset is plotted.
+
+```py
+rsplot.diversity_stats(
+    diversity_stats,
+    metadata=metadata,
+    group="experimental_group",
+)
+```
+
+If `group` is not provided, each sample is drawn as a separate bar. If one
+grouping column is provided, the plot uses that column on the x-axis and draws
+boxplots with jittered sample points. If two grouping columns are provided, the
+first column is used on the x-axis and the second column is used for color.
+
+```py
+rsplot.cdr3aa_stats(
+    cdr3_properties,
+    metadata=metadata,
+    group=["experimental_group", "subset"],
+)
+```
+
+Use `split` to create panels. One split column creates one set of panels; two
+split columns are combined into interaction panels.
+
+```py
+rsplot.diversity_stats(
+    diversity_stats,
+    metadata=metadata,
+    group="experimental_group",
+    split="chain",
+)
+
+rsplot.cdr3aa_stats(
+    cdr3_properties,
+    metadata=metadata,
+    group="experimental_group",
+    split=["chain", "subset"],
+)
+```
+
+Default property panels are provided for CDR3 amino-acid properties, diversity
+statistics, and convergence. You can override them with `properties`.
+
+```py
+rsplot.convergence(convergence, metadata=metadata, group="experimental_group")
+
+rsplot.diversity_stats(
+    diversity_stats,
+    metadata=metadata,
+    properties=["diversity", "chao1", "berger_parker"],
+    group="experimental_group",
+)
+```
+
+Ordered pandas categorical columns in metadata keep their order in the x-axis,
+color legend, and split panels.
+
 
 ??? info "Convergence visualization"
     Calculated stats can be visualized in Jupyter notebook using %%R cell magic. 

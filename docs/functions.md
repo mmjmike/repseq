@@ -65,6 +65,11 @@
     options:
            show_root_toc_entry: false
     
+## **plot**
+#### ::: plot
+    options:
+           show_root_toc_entry: false
+    
 ## **processing_stats**
 #### ::: processing_stats
     options:
