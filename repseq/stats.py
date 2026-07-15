@@ -264,14 +264,28 @@ def calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=
 def _print_normalization_message(function_name, cl_filter, seed, iterations):
     downsample = None if cl_filter is None else cl_filter.downsample_size
     top = None if cl_filter is None else cl_filter.top
-    print(
-        f"{function_name}: for the most honest comparison, use a filter with "
-        "equal downsampling for all samples. This is preferred to top=N filters "
-        "and much preferred to calculations without normalization."
-    )
+    if _should_print_downsampling_recommendation(cl_filter):
+        print(
+            f"{function_name}: for the most honest comparison, use a filter with "
+            "equal downsampling for all samples. This is preferred to top=N filters "
+            "and much preferred to calculations without normalization."
+        )
     print(
         f"{function_name} settings: seed={seed}, downsample={downsample}, "
         f"top={top}, iterations={iterations}"
+    )
+
+
+def _should_print_downsampling_recommendation(cl_filter):
+    if cl_filter is None:
+        return True
+    if cl_filter.downsample_size is None:
+        return True
+    return (
+        len(cl_filter.white_list) > 0
+        or len(cl_filter.black_list) > 0
+        or cl_filter.top is not None
+        or cl_filter.count_threshold is not None
     )
 
 

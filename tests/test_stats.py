@@ -277,7 +277,7 @@ def test_calc_convergence_defaults_to_three_iterations_and_prints_settings(monke
 
     captured = capsys.readouterr().out
     assert seen["iterations"] == 3
-    assert "equal downsampling for all samples" in captured
+    assert "equal downsampling for all samples" not in captured
     assert "seed=123, downsample=100, top=None, iterations=3" in captured
 
 
@@ -297,6 +297,23 @@ def test_calc_diversity_stats_prints_normalization_settings(monkeypatch, capsys)
     captured = capsys.readouterr().out
     assert "equal downsampling for all samples" in captured
     assert "seed=7, downsample=None, top=50, iterations=5" in captured
+
+
+def test_calc_diversity_stats_prints_recommendation_when_downsample_is_combined_with_extra_filters(monkeypatch, capsys):
+    def fake_generic_calculation(*args, **kwargs):
+        return pd.DataFrame([{"sample_id": "sample1", "diversity": 1}])
+
+    monkeypatch.setattr(stats, "generic_calculation", fake_generic_calculation)
+
+    stats.calc_diversity_stats(
+        pd.DataFrame([{"sample_id": "sample1", "filename": "sample.tsv"}]),
+        cl_filter=Filter(downsample=100, count_threshold=2),
+        seed=7,
+    )
+
+    captured = capsys.readouterr().out
+    assert "equal downsampling for all samples" in captured
+    assert "seed=7, downsample=100, top=None, iterations=3" in captured
 
 
 def test_generic_calculation_warns_and_keeps_small_samples_by_default(tmp_path, capsys):
