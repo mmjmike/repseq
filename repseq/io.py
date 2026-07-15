@@ -206,7 +206,8 @@ def save_to_vdjtools(samples_df, output_folder, cl_filter=None, force_overwrite=
         samples_df (pd.DataFrame): table with `sample_id` and `filename`
             columns. If a `chain` column is present, output filenames are
             written as `vdjtools.{sample_id}.{chain}.txt`; otherwise they are
-            written as `vdjtools.{sample_id}.txt`.
+            written as `vdjtools.{sample_id}.txt`. All additional columns are
+            preserved in `metadata.txt`.
         output_folder (str): folder in which to save converted clonosets and
             `metadata.txt`.
         cl_filter (Filter, optional): filter used to convert and filter each
@@ -230,14 +231,14 @@ def save_to_vdjtools(samples_df, output_folder, cl_filter=None, force_overwrite=
 
     os.makedirs(output_folder, exist_ok=True)
     has_chain = "chain" in samples_df.columns
-    metadata_list = []
+    output_filenames = []
     targets = []
 
     for _, row in samples_df.iterrows():
         new_filename = _vdjtools_filename(row, has_chain)
         new_path = os.path.join(output_folder, new_filename)
         targets.append(new_path)
-        metadata_list.append([new_filename, row["sample_id"]])
+        output_filenames.append(new_filename)
 
     metadata_filename = os.path.join(output_folder, "metadata.txt")
     targets.append(metadata_filename)
@@ -254,7 +255,10 @@ def save_to_vdjtools(samples_df, output_folder, cl_filter=None, force_overwrite=
         clonoset = cl_filter.apply(clonoset)
         clonoset.to_csv(new_path, index=False, sep="\t")
 
-    metadata = pd.DataFrame(metadata_list, columns=["#file.name", "sample.id"])
+    metadata = samples_df.copy().reset_index(drop=True)
+    metadata.insert(0, "#file.name", output_filenames)
+    if "sample.id" not in metadata.columns:
+        metadata.insert(1, "sample.id", metadata["sample_id"])
     metadata.to_csv(metadata_filename, index=False, sep="\t")
     print(f"Saved {len(metadata)} clonosets to: {output_folder}")
     print(f"Saved sample list to: {metadata_filename}")

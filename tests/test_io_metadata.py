@@ -68,16 +68,29 @@ def test_save_to_vdjtools_uses_chain_in_output_filename(tmp_path):
     output_folder = tmp_path / "vdjtools"
     _write_mixcr_clonoset(input_file, 5)
     samples = pd.DataFrame(
-        [{"sample_id": "sample1", "chain": "TRB", "filename": str(input_file)}]
+        [
+            {
+                "sample_id": "sample1",
+                "chain": "TRB",
+                "filename": str(input_file),
+                "group": "case",
+                "subject": "subject1",
+            }
+        ]
     )
 
     metadata = io.save_to_vdjtools(samples, str(output_folder))
+    metadata_from_file = pd.read_csv(output_folder / "metadata.txt", sep="\t")
 
     output_file = output_folder / "vdjtools.sample1.TRB.txt"
     assert output_file.exists()
     assert (output_folder / "metadata.txt").exists()
     assert metadata.loc[0, "#file.name"] == "vdjtools.sample1.TRB.txt"
     assert metadata.loc[0, "sample.id"] == "sample1"
+    assert metadata.loc[0, "group"] == "case"
+    assert metadata.loc[0, "subject"] == "subject1"
+    assert metadata_from_file.loc[0, "group"] == "case"
+    assert metadata_from_file.loc[0, "subject"] == "subject1"
 
 
 def test_save_to_vdjtools_keeps_old_filename_without_chain_column(tmp_path):
