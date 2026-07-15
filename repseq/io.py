@@ -214,7 +214,9 @@ def save_to_vdjtools(samples_df, output_folder, cl_filter=None, force_overwrite=
             clonoset. Defaults to `Filter()`.
         force_overwrite (bool): if `False`, check all target filenames before
             writing. If any target already exists, print a warning and do not
-            write any files. Set to `True` to overwrite existing files.
+            write any files. Set to `True` to overwrite existing clonoset files
+            and merge new rows into existing `metadata.txt`, preserving rows
+            for output files that still exist.
 
     Returns:
         pd.DataFrame or None: VDJtools metadata table when files are written,
@@ -255,14 +257,51 @@ def save_to_vdjtools(samples_df, output_folder, cl_filter=None, force_overwrite=
         clonoset = cl_filter.apply(clonoset)
         clonoset.to_csv(new_path, index=False, sep="\t")
 
+    metadata = _vdjtools_metadata(
+        samples_df,
+        output_filenames,
+        output_folder,
+        metadata_filename,
+        force_overwrite=force_overwrite,
+    )
+    metadata.to_csv(metadata_filename, index=False, sep="\t")
+    print(f"Saved {len(output_filenames)} clonosets to: {output_folder}")
+    print(f"Saved sample list to: {metadata_filename}")
+    return metadata
+
+
+def _new_vdjtools_metadata(samples_df, output_filenames):
     metadata = samples_df.copy().reset_index(drop=True)
+    if "#file.name" in metadata.columns:
+        metadata = metadata.drop(columns=["#file.name"])
+    if "filename" in metadata.columns:
+        metadata = metadata.rename(columns={"filename": "original_filename"})
     metadata.insert(0, "#file.name", output_filenames)
     if "sample.id" not in metadata.columns:
         metadata.insert(1, "sample.id", metadata["sample_id"])
-    metadata.to_csv(metadata_filename, index=False, sep="\t")
-    print(f"Saved {len(metadata)} clonosets to: {output_folder}")
-    print(f"Saved sample list to: {metadata_filename}")
     return metadata
+
+
+def _vdjtools_metadata(samples_df, output_filenames, output_folder, metadata_filename, force_overwrite=False):
+    new_metadata = _new_vdjtools_metadata(samples_df, output_filenames)
+    if not force_overwrite or not os.path.exists(metadata_filename):
+        return new_metadata
+
+    existing_metadata = pd.read_csv(metadata_filename, sep="\t")
+    if "filename" in existing_metadata.columns and "original_filename" not in existing_metadata.columns:
+        existing_metadata = existing_metadata.rename(columns={"filename": "original_filename"})
+    if "#file.name" not in existing_metadata.columns:
+        return new_metadata
+
+    new_filenames = set(output_filenames)
+    keep_existing = existing_metadata["#file.name"].apply(
+        lambda filename: (
+            filename not in new_filenames
+            and os.path.exists(os.path.join(output_folder, str(filename)))
+        )
+    )
+    existing_metadata = existing_metadata.loc[keep_existing]
+    return pd.concat([existing_metadata, new_metadata], ignore_index=True, sort=False)
 
 
 def read_json_report(sample_id, folder, report_type):

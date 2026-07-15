@@ -87,8 +87,12 @@ def test_save_to_vdjtools_uses_chain_in_output_filename(tmp_path):
     assert (output_folder / "metadata.txt").exists()
     assert metadata.loc[0, "#file.name"] == "vdjtools.sample1.TRB.txt"
     assert metadata.loc[0, "sample.id"] == "sample1"
+    assert "original_filename" in metadata.columns
+    assert "filename" not in metadata.columns
+    assert metadata.loc[0, "original_filename"] == str(input_file)
     assert metadata.loc[0, "group"] == "case"
     assert metadata.loc[0, "subject"] == "subject1"
+    assert metadata_from_file.loc[0, "original_filename"] == str(input_file)
     assert metadata_from_file.loc[0, "group"] == "case"
     assert metadata_from_file.loc[0, "subject"] == "subject1"
 
@@ -145,6 +149,64 @@ def test_save_to_vdjtools_force_overwrite_writes_conflicting_files(tmp_path):
     io.save_to_vdjtools(samples, str(output_folder), force_overwrite=True)
 
     assert output_file.read_text() != "existing\n"
+
+
+def test_save_to_vdjtools_force_overwrite_merges_existing_metadata_for_existing_files(tmp_path):
+    old_input_file = tmp_path / "old.clones_TRB.tsv"
+    new_input_file = tmp_path / "new.clones_TRA.tsv"
+    missing_input_file = tmp_path / "missing.clones_TRG.tsv"
+    output_folder = tmp_path / "vdjtools"
+    output_folder.mkdir()
+    _write_mixcr_clonoset(old_input_file, 5)
+    _write_mixcr_clonoset(new_input_file, 7)
+    _write_mixcr_clonoset(missing_input_file, 9)
+    old_output = output_folder / "vdjtools.old.TRB.txt"
+    old_output.write_text("old clonoset\n")
+    stale_output_name = "vdjtools.missing.TRG.txt"
+    existing_metadata = pd.DataFrame(
+        [
+            {
+                "#file.name": old_output.name,
+                "sample.id": "old",
+                "sample_id": "old",
+                "chain": "TRB",
+                "filename": str(old_input_file),
+                "group": "old_group",
+            },
+            {
+                "#file.name": stale_output_name,
+                "sample.id": "missing",
+                "sample_id": "missing",
+                "chain": "TRG",
+                "filename": str(missing_input_file),
+                "group": "stale_group",
+            },
+        ]
+    )
+    existing_metadata.to_csv(output_folder / "metadata.txt", sep="\t", index=False)
+    samples = pd.DataFrame(
+        [
+            {
+                "sample_id": "new",
+                "chain": "TRA",
+                "filename": str(new_input_file),
+                "group": "new_group",
+            }
+        ]
+    )
+
+    metadata = io.save_to_vdjtools(samples, str(output_folder), force_overwrite=True)
+
+    assert set(metadata["#file.name"]) == {
+        "vdjtools.old.TRB.txt",
+        "vdjtools.new.TRA.txt",
+    }
+    old_row = metadata.loc[metadata["sample_id"] == "old"].iloc[0]
+    new_row = metadata.loc[metadata["sample_id"] == "new"].iloc[0]
+    assert old_row["original_filename"] == str(old_input_file)
+    assert old_row["group"] == "old_group"
+    assert new_row["original_filename"] == str(new_input_file)
+    assert new_row["group"] == "new_group"
 
 
 def test_vdjtools_save_to_vdjtools_warns_and_delegates(tmp_path):
