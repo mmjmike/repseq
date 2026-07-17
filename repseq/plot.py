@@ -8,12 +8,17 @@ joined immediately before plotting.
 
 from __future__ import annotations
 
+import re
 import warnings
 from collections.abc import Iterable
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
+from matplotlib.colors import to_rgb
+from matplotlib.patches import Patch
+from scipy.cluster.hierarchy import dendrogram, leaves_list, linkage
 
 
 CDR3AA_STATS_PROPERTIES = [
@@ -38,6 +43,141 @@ CONVERGENCE_PROPERTIES = [
     "convergence_v",
     "convergence_vj",
 ]
+
+
+GENE_RE = re.compile(
+    r"""
+    ^
+    (?P<system>TR|IG)
+    (?P<chain>[ABGDHKL])
+    (?P<head>[A-Z])
+    (?P<body>[A-Z0-9/-]*)
+    (?:\*(?P<allele>\d{2,3}))?
+    $
+    """,
+    re.VERBOSE | re.IGNORECASE,
+)
+
+
+BODY_RE = re.compile(
+    r"""
+    ^
+    (?P<family>\d+)
+    (?P<subfamily>[A-Z]+)?
+
+    (?:
+        -?
+        (?P<segment>\d+)
+        (?P<attached_dual>[A-Z]+\d+)?
+        (?:-(?P<subsegment>[A-Z0-9]+))?
+    )?
+
+    (?:/(?P<slash_dual>[A-Z0-9-]+))?
+    $
+    """,
+    re.VERBOSE | re.IGNORECASE,
+)
+
+
+def parse_gene_name(gene):
+    """Parse a V, D, J, or C gene name into sortable components."""
+    if not isinstance(gene, str):
+        return None
+    gene_original = gene
+    gene = gene.strip().upper()
+
+    # AIRR/MiXCR multi-calls are ordered by preference; plot the first call.
+    gene = gene.split(",", 1)[0]
+    gene = gene.split(";", 1)[0]
+    gene = gene.split("|", 1)[0]
+    gene = gene.split("(", 1)[0]
+
+    match = GENE_RE.match(gene)
+    if not match:
+        return None
+
+    parsed = match.groupdict()
+    system = parsed["system"].upper()
+    chain = parsed["chain"].upper()
+    head = parsed["head"].upper()
+    body = parsed["body"].upper()
+
+    # IGHD is the delta constant gene, while IGHD3-10 is a D segment.
+    if system == "IG" and chain == "H" and (
+        head in {"M", "G", "A", "E"} or (head == "D" and body == "")
+    ):
+        gene_type = "C"
+        isotype = head
+    else:
+        gene_type = head
+        isotype = None
+
+    family = None
+    subfamily = None
+    segment = None
+    subsegment = None
+    dual_designation = None
+    if body:
+        body_match = BODY_RE.match(body)
+        if body_match:
+            body_parts = body_match.groupdict()
+            family = body_parts["family"]
+            subfamily = body_parts["subfamily"]
+            segment = body_parts["segment"]
+            subsegment = body_parts["subsegment"]
+            dual_designation = (
+                body_parts["attached_dual"] or body_parts["slash_dual"]
+            )
+
+    return {
+        "original": gene_original,
+        "system": system,
+        "chain": chain,
+        "gene_type": gene_type,
+        "isotype": isotype,
+        "family": family,
+        "subfamily": subfamily,
+        "segment": segment,
+        "subsegment": subsegment,
+        "dual_designation": dual_designation,
+        "allele": parsed["allele"],
+    }
+
+
+def _natural_sort_key(value):
+    return tuple(
+        (0, int(part)) if part.isdigit() else (1, part.casefold())
+        for part in re.split(r"(\d+)", str(value))
+        if part
+    )
+
+
+def _optional_number(value):
+    return (1, 0) if value is None else (0, int(value))
+
+
+def _gene_sort_key(gene):
+    parsed = parse_gene_name(gene)
+    if parsed is None:
+        return (1, _natural_sort_key(gene))
+    return (
+        0,
+        parsed["system"],
+        parsed["chain"],
+        parsed["gene_type"],
+        parsed["isotype"] or "",
+        _optional_number(parsed["family"]),
+        parsed["subfamily"] or "",
+        _optional_number(parsed["segment"]),
+        _natural_sort_key(parsed["dual_designation"] or ""),
+        _natural_sort_key(parsed["subsegment"] or ""),
+        _optional_number(parsed["allele"]),
+        _natural_sort_key(gene),
+    )
+
+
+def _sort_gene_names(genes):
+    return sorted(pd.unique(pd.Series(genes).dropna().astype(str)), key=_gene_sort_key)
 
 
 def _as_list(value, name, max_len=None):
@@ -427,6 +567,582 @@ def plot_stats(
     return grid
 
 
+def _column_by_name(columns, names):
+    names = {name.casefold() for name in names}
+    matches = [
+        column
+        for column in columns
+        if isinstance(column, str) and column.casefold() in names
+    ]
+    return matches[0] if matches else None
+
+
+def _infer_segment_type(values):
+    gene_types = {
+        parsed["gene_type"].lower()
+        for parsed in (parse_gene_name(value) for value in values)
+        if parsed is not None
+    }
+    if len(gene_types) != 1 or not gene_types.issubset({"v", "j", "c"}):
+        raise ValueError(
+            "Could not detect one V, J, or C segment type from the gene names"
+        )
+    return gene_types.pop()
+
+
+def _segment_chain(gene):
+    parsed = parse_gene_name(gene)
+    if parsed is None:
+        return None
+    return parsed["system"] + parsed["chain"]
+
+
+def _normalize_segment_usage_table(segment_usage_df):
+    if not isinstance(segment_usage_df, pd.DataFrame):
+        raise TypeError("segment_usage_df must be a pandas DataFrame")
+    if "sample_id" not in segment_usage_df.columns:
+        raise ValueError("segment_usage_df must contain a 'sample_id' column")
+
+    data = segment_usage_df.copy()
+    segment_columns = [
+        column
+        for column in data.columns
+        if isinstance(column, str) and column.casefold() in {"v", "j", "c"}
+    ]
+    generic_segment_column = _column_by_name(data.columns, {"segment", "gene"})
+    value_column = _column_by_name(
+        data.columns, {"usage", "value", "freq", "frequency", "count"}
+    )
+
+    if segment_columns:
+        if len(segment_columns) != 1:
+            raise ValueError(
+                "Long segment-usage tables must contain exactly one of: v, j, c"
+            )
+        if value_column is None:
+            raise ValueError(
+                "Long segment-usage tables need a usage, value, freq, frequency, "
+                "or count column"
+            )
+        segment_column = segment_columns[0]
+        segment_type = segment_column.casefold()
+        keep_columns = ["sample_id", segment_column, value_column]
+        if "chain" in data.columns:
+            keep_columns.insert(1, "chain")
+        data = data[keep_columns].rename(
+            columns={segment_column: "_segment", value_column: "_value"}
+        )
+    elif generic_segment_column is not None:
+        if value_column is None:
+            raise ValueError(
+                "Long segment-usage tables need a usage, value, freq, frequency, "
+                "or count column"
+            )
+        segment_type = _infer_segment_type(data[generic_segment_column].dropna())
+        keep_columns = ["sample_id", generic_segment_column, value_column]
+        if "chain" in data.columns:
+            keep_columns.insert(1, "chain")
+        data = data[keep_columns].rename(
+            columns={generic_segment_column: "_segment", value_column: "_value"}
+        )
+    else:
+        id_columns = ["sample_id"] + (["chain"] if "chain" in data.columns else [])
+        wide_segment_columns = [
+            column
+            for column in data.columns
+            if column not in id_columns and parse_gene_name(str(column)) is not None
+        ]
+        if not wide_segment_columns:
+            raise ValueError(
+                "Could not detect a long or wide V, J, or C segment-usage table"
+            )
+        segment_type = _infer_segment_type(map(str, wide_segment_columns))
+        data = data.melt(
+            id_vars=id_columns,
+            value_vars=wide_segment_columns,
+            var_name="_segment",
+            value_name="_value",
+        )
+
+    data["_value"] = pd.to_numeric(data["_value"], errors="coerce")
+    invalid_values = data["_value"].isna() | data["_segment"].isna()
+    if invalid_values.any():
+        warnings.warn(
+            f"Dropped {int(invalid_values.sum())} segment-usage row(s) with "
+            "missing or non-numeric values.",
+            UserWarning,
+            stacklevel=2,
+        )
+        data = data.loc[~invalid_values].copy()
+    if data.empty:
+        raise ValueError("No valid segment-usage values were found")
+
+    data["_segment"] = data["_segment"].astype(str)
+    inferred_chains = data["_segment"].map(_segment_chain)
+    if "chain" not in data.columns:
+        data["chain"] = inferred_chains.fillna("Unknown")
+    else:
+        data["chain"] = data["chain"].where(data["chain"].notna(), inferred_chains)
+        data["chain"] = data["chain"].fillna("Unknown")
+        # Wide batch tables contain the union of genes from every chain. Keep
+        # each chain panel independent by removing those cross-chain zero-fill
+        # columns after melting.
+        cross_chain = inferred_chains.notna() & (
+            data["chain"].astype(str) != inferred_chains.astype(str)
+        )
+        data = data.loc[~cross_chain].copy()
+    return data, segment_type
+
+
+def _prepare_segment_usage_data(segment_usage_df, metadata, group, split, plot_type):
+    data, segment_type = _normalize_segment_usage_table(segment_usage_df)
+    max_groups = 3 if plot_type == "heatmap" else 1
+    group_columns = _as_list(group, "group", max_len=max_groups)
+    split_columns = _as_list(split, "split", max_len=1)
+
+    data, metadata_columns, _ = _merge_stats_metadata(data, metadata)
+    if metadata is None and (group_columns or split_columns):
+        raise ValueError("metadata is required when group or split columns are used")
+    _validate_metadata_columns(group_columns, metadata_columns, "group")
+    _validate_metadata_columns(split_columns, metadata_columns, "split")
+    data["_sample_label"] = data["sample_id"].astype(str)
+    return data, segment_type, group_columns, split_columns
+
+
+def _panel_subsets(data, split_columns):
+    chain_order = _category_order(data["chain"])
+    if not split_columns:
+        return [
+            (str(chain), data.loc[data["chain"] == chain].copy())
+            for chain in chain_order
+        ]
+
+    split_column = split_columns[0]
+    split_order = _category_order(data[split_column])
+    panels = []
+    for chain in chain_order:
+        chain_data = data.loc[data["chain"] == chain]
+        for split_value in split_order:
+            panel_data = chain_data.loc[chain_data[split_column] == split_value].copy()
+            if not panel_data.empty:
+                panels.append((f"{chain} | {split_value}", panel_data))
+    return panels
+
+
+def _palette_mapping(levels, palette=None):
+    if isinstance(palette, dict):
+        missing = [level for level in levels if level not in palette]
+        if missing:
+            raise ValueError(f"palette does not define colors for: {missing}")
+        return {level: palette[level] for level in levels}
+    colors = sns.color_palette(palette, n_colors=len(levels))
+    return dict(zip(levels, colors))
+
+
+def _add_figure_legend(fig, axes, title):
+    handles = []
+    labels = []
+    for ax in axes:
+        ax_handles, ax_labels = ax.get_legend_handles_labels()
+        if ax.legend_ is not None:
+            ax.legend_.remove()
+        for handle, label in zip(ax_handles, ax_labels):
+            if label and label not in labels:
+                handles.append(handle)
+                labels.append(label)
+    if handles:
+        fig.legend(
+            handles,
+            labels,
+            title=title,
+            loc="upper center",
+            ncol=min(5, len(labels)),
+            frameon=False,
+        )
+
+
+def _draw_segment_barplot(ax, data, group_column, palette):
+    segment_order = _sort_gene_names(data["_segment"])
+    x = np.arange(len(segment_order), dtype=float)
+
+    if group_column is None:
+        series_column = "_sample_label"
+        series_order = _category_order(data[series_column])
+        values = data.pivot_table(
+            index="_segment",
+            columns=series_column,
+            values="_value",
+            aggfunc="sum",
+            fill_value=0,
+            sort=False,
+        ).reindex(segment_order, fill_value=0)
+        color_map = _palette_mapping(series_order, palette)
+        width = 0.8 / max(1, len(series_order))
+        for index, series in enumerate(series_order):
+            offset = (index - (len(series_order) - 1) / 2) * width
+            ax.bar(
+                x + offset,
+                values.reindex(columns=series_order)[series].to_numpy(),
+                width=width,
+                color=color_map[series],
+                label=str(series),
+            )
+    else:
+        series_order = _category_order(data[group_column])
+        color_map = _palette_mapping(series_order, palette)
+        summary = (
+            data.groupby(["_segment", group_column], observed=True)["_value"]
+            .agg(["mean", "std"])
+        )
+        width = 0.8 / max(1, len(series_order))
+        for index, series in enumerate(series_order):
+            group_summary = summary.xs(series, level=group_column).reindex(segment_order)
+            offset = (index - (len(series_order) - 1) / 2) * width
+            ax.bar(
+                x + offset,
+                group_summary["mean"].fillna(0).to_numpy(),
+                yerr=group_summary["std"].fillna(0).to_numpy(),
+                width=width,
+                capsize=2,
+                color=color_map[series],
+                label=str(series),
+            )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(segment_order, rotation=90)
+
+
+def _draw_segment_boxplot(ax, data, group_column, palette, seed):
+    segment_order = _sort_gene_names(data["_segment"])
+    group_order = _category_order(data[group_column])
+    color_map = _palette_mapping(group_order, palette)
+    sns.boxplot(
+        data=data,
+        x="_segment",
+        y="_value",
+        hue=group_column,
+        order=segment_order,
+        hue_order=group_order,
+        palette=color_map,
+        showfliers=False,
+        ax=ax,
+    )
+
+    random_state = np.random.get_state()
+    try:
+        np.random.seed(seed)
+        sns.stripplot(
+            data=data,
+            x="_segment",
+            y="_value",
+            hue=group_column,
+            order=segment_order,
+            hue_order=group_order,
+            palette=color_map,
+            dodge=True,
+            jitter=0.15,
+            linewidth=0.3,
+            edgecolor="black",
+            alpha=0.75,
+            ax=ax,
+        )
+    finally:
+        np.random.set_state(random_state)
+    ax.tick_params(axis="x", rotation=90)
+
+
+def _categorical_segment_usage_plot(
+    data,
+    panels,
+    plot_type,
+    group_columns,
+    palette,
+    height,
+    aspect,
+    seed,
+):
+    group_column = group_columns[0] if group_columns else None
+    series_column = group_column or "_sample_label"
+    series_count = data[series_column].nunique(dropna=True)
+    if series_count > 10:
+        warnings.warn(
+            "Categorical segment-usage plots support at most 10 groups; "
+            f"found {series_count}. Nothing was plotted.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return None
+
+    max_segments = max(panel["_segment"].nunique() for _, panel in panels)
+    figure_width = max(8, min(24, max_segments * 0.38 * aspect))
+    fig, axes_array = plt.subplots(
+        len(panels),
+        1,
+        figsize=(figure_width, height * len(panels)),
+        squeeze=False,
+    )
+    axes = list(axes_array[:, 0])
+    for panel_index, ((title, panel_data), ax) in enumerate(zip(panels, axes)):
+        if plot_type == "barplot":
+            _draw_segment_barplot(ax, panel_data, group_column, palette)
+        else:
+            _draw_segment_boxplot(
+                ax, panel_data, group_column, palette, seed + panel_index
+            )
+        ax.set_title(title)
+        ax.set_xlabel("Segment")
+        ax.set_ylabel("Value")
+        sns.despine(ax=ax)
+
+    _add_figure_legend(
+        fig,
+        axes,
+        _caption(group_column) if group_column else "Sample",
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    return fig
+
+
+def _cluster_rows(matrix):
+    if len(matrix) < 2:
+        return matrix, None
+    linkage_matrix = linkage(matrix.to_numpy(), method="average", metric="euclidean")
+    order = leaves_list(linkage_matrix)
+    return matrix.iloc[order], linkage_matrix
+
+
+def _heatmap_annotation_colors(data, sample_order, group_columns, palette):
+    sample_metadata = (
+        data[["_sample_label"] + group_columns]
+        .drop_duplicates("_sample_label")
+        .set_index("_sample_label")
+        .reindex(sample_order)
+    )
+    rgb = np.zeros((len(sample_order), len(group_columns), 3))
+    legend_handles = []
+    for group_index, group_column in enumerate(group_columns):
+        levels = _category_order(data[group_column])
+        color_map = _palette_mapping(levels, palette)
+        for sample_index, value in enumerate(sample_metadata[group_column]):
+            rgb[sample_index, group_index] = to_rgb(
+                color_map.get(value, "#d0d0d0")
+            )
+        legend_handles.extend(
+            Patch(
+                facecolor=color_map[level],
+                label=f"{_caption(group_column)}: {level}",
+            )
+            for level in levels
+        )
+    return rgb, legend_handles
+
+
+def _heatmap_segment_usage_plot(
+    panels,
+    group_columns,
+    palette,
+    cmap,
+    height,
+    aspect,
+):
+    max_segments = max(panel["_segment"].nunique() for _, panel in panels)
+    max_samples = max(panel["_sample_label"].nunique() for _, panel in panels)
+    figure_width = max(9, min(28, max_segments * 0.35 * aspect + 3))
+    panel_height = max(height, min(12, max_samples * 0.28 + 1.5))
+    fig = plt.figure(figsize=(figure_width, panel_height * len(panels)))
+    outer_grid = fig.add_gridspec(len(panels), 1, hspace=0.55)
+    all_legend_handles = []
+
+    for panel_index, (title, panel_data) in enumerate(panels):
+        segment_order = _sort_gene_names(panel_data["_segment"])
+        sample_order = list(pd.unique(panel_data["_sample_label"]))
+        matrix = panel_data.pivot_table(
+            index="_sample_label",
+            columns="_segment",
+            values="_value",
+            aggfunc="sum",
+            fill_value=0,
+            sort=False,
+        ).reindex(index=sample_order, columns=segment_order, fill_value=0)
+
+        linkage_matrix = None
+        if group_columns:
+            matrix, linkage_matrix = _cluster_rows(matrix)
+            inner_grid = outer_grid[panel_index].subgridspec(
+                1,
+                4,
+                width_ratios=[0.8, max(0.35, 0.25 * len(group_columns)), 6, 0.18],
+                wspace=0.08,
+            )
+            dendrogram_ax = fig.add_subplot(inner_grid[0, 0])
+            annotation_ax = fig.add_subplot(inner_grid[0, 1])
+            heatmap_ax = fig.add_subplot(inner_grid[0, 2])
+            colorbar_ax = fig.add_subplot(inner_grid[0, 3])
+
+            if linkage_matrix is not None:
+                dendrogram(
+                    linkage_matrix,
+                    orientation="left",
+                    no_labels=True,
+                    color_threshold=0,
+                    above_threshold_color="#555555",
+                    ax=dendrogram_ax,
+                )
+                dendrogram_ax.invert_yaxis()
+            dendrogram_ax.axis("off")
+
+            annotation_rgb, legend_handles = _heatmap_annotation_colors(
+                panel_data,
+                list(matrix.index),
+                group_columns,
+                palette,
+            )
+            annotation_ax.imshow(
+                annotation_rgb,
+                aspect="auto",
+                interpolation="nearest",
+            )
+            annotation_ax.set_xticks(np.arange(len(group_columns)))
+            annotation_ax.set_xticklabels(
+                [_caption(column) for column in group_columns],
+                rotation=90,
+            )
+            annotation_ax.xaxis.tick_top()
+            annotation_ax.set_yticks([])
+            annotation_ax.tick_params(length=0)
+            for spine in annotation_ax.spines.values():
+                spine.set_visible(False)
+            all_legend_handles.extend(legend_handles)
+        else:
+            inner_grid = outer_grid[panel_index].subgridspec(
+                1, 2, width_ratios=[6, 0.18], wspace=0.08
+            )
+            heatmap_ax = fig.add_subplot(inner_grid[0, 0])
+            colorbar_ax = fig.add_subplot(inner_grid[0, 1])
+
+        sns.heatmap(
+            matrix,
+            cmap=cmap,
+            ax=heatmap_ax,
+            cbar=True,
+            cbar_ax=colorbar_ax,
+            cbar_kws={"label": "Value"},
+            xticklabels=True,
+            yticklabels=True,
+        )
+        heatmap_ax.set_title(title)
+        heatmap_ax.set_xlabel("Segment")
+        heatmap_ax.set_ylabel("Sample")
+        heatmap_ax.tick_params(axis="x", labelrotation=90)
+
+    if all_legend_handles:
+        unique_handles = {}
+        for handle in all_legend_handles:
+            unique_handles.setdefault(handle.get_label(), handle)
+        fig.legend(
+            unique_handles.values(),
+            unique_handles.keys(),
+            loc="upper center",
+            ncol=min(5, len(unique_handles)),
+            frameon=False,
+        )
+        fig.subplots_adjust(top=0.93)
+    return fig
+
+
+def segment_usage(
+    segment_usage_df,
+    metadata=None,
+    plot_type="heatmap",
+    group=None,
+    split=None,
+    palette=None,
+    cmap="viridis",
+    height=3.2,
+    aspect=1.2,
+    seed=0,
+):
+    """Plot V, J, or C segment usage from a long or wide statistics table.
+
+    Parameters
+    ----------
+    segment_usage_df : pandas.DataFrame
+        Long output from ``stats.calc_segment_usage`` with a ``v``, ``j``, or
+        ``c`` column and a value column, or its wide output with genes in
+        columns. Generic long tables with ``segment`` or ``gene`` and one of
+        ``usage``, ``value``, ``freq``, ``frequency``, or ``count`` are also
+        accepted. The segment type and chain are detected from gene names.
+    metadata : pandas.DataFrame, optional
+        Metadata merged by ``sample_id`` and, when present in both tables,
+        ``chain``. Group and split columns must come from this table.
+    plot_type : {"heatmap", "barplot", "boxplot"}
+        Heatmaps show segments in columns and samples in rows. Barplots show
+        samples as separate series when ungrouped; with a group, bars show the
+        mean and sample standard deviation. Boxplots require a group and add
+        deterministic, horizontally jittered sample points. An ungrouped
+        boxplot falls back to a barplot.
+    group : str or sequence of str, optional
+        One metadata column for barplots and boxplots, or up to three columns
+        for heatmap sample annotations. Grouped heatmaps hierarchically cluster
+        samples by their segment-usage profiles.
+    split : str or one-item sequence of str, optional
+        Metadata column placed in plot rows. Chains always form independent
+        rows, with their own segment and sample axes.
+    palette : seaborn palette or dict, optional
+        Colors for samples, groups, and heatmap annotation categories.
+    cmap : matplotlib colormap, default "viridis"
+        Colormap for usage values in heatmaps.
+    height, aspect : float
+        Base panel height and width multiplier.
+    seed : int, default 0
+        Random seed used for horizontal jitter in boxplots.
+
+    Returns
+    -------
+    matplotlib.figure.Figure or None
+        The figure, or ``None`` when a categorical plot exceeds ten series.
+    """
+    plot_type = str(plot_type).casefold()
+    if plot_type not in {"heatmap", "barplot", "boxplot"}:
+        raise ValueError("plot_type must be one of: heatmap, barplot, boxplot")
+
+    data, _, group_columns, split_columns = _prepare_segment_usage_data(
+        segment_usage_df,
+        metadata,
+        group,
+        split,
+        plot_type,
+    )
+    if plot_type == "boxplot" and not group_columns:
+        warnings.warn(
+            "boxplot requires a group column; using barplot instead.",
+            UserWarning,
+            stacklevel=2,
+        )
+        plot_type = "barplot"
+
+    panels = _panel_subsets(data, split_columns)
+    if plot_type == "heatmap":
+        return _heatmap_segment_usage_plot(
+            panels,
+            group_columns,
+            palette,
+            cmap,
+            height,
+            aspect,
+        )
+    return _categorical_segment_usage_plot(
+        data,
+        panels,
+        plot_type,
+        group_columns,
+        palette,
+        height,
+        aspect,
+        seed,
+    )
+
+
 def cdr3aa_stats(
     stats_df,
     metadata=None,
@@ -500,7 +1216,9 @@ __all__ = [
     "CDR3AA_STATS_PROPERTIES",
     "DIVERSITY_STATS_PROPERTIES",
     "CONVERGENCE_PROPERTIES",
+    "parse_gene_name",
     "plot_stats",
+    "segment_usage",
     "cdr3aa_stats",
     "diversity_stats",
     "convergence",

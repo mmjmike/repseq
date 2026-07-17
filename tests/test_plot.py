@@ -2,8 +2,10 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+import numpy as np
 import pandas as pd
 import pytest
+from matplotlib.axes import Axes
 
 from repseq import plot as rsplot
 
@@ -208,3 +210,191 @@ def test_split_panels_only_show_samples_from_their_subset():
     }
     assert labels_by_panel["treated"] == ["sample1", "sample3"]
     assert labels_by_panel["control"] == ["sample2"]
+
+
+def _v_usage_long(sample_count=4):
+    rows = []
+    for sample_number in range(sample_count):
+        for segment, usage in [("TRBV10", 0.6), ("TRBV2", 0.4)]:
+            rows.append(
+                {
+                    "sample_id": f"sample{sample_number}",
+                    "chain": "TRB",
+                    "v": segment,
+                    "usage": usage + sample_number * 0.01,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def test_parse_gene_name_handles_isotypes_dual_genes_and_natural_sorting():
+    assert rsplot.parse_gene_name("IGHD")["gene_type"] == "C"
+    assert rsplot.parse_gene_name("IGHD3-10")["gene_type"] == "D"
+    assert rsplot.parse_gene_name("TRAV8-2DV6")["dual_designation"] == "DV6"
+    assert rsplot.parse_gene_name("TRAV8-2/DV6")["dual_designation"] == "DV6"
+    assert rsplot._sort_gene_names(
+        ["TRBV12-3-2", "TRBV7-8", "TRBV2", "TRBV12-3-1", "TRBV7-3"]
+    ) == ["TRBV2", "TRBV7-3", "TRBV7-8", "TRBV12-3-1", "TRBV12-3-2"]
+
+
+def test_segment_usage_detects_wide_table_and_keeps_chain_axes_independent():
+    usage = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample_TRA",
+                "chain": "TRA",
+                "TRAV10": 0.7,
+                "TRAV2": 0.3,
+                "TRBV2": 0,
+            },
+            {
+                "sample_id": "sample_TRB",
+                "chain": "TRB",
+                "TRAV10": 0,
+                "TRAV2": 0,
+                "TRBV2": 1.0,
+            },
+        ]
+    )
+
+    fig = rsplot.segment_usage(usage)
+
+    heatmaps = {ax.get_title(): ax for ax in fig.axes if ax.get_title()}
+    assert set(heatmaps) == {"TRA", "TRB"}
+    assert [tick.get_text() for tick in heatmaps["TRA"].get_xticklabels()] == [
+        "TRAV2",
+        "TRAV10",
+    ]
+    assert [tick.get_text() for tick in heatmaps["TRB"].get_xticklabels()] == [
+        "TRBV2"
+    ]
+
+
+def test_segment_usage_grouped_barplot_uses_standard_deviation(monkeypatch):
+    usage = _v_usage_long()
+    metadata = pd.DataFrame(
+        [
+            {
+                "sample_id": f"sample{sample_number}",
+                "chain": "TRB",
+                "condition": "control" if sample_number < 2 else "treated",
+            }
+            for sample_number in range(4)
+        ]
+    )
+    error_bars = []
+    original_bar = Axes.bar
+
+    def capture_bar(self, *args, **kwargs):
+        error_bars.append(kwargs.get("yerr"))
+        return original_bar(self, *args, **kwargs)
+
+    monkeypatch.setattr(Axes, "bar", capture_bar)
+
+    fig = rsplot.segment_usage(
+        usage,
+        metadata=metadata,
+        plot_type="barplot",
+        group="condition",
+    )
+
+    assert fig is not None
+    assert len(error_bars) == 2
+    assert all(np.all(np.asarray(values) > 0) for values in error_bars)
+    assert [tick.get_text() for tick in fig.axes[0].get_xticklabels()] == [
+        "TRBV2",
+        "TRBV10",
+    ]
+
+
+def test_segment_usage_ungrouped_boxplot_stops_above_ten_samples():
+    with pytest.warns(UserWarning, match="at most 10 groups"):
+        fig = rsplot.segment_usage(
+            _v_usage_long(sample_count=11),
+            plot_type="boxplot",
+        )
+
+    assert fig is None
+
+
+def test_segment_usage_heatmap_supports_three_ordered_annotations():
+    usage = _v_usage_long()
+    metadata = pd.DataFrame(
+        [
+            {
+                "sample_id": f"sample{sample_number}",
+                "chain": "TRB",
+                "condition": "treated" if sample_number >= 2 else "control",
+                "batch": f"b{sample_number % 2 + 1}",
+                "sex": "F" if sample_number % 2 else "M",
+            }
+            for sample_number in range(4)
+        ]
+    )
+    metadata["condition"] = pd.Categorical(
+        metadata["condition"],
+        categories=["control", "treated"],
+        ordered=True,
+    )
+
+    fig = rsplot.segment_usage(
+        usage,
+        metadata=metadata,
+        group=["condition", "batch", "sex"],
+    )
+
+    annotation_axes = [ax for ax in fig.axes if len(ax.images) == 1]
+    assert len(annotation_axes) == 1
+    assert [tick.get_text() for tick in annotation_axes[0].get_xticklabels()] == [
+        "Condition",
+        "Batch",
+        "Sex",
+    ]
+
+
+def test_segment_usage_split_order_is_preserved_in_rows():
+    usage = _v_usage_long()
+    metadata = pd.DataFrame(
+        [
+            {
+                "sample_id": f"sample{sample_number}",
+                "chain": "TRB",
+                "tissue": "blood" if sample_number < 2 else "tumor",
+            }
+            for sample_number in range(4)
+        ]
+    )
+    metadata["tissue"] = pd.Categorical(
+        metadata["tissue"], categories=["tumor", "blood"], ordered=True
+    )
+
+    fig = rsplot.segment_usage(
+        usage,
+        metadata=metadata,
+        plot_type="barplot",
+        split="tissue",
+    )
+
+    assert [ax.get_title() for ax in fig.axes] == ["TRB | tumor", "TRB | blood"]
+
+
+def test_segment_usage_rejects_too_many_boxplot_groups():
+    metadata = pd.DataFrame(
+        [
+            {
+                "sample_id": f"sample{sample_number}",
+                "chain": "TRB",
+                "condition": "control",
+                "batch": "b1",
+            }
+            for sample_number in range(4)
+        ]
+    )
+
+    with pytest.raises(ValueError, match="group can contain at most 1"):
+        rsplot.segment_usage(
+            _v_usage_long(),
+            metadata=metadata,
+            plot_type="boxplot",
+            group=["condition", "batch"],
+        )

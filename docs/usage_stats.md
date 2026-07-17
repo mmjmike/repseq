@@ -422,6 +422,82 @@ rsplot.diversity_stats(
 Ordered pandas categorical columns in metadata keep their order in the x-axis,
 color legend, and split panels.
 
+### Plotting segment usage
+
+`rsplot.segment_usage` accepts both the long and wide tables returned by
+`stats.calc_segment_usage`. It detects V, J, or C usage from the table and
+separates chains into independent panels. Generic long tables with a `segment`
+or `gene` column and a `usage`, `value`, `freq`, `frequency`, or `count` column
+are accepted as well.
+
+The default heatmap places segments in columns and samples in rows. Each chain
+has its own segment and sample axes. One metadata column can be used to split
+each chain into additional rows.
+
+```py
+v_usage = stats.calc_segment_usage(
+    clonosets,
+    segment="v",
+    cl_filter=func_filter,
+    table="long",
+)
+
+rsplot.segment_usage(v_usage)
+rsplot.segment_usage(v_usage, metadata=metadata, split="tissue")
+```
+
+Heatmaps accept up to three metadata grouping columns. These are displayed as
+vertical sample-annotation strips, and samples are hierarchically clustered by
+their segment-usage profiles. Ordered categorical metadata controls annotation
+colors and legend order.
+
+```py
+rsplot.segment_usage(
+    v_usage,
+    metadata=metadata,
+    group=["experimental_group", "tissue", "sex"],
+    cmap="viridis",
+)
+```
+
+Use `plot_type="barplot"` for bars. Without a group, each sample is a separate
+series. With one metadata group, the bars show the group mean with sample
+standard-deviation error bars.
+
+```py
+rsplot.segment_usage(
+    v_usage,
+    metadata=metadata,
+    plot_type="barplot",
+    group="experimental_group",
+)
+```
+
+Use `plot_type="boxplot"` with one metadata group for boxplots and
+deterministically jittered sample points. The jitter changes only horizontal
+positions; measured values are not modified. Set `seed` to change the jitter
+layout. An ungrouped boxplot falls back to a sample barplot. Categorical plots
+are limited to ten group or sample series; above this limit the function warns
+and does not create a figure.
+
+```py
+rsplot.segment_usage(
+    v_usage,
+    metadata=metadata,
+    plot_type="boxplot",
+    group="experimental_group",
+    split="tissue",
+    seed=7,
+)
+```
+
+Segment labels are ordered by receptor system, chain and gene type, followed by
+numeric family, alphabetic subfamily, numeric segment, dual designation,
+subsegment, and allele. AIRR/MiXCR multi-calls use the first gene call for
+sorting. This gives natural orders such as `TRBV2`, `TRBV7-3`, `TRBV7-8`,
+`TRBV12-3-1`, `TRBV12-3-2`. IGH constant isotypes and the `IGHD` constant-gene
+versus `IGHD3-10` D-segment ambiguity are handled explicitly.
+
 
 ??? info "Convergence visualization"
     Calculated stats can be visualized in Jupyter notebook using %%R cell magic. 
