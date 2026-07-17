@@ -8,6 +8,7 @@ joined immediately before plotting.
 
 from __future__ import annotations
 
+import ast
 import re
 import warnings
 from collections.abc import Iterable
@@ -1150,6 +1151,601 @@ def segment_usage(
     return fig
 
 
+def _parse_usage_combination(value, expected_length):
+    combination = value
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.startswith(("(", "[")):
+            try:
+                combination = ast.literal_eval(stripped)
+            except (SyntaxError, ValueError):
+                combination = None
+        elif "|" in stripped:
+            combination = stripped.split("|")
+    if not isinstance(combination, (tuple, list)):
+        return None
+    if len(combination) != expected_length:
+        return None
+    v_gene, j_gene = combination[:2]
+    if parse_gene_name(str(v_gene)) is None or parse_gene_name(str(j_gene)) is None:
+        return None
+    if expected_length == 3:
+        try:
+            cdr3_length = int(combination[2])
+        except (TypeError, ValueError):
+            return None
+        return str(v_gene), str(j_gene), cdr3_length
+    return str(v_gene), str(j_gene)
+
+
+def _normalize_combination_usage_table(usage_df, combination_type):
+    if not isinstance(usage_df, pd.DataFrame):
+        raise TypeError("usage_df must be a pandas DataFrame")
+    if "sample_id" not in usage_df.columns:
+        raise ValueError("usage_df must contain a 'sample_id' column")
+
+    expected_length = 2 if combination_type == "vj" else 3
+    data = usage_df.copy()
+    combination_column = _column_by_name(data.columns, {combination_type})
+    value_column = _column_by_name(
+        data.columns, {"usage", "value", "freq", "frequency", "count"}
+    )
+    v_column = _column_by_name(data.columns, {"v"})
+    j_column = _column_by_name(data.columns, {"j"})
+    length_column = _column_by_name(
+        data.columns, {"cdr3_length", "cdr3aa_length", "length", "len"}
+    )
+
+    id_columns = ["sample_id"] + (["chain"] if "chain" in data.columns else [])
+    if combination_column is not None:
+        if value_column is None:
+            raise ValueError(
+                f"Long {combination_type} tables need a usage, value, freq, "
+                "frequency, or count column"
+            )
+        keep_columns = id_columns + [combination_column, value_column]
+        data = data[keep_columns].rename(columns={value_column: "_value"})
+        combinations = data[combination_column].map(
+            lambda value: _parse_usage_combination(value, expected_length)
+        )
+    elif v_column is not None and j_column is not None and (
+        expected_length == 2 or length_column is not None
+    ):
+        if value_column is None:
+            raise ValueError(
+                f"Long {combination_type} tables need a usage, value, freq, "
+                "frequency, or count column"
+            )
+        keep_columns = id_columns + [v_column, j_column]
+        if expected_length == 3:
+            keep_columns.append(length_column)
+        keep_columns.append(value_column)
+        data = data[keep_columns].rename(columns={value_column: "_value"})
+        if expected_length == 2:
+            combinations = pd.Series(
+                zip(data[v_column], data[j_column]), index=data.index
+            ).map(lambda value: _parse_usage_combination(value, expected_length))
+        else:
+            combinations = pd.Series(
+                zip(data[v_column], data[j_column], data[length_column]),
+                index=data.index,
+            ).map(lambda value: _parse_usage_combination(value, expected_length))
+    else:
+        wide_columns = [
+            column
+            for column in data.columns
+            if column not in id_columns
+            and _parse_usage_combination(column, expected_length) is not None
+        ]
+        if not wide_columns:
+            raise ValueError(
+                f"Could not detect a long or wide {combination_type} usage table"
+            )
+        data = data.melt(
+            id_vars=id_columns,
+            value_vars=wide_columns,
+            var_name="_combination",
+            value_name="_value",
+        )
+        combinations = data["_combination"].map(
+            lambda value: _parse_usage_combination(value, expected_length)
+        )
+
+    data["_value"] = pd.to_numeric(data["_value"], errors="coerce")
+    invalid = combinations.isna() | data["_value"].isna()
+    if invalid.any():
+        warnings.warn(
+            f"Dropped {int(invalid.sum())} invalid {combination_type} usage row(s).",
+            UserWarning,
+            stacklevel=2,
+        )
+        data = data.loc[~invalid].copy()
+        combinations = combinations.loc[~invalid]
+    if data.empty:
+        raise ValueError(f"No valid {combination_type} usage values were found")
+
+    data["_v"] = [combination[0] for combination in combinations]
+    data["_j"] = [combination[1] for combination in combinations]
+    if expected_length == 3:
+        data["_length"] = [combination[2] for combination in combinations]
+
+    inferred_chains = data["_v"].map(_segment_chain)
+    j_chains = data["_j"].map(_segment_chain)
+    mismatched_gene_chains = (
+        inferred_chains.notna() & j_chains.notna() & (inferred_chains != j_chains)
+    )
+    if mismatched_gene_chains.any():
+        raise ValueError("V and J genes must belong to the same chain")
+
+    if "chain" not in data.columns:
+        data["chain"] = inferred_chains.fillna("Unknown")
+    else:
+        data["chain"] = data["chain"].where(data["chain"].notna(), inferred_chains)
+        data["chain"] = data["chain"].fillna("Unknown")
+        cross_chain = inferred_chains.notna() & (
+            data["chain"].astype(str) != inferred_chains.astype(str)
+        )
+        data = data.loc[~cross_chain].copy()
+
+    output_columns = ["sample_id", "chain", "_v", "_j"]
+    if expected_length == 3:
+        output_columns.append("_length")
+    output_columns.append("_value")
+    return data[output_columns]
+
+
+def _prepare_combination_plot_data(usage_df, metadata, group, split, combination_type):
+    data = _normalize_combination_usage_table(usage_df, combination_type)
+    group_columns = _as_list(group, "group", max_len=1)
+    split_columns = _as_list(split, "split", max_len=2)
+    data, metadata_columns, _ = _merge_stats_metadata(data, metadata)
+    if metadata is None and (group_columns or split_columns):
+        raise ValueError("metadata is required when group or split columns are used")
+    _validate_metadata_columns(group_columns, metadata_columns, "group")
+    _validate_metadata_columns(split_columns, metadata_columns, "split")
+    data["_sample_label"] = data["sample_id"].astype(str)
+    return data, group_columns, split_columns
+
+
+def _ordered_observed_values(data, column):
+    return _category_order(data[column])
+
+
+def _combination_facet_layout(data, split_columns, include_chain):
+    row_columns = (["chain"] if include_chain else []) + split_columns[:1]
+    column_columns = split_columns[1:2]
+    row_levels = (
+        list(
+            _cartesian_product(
+                [_ordered_observed_values(data, column) for column in row_columns]
+            )
+        )
+        if row_columns
+        else [()]
+    )
+    column_levels = (
+        list(
+            _cartesian_product(
+                [_ordered_observed_values(data, column) for column in column_columns]
+            )
+        )
+        if column_columns
+        else [()]
+    )
+    return row_columns, column_columns, row_levels, column_levels
+
+
+def _facet_subset(data, columns, values):
+    subset = data
+    for column, value in zip(columns, values):
+        subset = subset.loc[subset[column] == value]
+    return subset.copy()
+
+
+def _facet_title(row_columns, row_values, column_columns, column_values):
+    values = list(row_values) + list(column_values)
+    return " | ".join(map(str, values)) if values else ""
+
+
+def _close_and_return(fig):
+    plt.close(fig)
+    return fig
+
+
+def _scaled_dot_sizes(values, size_range):
+    minimum_size, maximum_size = map(float, size_range)
+    if minimum_size <= 0 or maximum_size < minimum_size:
+        raise ValueError("size_range must contain two positive increasing values")
+    values = np.asarray(values, dtype=float)
+    if len(values) == 0:
+        return values
+    maximum_value = np.nanmax(values)
+    if maximum_value <= 0:
+        return np.full(len(values), minimum_size)
+    return minimum_size + (values / maximum_value) * (maximum_size - minimum_size)
+
+
+def _aggregate_vj_panel(panel_data, series_column, grouped):
+    aggregation = "mean" if grouped else "sum"
+    return (
+        panel_data.groupby(["_v", "_j", series_column], observed=True)["_value"]
+        .agg(aggregation)
+        .reset_index()
+    )
+
+
+def vj_usage(
+    usage_df,
+    metadata=None,
+    group=None,
+    split=None,
+    palette=None,
+    size_range=(20, 800),
+    repel=0.18,
+    height=5.0,
+    aspect=1.2,
+):
+    """Plot V-J usage as categorical bubbles.
+
+    Point area represents usage. With no group, colors and radial offsets
+    identify samples; with one metadata group, each point is the group mean.
+    At most eight samples or group levels can be displayed. One or two split
+    columns create facet rows and columns, while chains always occupy separate
+    rows.
+
+    Parameters
+    ----------
+    usage_df : pandas.DataFrame
+        Long or wide output of ``calc_segment_usage(segment="vj")``. Explicit
+        long ``v`` and ``j`` columns plus a value column are also accepted.
+    metadata : pandas.DataFrame, optional
+        Metadata merged by sample and chain.
+    group : str, optional
+        Metadata column whose sample means are plotted using distinct colors.
+    split : str or sequence of up to two str, optional
+        First column creates rows and second creates columns.
+    palette : seaborn palette or dict, optional
+        Sample or group fill colors.
+    size_range : pair of float, default (20, 800)
+        Minimum and maximum marker areas.
+    repel : float, default 0.18
+        Radial displacement around each categorical V-J center.
+    height, aspect : float
+        Facet dimensions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        A closed figure that renders once in Jupyter.
+    """
+    data, group_columns, split_columns = _prepare_combination_plot_data(
+        usage_df, metadata, group, split, "vj"
+    )
+    grouped = bool(group_columns)
+    series_column = group_columns[0] if grouped else "_sample_label"
+    series_order = _category_order(data[series_column])
+    if len(series_order) > 8:
+        label = "groups" if grouped else "samples"
+        raise ValueError(f"vj_usage supports at most 8 {label}; found {len(series_order)}")
+    color_map = _palette_mapping(series_order, palette)
+
+    row_columns, column_columns, row_levels, column_levels = (
+        _combination_facet_layout(data, split_columns, include_chain=True)
+    )
+    fig, axes = plt.subplots(
+        len(row_levels),
+        len(column_levels),
+        figsize=(height * aspect * len(column_levels), height * len(row_levels)),
+        squeeze=False,
+    )
+    series_rank = {series: index for index, series in enumerate(series_order)}
+
+    for row_index, row_values in enumerate(row_levels):
+        row_data = _facet_subset(data, row_columns, row_values)
+        for column_index, column_values in enumerate(column_levels):
+            ax = axes[row_index, column_index]
+            panel_data = _facet_subset(row_data, column_columns, column_values)
+            if panel_data.empty:
+                ax.set_visible(False)
+                continue
+
+            v_order = _sort_gene_names(panel_data["_v"])
+            j_order = _sort_gene_names(panel_data["_j"])
+            v_positions = {gene: index for index, gene in enumerate(v_order)}
+            j_positions = {gene: index for index, gene in enumerate(j_order)}
+            plotted = _aggregate_vj_panel(panel_data, series_column, grouped)
+            plotted = plotted.loc[plotted["_value"] > 0].copy()
+            plotted = plotted.sort_values("_value", ascending=False)
+
+            angles = np.zeros(len(plotted), dtype=float)
+            displacement = np.zeros(len(plotted), dtype=float)
+            for indices in plotted.groupby(["_v", "_j"], sort=False).indices.values():
+                ordered_indices = sorted(
+                    indices,
+                    key=lambda index: series_rank[plotted.iloc[index][series_column]],
+                )
+                if len(ordered_indices) > 1:
+                    for position, index in enumerate(ordered_indices):
+                        angles[index] = 2 * np.pi * position / len(ordered_indices)
+                        displacement[index] = float(repel)
+            x = plotted["_v"].map(v_positions).to_numpy(dtype=float)
+            y = plotted["_j"].map(j_positions).to_numpy(dtype=float)
+            x += displacement * np.cos(angles)
+            y += displacement * np.sin(angles)
+            ax.scatter(
+                x,
+                y,
+                s=_scaled_dot_sizes(plotted["_value"], size_range),
+                c=[color_map[value] for value in plotted[series_column]],
+                edgecolors="black",
+                linewidths=0.6,
+            )
+            ax.set_xticks(np.arange(len(v_order)))
+            ax.set_xticklabels(v_order, rotation=90)
+            ax.set_yticks(np.arange(len(j_order)))
+            ax.set_yticklabels(j_order)
+            ax.set_xlim(-0.6, len(v_order) - 0.4)
+            ax.set_ylim(-0.6, len(j_order) - 0.4)
+            ax.set_xlabel("V segment")
+            ax.set_ylabel("J segment")
+            ax.grid(color="#e5e5e5", linewidth=0.6, zorder=0)
+            ax.set_axisbelow(True)
+            ax.set_title(
+                _facet_title(
+                    row_columns, row_values, column_columns, column_values
+                )
+            )
+
+    legend_handles = [
+        Patch(facecolor=color_map[level], edgecolor="black", label=str(level))
+        for level in series_order
+    ]
+    fig.legend(
+        handles=legend_handles,
+        title=_caption(series_column) if grouped else "Sample",
+        loc="upper center",
+        ncol=min(8, len(legend_handles)),
+        frameon=False,
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    return _close_and_return(fig)
+
+
+def _short_gene_label(gene):
+    gene = str(gene).strip().split(",", 1)[0].split(";", 1)[0].split("|", 1)[0]
+    parsed = parse_gene_name(gene)
+    if parsed is None:
+        return gene
+    prefix = parsed["system"] + parsed["chain"]
+    return gene[len(prefix):] if gene.upper().startswith(prefix) else gene
+
+
+def _vjlen_label(v_gene, j_gene, cdr3_length):
+    return f"{_short_gene_label(v_gene)}|{_short_gene_label(j_gene)}|{int(cdr3_length)}"
+
+
+def _aggregate_vjlen_panel(panel_data, series_column, grouped, series_order):
+    aggregation = "mean" if grouped else "sum"
+    aggregated = (
+        panel_data.groupby(
+            ["_v", "_j", "_length", series_column], observed=True
+        )["_value"]
+        .agg(aggregation)
+        .reset_index()
+    )
+    return aggregated.pivot_table(
+        index=["_v", "_j", "_length"],
+        columns=series_column,
+        values="_value",
+        aggfunc="sum",
+        fill_value=0,
+        sort=False,
+    ).reindex(columns=series_order, fill_value=0)
+
+
+def _log_floor(x, y):
+    positive = np.concatenate([x[x > 0], y[y > 0]])
+    if len(positive) == 0:
+        raise ValueError("Log-scale VJ-length plots require at least one positive value")
+    return float(np.min(positive)) / 10
+
+
+def _add_isolated_vjlen_labels(
+    ax,
+    x,
+    y,
+    labels,
+    max_labels,
+    minimum_distance=35,
+):
+    if not labels or max_labels <= 0:
+        return
+    ax.figure.canvas.draw()
+    display_coordinates = ax.transData.transform(np.column_stack([x, y]))
+    if len(display_coordinates) == 1:
+        nearest_distances = np.array([np.inf])
+    else:
+        differences = display_coordinates[:, None, :] - display_coordinates[None, :, :]
+        distances = np.sqrt(np.sum(differences ** 2, axis=2))
+        np.fill_diagonal(distances, np.inf)
+        nearest_distances = distances.min(axis=1)
+
+    candidates = [
+        index
+        for index in np.argsort(-nearest_distances)
+        if nearest_distances[index] >= minimum_distance
+    ][:max_labels]
+    renderer = ax.figure.canvas.get_renderer()
+    occupied = []
+    offsets = [(5, 5), (5, -9), (-5, 5), (-5, -9), (10, 0), (-10, 0)]
+    for index in candidates:
+        for x_offset, y_offset in offsets:
+            annotation = ax.annotate(
+                labels[index],
+                xy=(x[index], y[index]),
+                xytext=(x_offset, y_offset),
+                textcoords="offset points",
+                ha="left" if x_offset >= 0 else "right",
+                va="bottom" if y_offset >= 0 else "top",
+                fontsize=7,
+                arrowprops={"arrowstyle": "-", "color": "#777777", "lw": 0.5},
+            )
+            ax.figure.canvas.draw()
+            bounds = annotation.get_window_extent(renderer=renderer).expanded(1.05, 1.1)
+            if not any(bounds.overlaps(existing) for existing in occupied):
+                occupied.append(bounds)
+                break
+            annotation.remove()
+
+
+def vjlen_usage(
+    usage_df,
+    metadata=None,
+    group=None,
+    split=None,
+    log_scale=False,
+    labels=False,
+    max_labels=20,
+    color="#d62728",
+    alpha=0.6,
+    dot_size=45,
+    height=4.5,
+    aspect=1.0,
+):
+    """Compare V-J-CDR3-length usage between exactly two series per facet.
+
+    The x and y axes represent usage in the two samples, or mean usage in two
+    metadata groups. The input must contain one chain. Up to two metadata split
+    columns form facet rows and columns. Optional labels are added only for
+    isolated points and use compact forms such as ``V12-1|J1-2|15``.
+
+    Parameters
+    ----------
+    usage_df : pandas.DataFrame
+        Long or wide output of ``calc_segment_usage(segment="vjlen")``.
+        Explicit ``v``, ``j``, length, and value columns are also accepted.
+    metadata : pandas.DataFrame, optional
+        Metadata merged by sample and chain.
+    group : str, optional
+        Metadata column containing exactly two observed levels in each facet.
+        Values are averaged across samples within each level.
+    split : str or sequence of up to two str, optional
+        First metadata column creates rows; second creates columns.
+    log_scale : bool, default False
+        Use logarithmic frequency axes. Zeros are placed one decade below the
+        smallest positive value in their panel.
+    labels : bool, default False
+        Label isolated V-J-length points with compact gene names.
+    max_labels : int, default 20
+        Maximum labels in each panel.
+    color : matplotlib color, default "#d62728"
+        Marker fill color.
+    alpha : float, default 0.6
+        Marker opacity.
+    dot_size : float, default 45
+        Marker area.
+    height, aspect : float
+        Facet dimensions.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        A closed figure that renders once in Jupyter.
+    """
+    data, group_columns, split_columns = _prepare_combination_plot_data(
+        usage_df, metadata, group, split, "vjlen"
+    )
+    chains = _category_order(data["chain"])
+    if len(chains) != 1:
+        raise ValueError(
+            "vjlen_usage requires exactly one chain in the input table; "
+            f"found {len(chains)}: {', '.join(map(str, chains))}"
+        )
+
+    grouped = bool(group_columns)
+    series_column = group_columns[0] if grouped else "_sample_label"
+    row_columns, column_columns, row_levels, column_levels = (
+        _combination_facet_layout(data, split_columns, include_chain=False)
+    )
+    fig, axes = plt.subplots(
+        len(row_levels),
+        len(column_levels),
+        figsize=(height * aspect * len(column_levels), height * len(row_levels)),
+        squeeze=False,
+    )
+
+    for row_index, row_values in enumerate(row_levels):
+        row_data = _facet_subset(data, row_columns, row_values)
+        for column_index, column_values in enumerate(column_levels):
+            ax = axes[row_index, column_index]
+            panel_data = _facet_subset(row_data, column_columns, column_values)
+            if panel_data.empty:
+                ax.set_visible(False)
+                continue
+
+            series_order = _category_order(panel_data[series_column])
+            if len(series_order) != 2:
+                facet_name = _facet_title(
+                    row_columns, row_values, column_columns, column_values
+                ) or "unsplit panel"
+                label = "groups" if grouped else "samples"
+                plt.close(fig)
+                raise ValueError(
+                    "vjlen_usage requires exactly 2 "
+                    f"{label} in each panel; {facet_name} has {len(series_order)}"
+                )
+
+            comparison = _aggregate_vjlen_panel(
+                panel_data, series_column, grouped, series_order
+            )
+            comparison = comparison.loc[(comparison > 0).any(axis=1)].copy()
+            x = comparison[series_order[0]].to_numpy(dtype=float)
+            y = comparison[series_order[1]].to_numpy(dtype=float)
+            if log_scale:
+                floor = _log_floor(x, y)
+                x = np.maximum(x, floor)
+                y = np.maximum(y, floor)
+
+            ax.scatter(
+                x,
+                y,
+                s=float(dot_size),
+                facecolors=color,
+                edgecolors="black",
+                linewidths=0.6,
+                alpha=float(alpha),
+            )
+            if log_scale:
+                ax.set_xscale("log")
+                ax.set_yscale("log")
+            ax.set_xlabel(str(series_order[0]))
+            ax.set_ylabel(str(series_order[1]))
+            ax.set_title(
+                _facet_title(
+                    row_columns, row_values, column_columns, column_values
+                )
+                or str(chains[0])
+            )
+            ax.grid(color="#e5e5e5", linewidth=0.6)
+            ax.set_axisbelow(True)
+
+            if labels:
+                point_labels = [
+                    _vjlen_label(v_gene, j_gene, cdr3_length)
+                    for v_gene, j_gene, cdr3_length in comparison.index
+                ]
+                _add_isolated_vjlen_labels(
+                    ax,
+                    x,
+                    y,
+                    point_labels,
+                    int(max_labels),
+                )
+
+    fig.tight_layout()
+    return _close_and_return(fig)
+
+
 def cdr3aa_stats(
     stats_df,
     metadata=None,
@@ -1226,6 +1822,8 @@ __all__ = [
     "parse_gene_name",
     "plot_stats",
     "segment_usage",
+    "vj_usage",
+    "vjlen_usage",
     "cdr3aa_stats",
     "diversity_stats",
     "convergence",

@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.colors import to_rgba
 
 from repseq import plot as rsplot
 
@@ -406,3 +407,221 @@ def test_segment_usage_rejects_too_many_boxplot_groups():
             plot_type="boxplot",
             group=["condition", "batch"],
         )
+
+
+def _vj_usage_long(sample_count=2):
+    rows = []
+    for sample_number in range(sample_count):
+        rows.extend(
+            [
+                {
+                    "sample_id": f"sample{sample_number}",
+                    "chain": "TRB",
+                    "vj": ("TRBV10", "TRBJ2-1"),
+                    "usage": 0.2 + sample_number * 0.05,
+                },
+                {
+                    "sample_id": f"sample{sample_number}",
+                    "chain": "TRB",
+                    "vj": ("TRBV2", "TRBJ1-1"),
+                    "usage": 0.6 - sample_number * 0.05,
+                },
+            ]
+        )
+    return pd.DataFrame(rows)
+
+
+def _vjlen_usage_long(sample_ids=("sample0", "sample1")):
+    rows = []
+    for sample_number, sample_id in enumerate(sample_ids):
+        rows.extend(
+            [
+                {
+                    "sample_id": sample_id,
+                    "chain": "TRB",
+                    "vjlen": ("TRBV2", "TRBJ1-1", 15),
+                    "usage": 0.2 + sample_number * 0.2,
+                },
+                {
+                    "sample_id": sample_id,
+                    "chain": "TRB",
+                    "vjlen": ("TRBV10", "TRBJ2-1", 14),
+                    "usage": 0.1 if sample_number == 0 else 0,
+                },
+            ]
+        )
+    return pd.DataFrame(rows)
+
+
+def test_vj_usage_draws_largest_black_edged_dots_first_and_repels_series():
+    fig = rsplot.vj_usage(_vj_usage_long())
+
+    collection = fig.axes[0].collections[0]
+    sizes = collection.get_sizes()
+    offsets = collection.get_offsets()
+    assert list(sizes) == sorted(sizes, reverse=True)
+    assert np.allclose(collection.get_edgecolors()[0], to_rgba("black"))
+    assert any(not np.isclose(value, round(value)) for value in offsets.ravel())
+    assert fig.number not in plt.get_fignums()
+
+
+def test_vj_usage_keeps_single_dot_at_its_vj_center():
+    usage = _vj_usage_long()
+    usage.loc[
+        (usage["sample_id"] == "sample1")
+        & (usage["vj"] == ("TRBV10", "TRBJ2-1")),
+        "usage",
+    ] = 0
+
+    fig = rsplot.vj_usage(usage)
+
+    offsets = np.asarray(fig.axes[0].collections[0].get_offsets())
+    assert any(np.allclose(point, [1, 1]) for point in offsets)
+
+
+def test_vj_usage_grouped_values_are_means_and_limit_is_eight():
+    usage = _vj_usage_long(sample_count=4)
+    metadata = pd.DataFrame(
+        [
+            {
+                "sample_id": f"sample{sample_number}",
+                "chain": "TRB",
+                "condition": "control" if sample_number < 2 else "treated",
+            }
+            for sample_number in range(4)
+        ]
+    )
+    data, groups, _ = rsplot._prepare_combination_plot_data(
+        usage, metadata, "condition", None, "vj"
+    )
+    means = rsplot._aggregate_vj_panel(data, groups[0], grouped=True)
+    control_v2 = means.loc[
+        (means["_v"] == "TRBV2") & (means["condition"] == "control"),
+        "_value",
+    ].iloc[0]
+    assert control_v2 == pytest.approx(0.575)
+
+    with pytest.raises(ValueError, match="at most 8 samples"):
+        rsplot.vj_usage(_vj_usage_long(sample_count=9))
+
+
+def test_vj_usage_accepts_native_wide_tuple_columns():
+    usage = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample0",
+                "chain": "TRB",
+                ("TRBV2", "TRBJ1-1"): 0.7,
+                ("TRBV10", "TRBJ2-1"): 0.3,
+            }
+        ]
+    )
+
+    fig = rsplot.vj_usage(usage)
+
+    assert [tick.get_text() for tick in fig.axes[0].get_xticklabels()] == [
+        "TRBV2",
+        "TRBV10",
+    ]
+
+
+def test_vjlen_usage_plots_two_sample_frequencies_and_default_style():
+    fig = rsplot.vjlen_usage(_vjlen_usage_long())
+
+    collection = fig.axes[0].collections[0]
+    offsets = np.asarray(collection.get_offsets())
+    assert any(np.allclose(point, [0.2, 0.4]) for point in offsets)
+    assert np.allclose(collection.get_edgecolors()[0], to_rgba("black", 0.6))
+    assert np.allclose(collection.get_facecolors()[0], to_rgba("#d62728", 0.6))
+    assert fig.axes[0].get_xlabel() == "sample0"
+    assert fig.axes[0].get_ylabel() == "sample1"
+
+
+def test_vjlen_usage_grouped_axes_are_group_means():
+    usage = _vjlen_usage_long(("s1", "s2", "s3", "s4"))
+    metadata = pd.DataFrame(
+        [
+            {"sample_id": "s1", "chain": "TRB", "condition": "control"},
+            {"sample_id": "s2", "chain": "TRB", "condition": "control"},
+            {"sample_id": "s3", "chain": "TRB", "condition": "treated"},
+            {"sample_id": "s4", "chain": "TRB", "condition": "treated"},
+        ]
+    )
+
+    fig = rsplot.vjlen_usage(usage, metadata=metadata, group="condition")
+
+    offsets = np.asarray(fig.axes[0].collections[0].get_offsets())
+    assert any(np.allclose(point, [0.3, 0.7]) for point in offsets)
+    assert fig.axes[0].get_xlabel() == "control"
+    assert fig.axes[0].get_ylabel() == "treated"
+
+
+def test_vjlen_usage_supports_two_split_facet_grid():
+    sample_ids = [f"s{index}" for index in range(8)]
+    usage = _vjlen_usage_long(tuple(sample_ids))
+    metadata_rows = []
+    for row_index, row_value in enumerate(["r1", "r2"]):
+        for column_index, column_value in enumerate(["c1", "c2"]):
+            start = (row_index * 2 + column_index) * 2
+            for sample_id in sample_ids[start:start + 2]:
+                metadata_rows.append(
+                    {
+                        "sample_id": sample_id,
+                        "chain": "TRB",
+                        "row_group": row_value,
+                        "column_group": column_value,
+                    }
+                )
+    metadata = pd.DataFrame(metadata_rows)
+
+    fig = rsplot.vjlen_usage(
+        usage,
+        metadata=metadata,
+        split=["row_group", "column_group"],
+    )
+
+    assert len(fig.axes) == 4
+    assert [ax.get_title() for ax in fig.axes] == [
+        "r1 | c1",
+        "r1 | c2",
+        "r2 | c1",
+        "r2 | c2",
+    ]
+
+
+def test_vjlen_usage_log_scale_adds_compact_isolated_labels():
+    fig = rsplot.vjlen_usage(
+        _vjlen_usage_long(),
+        log_scale=True,
+        labels=True,
+    )
+
+    assert fig.axes[0].get_xscale() == "log"
+    assert fig.axes[0].get_yscale() == "log"
+    labels = {text.get_text() for text in fig.axes[0].texts}
+    assert "V2|J1-1|15" in labels
+    assert "V10|J2-1|14" in labels
+
+
+def test_vjlen_usage_rejects_multiple_chains_and_wrong_panel_size():
+    multiple_chains = pd.concat(
+        [
+            _vjlen_usage_long(),
+            pd.DataFrame(
+                [
+                    {
+                        "sample_id": "sample0",
+                        "chain": "TRA",
+                        "vjlen": ("TRAV2", "TRAJ1", 15),
+                        "usage": 0.1,
+                    }
+                ]
+            ),
+        ],
+        ignore_index=True,
+    )
+    with pytest.raises(ValueError, match="exactly one chain"):
+        rsplot.vjlen_usage(multiple_chains)
+
+    with pytest.raises(ValueError, match="exactly 2 samples"):
+        rsplot.vjlen_usage(_vjlen_usage_long(("s1", "s2", "s3")))

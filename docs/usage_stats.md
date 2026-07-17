@@ -501,6 +501,92 @@ sorting. This gives natural orders such as `TRBV2`, `TRBV7-3`, `TRBV7-8`,
 `TRBV12-3-1`, `TRBV12-3-2`. IGH constant isotypes and the `IGHD` constant-gene
 versus `IGHD3-10` D-segment ambiguity are handled explicitly.
 
+### Plotting V-J usage
+
+`rsplot.vj_usage` accepts long or wide output from
+`stats.calc_segment_usage(segment="vj")`. V segments are placed on the x-axis,
+J segments on the y-axis, and marker area represents usage. Larger markers are
+drawn first, behind smaller markers. Samples or groups use different fill
+colors with black marker borders and stable radial offsets around each V-J
+position.
+
+```py
+vj = stats.calc_segment_usage(
+    clonosets,
+    segment="vj",
+    cl_filter=func_filter,
+    table="long",
+)
+
+rsplot.vj_usage(vj)
+rsplot.vj_usage(vj, metadata=metadata, group="experimental_group")
+```
+
+Without `group`, each marker represents one sample. With one group column, it
+represents the mean usage among samples in that group. At most eight samples or
+eight group levels can be plotted. One or two metadata `split` columns can be
+used; the first creates facet rows and the second creates columns. Chains are
+always placed in separate rows.
+
+```py
+rsplot.vj_usage(
+    vj,
+    metadata=metadata,
+    group="experimental_group",
+    split=["tissue", "batch"],
+    size_range=(20, 800),
+)
+```
+
+### Comparing V-J-length usage
+
+`rsplot.vjlen_usage` compares exactly two samples, or the means of exactly two
+groups, in every panel. It accepts long or wide output from
+`stats.calc_segment_usage(segment="vjlen")`. The first sample or group is the
+x-axis and the second is the y-axis. The input table must contain exactly one
+chain.
+
+```py
+vjlen = stats.calc_segment_usage(
+    clonosets,
+    segment="vjlen",
+    cl_filter=func_filter,
+    table="long",
+)
+
+rsplot.vjlen_usage(vjlen)
+rsplot.vjlen_usage(
+    vjlen,
+    metadata=metadata,
+    group="experimental_group",
+)
+```
+
+Markers have red fill, black borders, and default opacity `0.6`. Set
+`log_scale=True` for logarithmic axes. In log mode, zero values are placed one
+decade below the smallest positive value in that panel so combinations found
+on only one side remain visible.
+
+Set `labels=True` to label isolated points. Labels use compact forms such as
+`V12-1|J1-2|15`; crowded points are left unlabeled, and `max_labels` limits the
+number in each panel.
+
+```py
+rsplot.vjlen_usage(
+    vjlen,
+    metadata=metadata,
+    group="experimental_group",
+    split=["tissue", "batch"],
+    log_scale=True,
+    labels=True,
+    max_labels=20,
+)
+```
+
+Up to two ordered categorical split columns are supported. The first defines
+facet rows and the second facet columns. Every resulting panel is validated to
+contain exactly two samples or two observed group levels.
+
 
 ??? info "Convergence visualization"
     Calculated stats can be visualized in Jupyter notebook using %%R cell magic. 
