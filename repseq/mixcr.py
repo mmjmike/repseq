@@ -946,6 +946,13 @@ def _coverage_table_from_refine_reports(folder):
     return pd.DataFrame(rows, columns=["sample_id", "reads_per_umi", "overseq_threshold"])
 
 
+def _format_qc_value(value):
+    numeric_value = float(value)
+    if numeric_value.is_integer():
+        return str(int(numeric_value))
+    return str(value)
+
+
 def _plot_coverage_qc(folder, processing_table=None, output_file=None,
                       show_offtarget=False, offtarget_chain_threshold=0.01):
     del show_offtarget, offtarget_chain_threshold
@@ -974,26 +981,52 @@ def _plot_coverage_qc(folder, processing_table=None, output_file=None,
         plot_rows = max(size, min_size_2)
     fig, ax = plt.subplots(figsize=(9, plot_rows * bar_height * 0.5), dpi=100, constrained_layout=True)
     y = np.arange(len(plot_data))
-    ax.barh(
+    bars = ax.barh(
         y=y,
         width=plot_data["reads_per_umi"].values,
         height=bar_height,
         color="#d8c3a5",
         label="Reads per UMI",
     )
+    for bar, reads_per_umi in zip(bars, plot_data["reads_per_umi"]):
+        ax.annotate(
+            _format_qc_value(reads_per_umi),
+            xy=(bar.get_width(), bar.get_y() + bar.get_height() / 2),
+            xytext=(4, 0),
+            textcoords="offset points",
+            ha="left",
+            va="center",
+            color="#5c5142",
+        )
     marker_labeled = False
     for i, threshold in enumerate(plot_data["overseq_threshold"]):
         if pd.isna(threshold):
             continue
+        marker_position = float(threshold) - 1
         ax.vlines(
-            float(threshold) - 1,
+            marker_position,
             i - bar_height / 2,
             i + bar_height / 2,
             color="#d62728",
             linewidth=2,
             label="Overseq threshold - 1" if not marker_labeled else None,
         )
+        ax.annotate(
+            _format_qc_value(threshold),
+            xy=(marker_position, i),
+            xytext=(4, 0),
+            textcoords="offset points",
+            ha="left",
+            va="center",
+            color="#d62728",
+        )
         marker_labeled = True
+    marker_positions = plot_data["overseq_threshold"].dropna().astype(float) - 1
+    rightmost_value = max(
+        float(plot_data["reads_per_umi"].max()),
+        float(marker_positions.max()) if not marker_positions.empty else 0,
+    )
+    ax.set_xlim(0, rightmost_value + max(1, rightmost_value * 0.12))
     ax.set_yticks(y)
     ax.set_yticklabels(plot_data.index)
     ax.set_ylim(-0.5, len(plot_data) - 0.5)

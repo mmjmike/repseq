@@ -302,6 +302,47 @@ def test_show_qc_plot_coverage_accepts_processing_table(monkeypatch):
     assert legend_calls[-1]["title"] == "Coverage"
 
 
+def test_show_qc_plot_coverage_labels_actual_values(monkeypatch):
+    processing_table = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample1",
+                "reads_per_umi": 4.5,
+                "overseq_threshold": 7,
+            }
+        ]
+    )
+    annotations = []
+    marker_positions = []
+    monkeypatch.setattr(mixcr.plt, "show", lambda: None)
+
+    original_annotate = Axes.annotate
+    original_vlines = Axes.vlines
+
+    def capture_annotation(self, text, *args, **kwargs):
+        annotations.append((text, kwargs))
+        return original_annotate(self, text, *args, **kwargs)
+
+    def capture_vlines(self, x, *args, **kwargs):
+        marker_positions.append(x)
+        return original_vlines(self, x, *args, **kwargs)
+
+    monkeypatch.setattr(Axes, "annotate", capture_annotation)
+    monkeypatch.setattr(Axes, "vlines", capture_vlines)
+
+    mixcr.show_qc_plot(
+        ".",
+        chart_type="coverage",
+        processing_table=processing_table,
+    )
+
+    annotations_by_text = {text: kwargs for text, kwargs in annotations}
+    assert marker_positions == [6.0]
+    assert annotations_by_text["4.5"]["xy"][0] == 4.5
+    assert annotations_by_text["7"]["xy"][0] == 6.0
+    assert annotations_by_text["7"]["color"] == "#d62728"
+
+
 def test_show_qc_plot_coverage_reads_refine_reports_directly(tmp_path, monkeypatch):
     report = {
         "correctionReport": {
