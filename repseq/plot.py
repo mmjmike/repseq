@@ -930,7 +930,7 @@ def _heatmap_annotation_colors(data, sample_order, group_columns, palette):
         legend_handles.extend(
             Patch(
                 facecolor=color_map[level],
-                label=f"{_caption(group_column)}: {level}",
+                label=str(level),
             )
             for level in levels
         )
@@ -1057,7 +1057,7 @@ def segment_usage(
     group=None,
     split=None,
     palette=None,
-    cmap="viridis",
+    cmap="RdBu_r",
     height=3.2,
     aspect=1.2,
     seed=0,
@@ -1090,7 +1090,7 @@ def segment_usage(
         rows, with their own segment and sample axes.
     palette : seaborn palette or dict, optional
         Colors for samples, groups, and heatmap annotation categories.
-    cmap : matplotlib colormap, default "viridis"
+    cmap : matplotlib colormap, default "RdBu_r"
         Colormap for usage values in heatmaps.
     height, aspect : float
         Base panel height and width multiplier.
@@ -1123,7 +1123,7 @@ def segment_usage(
 
     panels = _panel_subsets(data, split_columns)
     if plot_type == "heatmap":
-        return _heatmap_segment_usage_plot(
+        fig = _heatmap_segment_usage_plot(
             panels,
             group_columns,
             palette,
@@ -1131,16 +1131,23 @@ def segment_usage(
             height,
             aspect,
         )
-    return _categorical_segment_usage_plot(
-        data,
-        panels,
-        plot_type,
-        group_columns,
-        palette,
-        height,
-        aspect,
-        seed,
-    )
+    else:
+        fig = _categorical_segment_usage_plot(
+            data,
+            panels,
+            plot_type,
+            group_columns,
+            palette,
+            height,
+            aspect,
+            seed,
+        )
+
+    # Inline backends display open pyplot figures and the returned object. A
+    # closed Figure remains renderable and editable but appears only once.
+    if fig is not None:
+        plt.close(fig)
+    return fig
 
 
 def cdr3aa_stats(

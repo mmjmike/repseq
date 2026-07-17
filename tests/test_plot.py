@@ -5,6 +5,7 @@ matplotlib.use("Agg")
 import numpy as np
 import pandas as pd
 import pytest
+from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 
 from repseq import plot as rsplot
@@ -261,6 +262,8 @@ def test_segment_usage_detects_wide_table_and_keeps_chain_axes_independent():
 
     heatmaps = {ax.get_title(): ax for ax in fig.axes if ax.get_title()}
     assert set(heatmaps) == {"TRA", "TRB"}
+    assert heatmaps["TRA"].collections[0].cmap.name == "RdBu_r"
+    assert fig.number not in plt.get_fignums()
     assert [tick.get_text() for tick in heatmaps["TRA"].get_xticklabels()] == [
         "TRAV2",
         "TRAV10",
@@ -299,6 +302,7 @@ def test_segment_usage_grouped_barplot_uses_standard_deviation(monkeypatch):
     )
 
     assert fig is not None
+    assert fig.number not in plt.get_fignums()
     assert len(error_bars) == 2
     assert all(np.all(np.asarray(values) > 0) for values in error_bars)
     assert [tick.get_text() for tick in fig.axes[0].get_xticklabels()] == [
@@ -350,6 +354,10 @@ def test_segment_usage_heatmap_supports_three_ordered_annotations():
         "Batch",
         "Sex",
     ]
+    legend_labels = [text.get_text() for text in fig.legends[0].get_texts()]
+    assert "control" in legend_labels
+    assert "treated" in legend_labels
+    assert all(":" not in label for label in legend_labels)
 
 
 def test_segment_usage_split_order_is_preserved_in_rows():

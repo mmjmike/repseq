@@ -456,9 +456,12 @@ rsplot.segment_usage(
     v_usage,
     metadata=metadata,
     group=["experimental_group", "tissue", "sex"],
-    cmap="viridis",
 )
 ```
+
+Usage heatmaps use the blue-to-red `RdBu_r` colormap by default. Pass any
+Matplotlib-compatible `cmap` to override it. Annotation legends show category
+values only; the metadata column names remain above the annotation strips.
 
 Use `plot_type="barplot"` for bars. Without a group, each sample is a separate
 series. With one metadata group, the bars show the group mean with sample
