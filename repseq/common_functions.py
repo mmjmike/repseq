@@ -228,7 +228,7 @@ def calc_insert_size(vend,dstart,dend,jstart):
 
 
 def overlap_type_to_flags(overlap_type):
-    possible_overlap_types = ["aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ"]
+    possible_overlap_types = ["aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ", "VJ", "VJlen"]
     if overlap_type not in possible_overlap_types:
         raise ValueError("Incorrect overlap type. Possible values: {}".format(", ".join(possible_overlap_types)))    
     aa = False
@@ -241,6 +241,11 @@ def overlap_type_to_flags(overlap_type):
     if "J" in overlap_type:
         check_j = True
     return aa, check_v, check_j
+
+
+def overlap_type_uses_sequence(overlap_type):
+    overlap_type_to_flags(overlap_type)
+    return overlap_type not in {"VJ", "VJlen"}
 
 
 def jaccard_index(list1, list2):
@@ -274,8 +279,8 @@ def kl_divergence(p, q, epsilon=1e-10):
         float: KL divergence D(P || Q)
     """
     
-    p = np.asarray(p, dtype=np.float64)
-    q = np.asarray(q, dtype=np.float64)
+    p = np.array(p, dtype=np.float64, copy=True)
+    q = np.array(q, dtype=np.float64, copy=True)
 
     # normalize
     p /= np.sum(p)
@@ -290,8 +295,8 @@ def kl_divergence(p, q, epsilon=1e-10):
     return result
 
 def jensen_shannon_divergence(p, q, epsilon=1e-10):
-    p = np.asarray(p, dtype=np.float64)
-    q = np.asarray(q, dtype=np.float64)
+    p = np.array(p, dtype=np.float64, copy=True)
+    q = np.array(q, dtype=np.float64, copy=True)
     
     # Normalize the distributions
     p /= np.sum(p)
@@ -307,6 +312,107 @@ def jensen_shannon_divergence(p, q, epsilon=1e-10):
     # Calculate JSD
     jsd = 0.5 * kld_p_m + 0.5 * kld_q_m
     return jsd
+
+
+
+def _validate_metric_vectors(values1, values2):
+    values1 = np.asarray(values1, dtype=np.float64)
+    values2 = np.asarray(values2, dtype=np.float64)
+    if values1.shape != values2.shape:
+        raise ValueError("Metric vectors must have the same shape")
+    if np.any(values1 < 0) or np.any(values2 < 0):
+        raise ValueError("Metric vectors must contain non-negative values")
+    return values1, values2
+
+
+def _normalized_metric_vectors(values1, values2):
+    values1, values2 = _validate_metric_vectors(values1, values2)
+    sum1, sum2 = np.sum(values1), np.sum(values2)
+    if sum1 == 0 or sum2 == 0:
+        return values1, values2
+    return values1 / sum1, values2 / sum2
+
+
+def intersecting_clonotypes_count(values1, values2):
+    values1, values2 = _validate_metric_vectors(values1, values2)
+    return int(np.sum((values1 > 0) & (values2 > 0)))
+
+
+def relative_diversity(values1, values2):
+    values1, values2 = _validate_metric_vectors(values1, values2)
+    denominator = np.sum(values1 > 0) * np.sum(values2 > 0)
+    return intersecting_clonotypes_count(values1, values2) / denominator if denominator else np.nan
+
+
+def pearson_correlation(values1, values2):
+    values1, values2 = _validate_metric_vectors(values1, values2)
+    mask = (values1 > 0) & (values2 > 0)
+    if np.sum(mask) < 2 or np.std(values1[mask]) == 0 or np.std(values2[mask]) == 0:
+        return np.nan
+    return float(np.corrcoef(values1[mask], values2[mask])[0, 1])
+
+
+def f1_similarity(values1, values2):
+    values1, values2 = _validate_metric_vectors(values1, values2)
+    mask = (values1 > 0) & (values2 > 0)
+    return float(np.sqrt(np.sum(values1[mask]) * np.sum(values2[mask])))
+
+
+def f2_similarity(values1, values2):
+    values1, values2 = _validate_metric_vectors(values1, values2)
+    return float(np.sum(np.sqrt(values1 * values2)))
+
+
+def jaccard_similarity(values1, values2):
+    values1, values2 = _validate_metric_vectors(values1, values2)
+    union = np.sum((values1 > 0) | (values2 > 0))
+    return intersecting_clonotypes_count(values1, values2) / union if union else np.nan
+
+
+def jaccard_distance(values1, values2):
+    return 1 - jaccard_similarity(values1, values2)
+
+
+def dice_similarity(values1, values2):
+    values1, values2 = _validate_metric_vectors(values1, values2)
+    denominator = np.sum(values1 > 0) + np.sum(values2 > 0)
+    return 2 * intersecting_clonotypes_count(values1, values2) / denominator if denominator else np.nan
+
+
+def dice_distance(values1, values2):
+    return 1 - dice_similarity(values1, values2)
+
+
+def szymkiewicz_simpson_similarity(values1, values2):
+    values1, values2 = _validate_metric_vectors(values1, values2)
+    denominator = min(np.sum(values1 > 0), np.sum(values2 > 0))
+    return intersecting_clonotypes_count(values1, values2) / denominator if denominator else np.nan
+
+
+def l1_distance(values1, values2):
+    values1, values2 = _validate_metric_vectors(values1, values2)
+    return float(np.sum(np.abs(values1 - values2)))
+
+
+def total_variation_distance(values1, values2):
+    values1, values2 = _normalized_metric_vectors(values1, values2)
+    return float(0.5 * np.sum(np.abs(values1 - values2)))
+
+
+def l2_distance(values1, values2):
+    values1, values2 = _validate_metric_vectors(values1, values2)
+    return float(np.linalg.norm(values1 - values2))
+
+
+def morisita_horn_similarity(values1, values2):
+    values1, values2 = _normalized_metric_vectors(values1, values2)
+    denominator = np.sum(values1 ** 2) + np.sum(values2 ** 2)
+    return float(2 * np.sum(values1 * values2) / denominator) if denominator else np.nan
+
+
+def hellinger_distance(values1, values2):
+    values1, values2 = _normalized_metric_vectors(values1, values2)
+    return float(np.linalg.norm(np.sqrt(values1) - np.sqrt(values2)) / np.sqrt(2))
 
 
 def decide_count_and_frac_columns(colnames, by_umi, suppress_warnings=False):

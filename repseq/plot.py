@@ -8,7 +8,6 @@ joined immediately before plotting.
 
 from __future__ import annotations
 
-import ast
 import re
 import warnings
 from collections.abc import Iterable
@@ -1151,19 +1150,10 @@ def segment_usage(
     return fig
 
 
-def _parse_usage_combination(value, expected_length):
-    combination = value
-    if isinstance(value, str):
-        stripped = value.strip()
-        if stripped.startswith(("(", "[")):
-            try:
-                combination = ast.literal_eval(stripped)
-            except (SyntaxError, ValueError):
-                combination = None
-        elif "|" in stripped:
-            combination = stripped.split("|")
-    if not isinstance(combination, (tuple, list)):
+def _parse_pipe_usage_combination(value, expected_length):
+    if not isinstance(value, str):
         return None
+    combination = value.split("|")
     if len(combination) != expected_length:
         return None
     v_gene, j_gene = combination[:2]
@@ -1192,50 +1182,56 @@ def _normalize_combination_usage_table(usage_df, combination_type):
     )
     v_column = _column_by_name(data.columns, {"v"})
     j_column = _column_by_name(data.columns, {"j"})
-    length_column = _column_by_name(
-        data.columns, {"cdr3_length", "cdr3aa_length", "length", "len"}
-    )
+    length_column = _column_by_name(data.columns, {"len"})
 
     id_columns = ["sample_id"] + (["chain"] if "chain" in data.columns else [])
     if combination_column is not None:
-        if value_column is None:
+        required_columns = [v_column, j_column, value_column]
+        if expected_length == 3:
+            required_columns.append(length_column)
+        if any(column is None for column in required_columns):
             raise ValueError(
-                f"Long {combination_type} tables need a usage, value, freq, "
-                "frequency, or count column"
+                f"Long {combination_type} tables require pipe-delimited "
+                f"{combination_type}, v, j"
+                + (", len" if expected_length == 3 else "")
+                + ", and a value column"
             )
-        keep_columns = id_columns + [combination_column, value_column]
-        data = data[keep_columns].rename(columns={value_column: "_value"})
-        combinations = data[combination_column].map(
-            lambda value: _parse_usage_combination(value, expected_length)
-        )
-    elif v_column is not None and j_column is not None and (
-        expected_length == 2 or length_column is not None
-    ):
-        if value_column is None:
-            raise ValueError(
-                f"Long {combination_type} tables need a usage, value, freq, "
-                "frequency, or count column"
-            )
-        keep_columns = id_columns + [v_column, j_column]
+        keep_columns = id_columns + [combination_column, v_column, j_column]
         if expected_length == 3:
             keep_columns.append(length_column)
         keep_columns.append(value_column)
         data = data[keep_columns].rename(columns={value_column: "_value"})
-        if expected_length == 2:
-            combinations = pd.Series(
-                zip(data[v_column], data[j_column]), index=data.index
-            ).map(lambda value: _parse_usage_combination(value, expected_length))
-        else:
-            combinations = pd.Series(
-                zip(data[v_column], data[j_column], data[length_column]),
-                index=data.index,
-            ).map(lambda value: _parse_usage_combination(value, expected_length))
+        if not data[combination_column].map(lambda value: isinstance(value, str)).all():
+            raise ValueError(
+                f"{combination_type} values must use pipe-delimited strings, "
+                "not tuples"
+            )
+        combinations = data[combination_column].map(
+            lambda value: _parse_pipe_usage_combination(value, expected_length)
+        )
+        expected_identifiers = (
+            data[v_column].astype(str) + "|" + data[j_column].astype(str)
+        )
+        if expected_length == 3:
+            expected_identifiers += "|" + data[length_column].astype(str)
+        if (data[combination_column].astype(str) != expected_identifiers).any():
+            raise ValueError(
+                f"{combination_type} values must match the separate v, j"
+                + (", and len" if expected_length == 3 else "")
+                + " columns"
+            )
     else:
+        tuple_columns = [column for column in data.columns if isinstance(column, tuple)]
+        if tuple_columns:
+            raise ValueError(
+                f"{combination_type} wide tables must use pipe-delimited string "
+                "column names, not tuples"
+            )
         wide_columns = [
             column
             for column in data.columns
             if column not in id_columns
-            and _parse_usage_combination(column, expected_length) is not None
+            and _parse_pipe_usage_combination(column, expected_length) is not None
         ]
         if not wide_columns:
             raise ValueError(
@@ -1248,7 +1244,7 @@ def _normalize_combination_usage_table(usage_df, combination_type):
             value_name="_value",
         )
         combinations = data["_combination"].map(
-            lambda value: _parse_usage_combination(value, expected_length)
+            lambda value: _parse_pipe_usage_combination(value, expected_length)
         )
 
     data["_value"] = pd.to_numeric(data["_value"], errors="coerce")

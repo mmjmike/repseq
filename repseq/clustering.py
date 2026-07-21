@@ -631,7 +631,7 @@ class Clusters(list):
         Returns:
             list: List of clusters (nx.Graph objects).
         """
-        possible_overlap_types = ["aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ"]
+        possible_overlap_types = ["aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ", "VJ", "VJlen"]
         compulsory_columns = ["freq", "count", "v", "j", "cdr3aa", "cdr3nt", "sample_id"]
         tcr_dist = isinstance(tcrdist_radius, int)
 

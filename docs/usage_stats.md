@@ -268,8 +268,13 @@ convergence = stats.calc_convergence(clonosets, cl_filter=top_filter)
 
 The resulting dataframe can be in either `long` or `wide` format:
 
-- `long` - four columns: `sample_id`, `chain`, `<segment_type>`, `usage`
-- `wide` - num of rows equals to the number of input clonosets, and all segments are the columns and usage is in each cell.
+- `long` - basic V/J/C usage has `sample_id`, `chain`, `<segment_type>`, and
+  `usage`. V-J usage additionally has string `v`, `j`, and `vj` columns, where
+  `vj` is `v|j`. V-J-length usage additionally has string `v`, `j`, `vjlen`, and
+  integer `len` columns, where `vjlen` is `v|j|len`.
+- `wide` - the number of rows equals the number of input clonosets. Segment or
+  combination identifiers are string column names; V-J and V-J-length names use
+  the same `|` separator.
 
 ```py
 v_usage = stats.calc_segment_usage(clonosets, segment="v", cl_filter=func_filter, table="long")
@@ -510,6 +515,10 @@ drawn first, behind smaller markers. Samples or groups use different fill
 colors with black marker borders and stable radial offsets around each V-J
 position.
 
+The long table uses string columns `v`, `j`, and `vj`, where `vj` is the
+pipe-delimited identifier `v|j`. Wide tables use the same pipe-delimited names
+as columns. Tuple identifiers are not supported.
+
 ```py
 vj = stats.calc_segment_usage(
     clonosets,
@@ -545,6 +554,10 @@ groups, in every panel. It accepts long or wide output from
 `stats.calc_segment_usage(segment="vjlen")`. The first sample or group is the
 x-axis and the second is the y-axis. The input table must contain exactly one
 chain.
+
+The long table uses string `v`, `j`, and `vjlen` columns plus integer `len`,
+where `vjlen` is `v|j|len`. Wide tables use `v|j|len` as their string column
+names. Tuple identifiers are not supported.
 
 ```py
 vjlen = stats.calc_segment_usage(

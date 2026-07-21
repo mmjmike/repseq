@@ -124,3 +124,22 @@ tcrnet_compared_clns = intersections.tcrnet(clonosets_df_exp, clonoset_df_contro
             scale_x_log10(limits = c(1e-5, 3.5e-03)) +
             scale_y_log10(limits = c(1e-5, 3.5e-03))
     ```
+
+
+## Beta diversity
+
+`repseq.beta.metrics` builds one full pairwise intersection table and calculates
+one or more beta-diversity matrices from it. Pass a metric name, a list of names,
+or leave `metrics=None` to calculate every supported metric plus `full_table`.
+Use `cpu` to control parallel pair calculation.
+
+```python
+from repseq import beta
+
+jaccard = beta.metrics(clonosets_df, metrics="jaccard", cpu=4)
+all_metrics = beta.metrics(clonosets_df, overlap_type="VJlen")
+reused = beta.metrics_from_table(all_metrics["full_table"], metrics=["f2", "bray-curtis"])
+```
+
+In addition to sequence-based overlap types, intersection functions accept `VJ`
+(V/J pair) and `VJlen` (V/J pair plus CDR3 amino-acid length).

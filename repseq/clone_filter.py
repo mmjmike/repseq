@@ -328,7 +328,7 @@ class Filter:
                 raise ValueError(f"Incorrect value '{self.top}' for top. Value too low")
         if not isinstance(self.seed, Hashable):
             raise ValueError(f"Incorrect value '{self.seed}' for seed. Must be hashable")
-        pool_by_options = ["", "aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ"]
+        pool_by_options = ["", "aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ", "VJ", "VJlen"]
         if self.pool_by not in pool_by_options:
             raise ValueError(f"Incorrect value '{self.pool_by}' for clonoset pool. Possible values: {', '.join(pool_by_options)}")
   
@@ -485,17 +485,23 @@ class Filter:
         # create list of pool columns
         aa, check_v, check_j = overlap_type_to_flags(self.pool_by)
         columns_for_pool = []
-        if aa:
-            columns_for_pool.append(colnames["cdr3aa_column"])
-        else:
-            columns_for_pool.append(colnames["cdr3nt_column"])
+        if self.pool_by not in {"VJ", "VJlen"}:
+            if aa:
+                columns_for_pool.append(colnames["cdr3aa_column"])
+            else:
+                columns_for_pool.append(colnames["cdr3nt_column"])
         if check_v:
             columns_for_pool.append(colnames["v_column"])
         if check_j:
             columns_for_pool.append(colnames["j_column"])
+        if self.pool_by == "VJlen":
+            clonoset["cdr3_len"] = clonoset[colnames["cdr3aa_column"]].str.len()
+            columns_for_pool.append("cdr3_len")
 
         # create column combining all pool columns
-        clonoset["pool_id"] = clonoset.apply(lambda x: "|".join([x[colname] for colname in columns_for_pool]), axis=1)
+        clonoset["pool_id"] = clonoset.apply(
+            lambda x: "|".join(str(x[colname]) for colname in columns_for_pool), axis=1
+        )
         
         indices_to_retain = []
 

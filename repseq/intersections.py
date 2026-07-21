@@ -9,14 +9,16 @@ from scipy.stats import binom, poisson
 
 
 from .common_functions import (print_progress_bar, run_parallel_calculation, overlap_type_to_flags,
-                               jaccard_index, bray_curtis_dissimilarity, jensen_shannon_divergence)
+                               jaccard_index, bray_curtis_dissimilarity, jensen_shannon_divergence,
+                               overlap_type_uses_sequence)
 from .io import read_clonoset
 from .clonosets import get_column_names_from_clonoset, pool_clonotypes_from_clonosets_df
 from repseq.clone_filter import Filter
 
 
 
-def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True, clonosets_df2=None, cl_filter2=None):
+def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True,
+                                      clonosets_df2=None, cl_filter2=None, cpu=None):
     """
     Calculating frequencies of intersecting clonotypes between multiple repseq samples.
     The result of this function may be used for scatterplots of frequencies/counts of 
@@ -33,6 +35,7 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
             in UMI's if they exist in implemented protocol
         by_freq (bool): default is `True` - this means that the intersect metric is frequency of clonotype, 
             but not its count
+        cpu (int, optional): number of worker processes. `None` uses the executor default.
         only_functional (bool): use only functional clonotypes (do not contain stop codons or
             frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
             1 after filtering of non-functional clonotypes
@@ -70,11 +73,14 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
                 sample2 = sample_list[j+i+1]
                 tasks.append((sample1, sample2, clonoset_lists))
     
-    results = run_parallel_calculation(intersect_two_clone_dicts, tasks, "Intersecting clonosets", object_name="pairs")
+    results = run_parallel_calculation(intersect_two_clone_dicts, tasks, "Intersecting clonosets",
+                                       object_name="pairs", cpu=cpu)
 
     # df = pd.concat(results).index.set_names()
     df = pd.concat(results).reset_index(drop=True)
     df = split_tuple_clone_column(df, overlap_type)
+    df.attrs["sample_list"] = sample_list
+    df.attrs["sample_list2"] = sample_list2
 
     return df
 
@@ -865,64 +871,43 @@ def clonotypes_equal(clonotype_1, clonotype_2, check_v, check_j, mismatches=0):
 
 def prepare_clonoset_for_intersection(clonoset, overlap_type="aaV", by_freq=True, len_vj_format=False, pool_clonotypes=True):
     aa, check_v, check_j = overlap_type_to_flags(overlap_type)
-    
-    colnames = get_column_names_from_clonoset(clonoset)
-    # if only_functional:
-    #     clonoset = filter_nonfunctional_clones(clonoset, colnames=colnames)
-    #     clonoset = recount_fractions_for_clonoset(clonoset, colnames=colnames)
-    
-    cl_seq_col = colnames["cdr3aa_column"]
-    if not aa:
-        cl_seq_col = colnames["cdr3nt_column"]
-    clonoset["seq"] = clonoset[cl_seq_col]
-    
-    weight_column = colnames["count_column"]
-    if by_freq:
-        weight_column = colnames["fraction_column"]
-    
-    result_colnames = ["seq"]
-    
-    if check_v:
-        cl_v_col = colnames["v_column"]
-        result_colnames.append(cl_v_col)
-    
-    if check_j:
-        cl_j_col = colnames["j_column"]
-        result_colnames.append(cl_j_col)
-    
-    
-    if not len_vj_format or pool_clonotypes:
-        clonoset["clone"] = clonoset.apply(lambda x: tuple(x[col] for col in result_colnames), axis=1)
-        clonoset_dict = clonoset[["clone", weight_column]].groupby("clone").sum().sort_values(by=weight_column,ascending=False).to_dict()[weight_column]
-        if len_vj_format:
-            clonoset_dict = clone_dict_to_len_vj_format(clonoset_dict)
-    else:
-        result_colnames.append(weight_column)
-        clonoset_compact = clonoset[result_colnames]
-        clonoset_dict = dict()
-        for i,r in clonoset_compact.iterrows():
-            clone = [v for v in r]
-            clone_value = [clone[0], clone[-1]]
-            clone_key = tuple([len(clone[0])] + clone[1:-1])
-            if clone_key not in clonoset_dict:
-                clonoset_dict[clone_key] = [clone_value]
-            else:
-                clonoset_dict[clone_key].append(clone_value)
+    uses_sequence = overlap_type_uses_sequence(overlap_type)
 
-        
-    # else:
-        
-    #     clonoset_list = list(clonoset.apply(lambda x: tuple(x[col] for col in result_colnames), axis=1))
-    #     clonoset_dict = dict()
-    #     for clone in clonoset_list:
-    #         seq_len = len(clone[0])
-    #         if seq_len in clonoset_dict:
-    #             clonoset_dict[seq_len].append(clone)
-    #         else:
-    #             clonoset_dict[seq_len] = [clone]
-    
-    # if len_vj_format:
-    #     clonoset_dict = clone_dict_to_len_vj_format(clonoset_dict)
+    colnames = get_column_names_from_clonoset(clonoset)
+    clonoset = clonoset.copy()
+    weight_column = colnames["fraction_column"] if by_freq else colnames["count_column"]
+
+    result_colnames = []
+    if uses_sequence:
+        cl_seq_col = colnames["cdr3aa_column"] if aa else colnames["cdr3nt_column"]
+        clonoset["seq"] = clonoset[cl_seq_col]
+        result_colnames.append("seq")
+    if check_v:
+        result_colnames.append(colnames["v_column"])
+    if check_j:
+        result_colnames.append(colnames["j_column"])
+    if overlap_type == "VJlen":
+        clonoset["cdr3_len"] = clonoset[colnames["cdr3aa_column"]].str.len()
+        result_colnames.append("cdr3_len")
+
+    clonoset["clone"] = clonoset.apply(lambda row: tuple(row[col] for col in result_colnames), axis=1)
+    clonoset_dict = (clonoset[["clone", weight_column]].groupby("clone").sum()
+                     .sort_values(by=weight_column, ascending=False).to_dict()[weight_column])
+
+    if not uses_sequence:
+        return clonoset_dict
+    if len_vj_format and pool_clonotypes:
+        return clone_dict_to_len_vj_format(clonoset_dict)
+    if not len_vj_format:
+        return clonoset_dict
+
+    compact_columns = result_colnames + [weight_column]
+    clonoset_dict = {}
+    for _, row in clonoset[compact_columns].iterrows():
+        clone = [value for value in row]
+        clone_value = [clone[0], clone[-1]]
+        clone_key = tuple([len(clone[0])] + clone[1:-1])
+        clonoset_dict.setdefault(clone_key, []).append(clone_value)
     return clonoset_dict
 
 def clone_dict_to_len_vj_format(clone_dict):
@@ -959,23 +944,23 @@ def intersect_two_clone_dicts(args):
 def split_tuple_clone_column(df, overlap_type):
     clone_column = "clone"
     aa, check_v, check_j = overlap_type_to_flags(overlap_type)
-    
-    seq_column = "cdr3nt"
-    if aa:
-        seq_column = "cdr3aa"
-    df[seq_column] = df[clone_column].apply(lambda x: x[0])
 
-    if check_j:
-        df["j"] = df[clone_column].apply(lambda x: x[2])
-        df.insert(0, "j", df.pop("j"))
+    if overlap_type in {"VJ", "VJlen"}:
+        df["v"] = df[clone_column].apply(lambda clone: clone[0])
+        df["j"] = df[clone_column].apply(lambda clone: clone[1])
+        if overlap_type == "VJlen":
+            df["len"] = df[clone_column].apply(lambda clone: clone[2]).astype(int)
+        feature_columns = ["v", "j"] + (["len"] if overlap_type == "VJlen" else [])
+        return df[feature_columns + [column for column in df.columns if column not in feature_columns + [clone_column]]]
 
+    seq_column = "cdr3aa" if aa else "cdr3nt"
+    df[seq_column] = df[clone_column].apply(lambda clone: clone[0])
     if check_v:
-        df["v"] = df[clone_column].apply(lambda x: x[1])
-        df.insert(0, "v", df.pop("v"))
-
-    df.insert(0, seq_column, df.pop(seq_column))
-    df = df.drop(columns=[clone_column])
-    return df
+        df["v"] = df[clone_column].apply(lambda clone: clone[1])
+    if check_j:
+        df["j"] = df[clone_column].apply(lambda clone: clone[2])
+    feature_columns = [seq_column] + (["v"] if check_v else []) + (["j"] if check_j else [])
+    return df[feature_columns + [column for column in df.columns if column not in feature_columns + [clone_column]]]
 
 
 def find_overlapping_clones_in_two_clone_dicts(args):

@@ -66,7 +66,10 @@ def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long", 
                        cpu=None, drop_small_samples=False, verbose=True):
     """
     Calculates segment (`V`, `J`, or `C`) usage for several samples. By default outputs
-    'long' table with four columns: segment name, `usage`, `sample_id` and `chain`.
+    a long table with segment identifiers, `usage`, `sample_id`, and `chain`.
+    For `vj` and `vjlen`, identifiers are pipe-delimited strings and the long
+    table also contains separate `v`, `j`, and (for `vjlen`) integer `len`
+    columns.
     It also may take a clone_filter as input: `cl_filter` from `clone_filter` module.
 
 
@@ -114,8 +117,24 @@ def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long", 
     df = df.fillna(0)
     if table == "wide":
         return df
-    else:
-        return df.melt(id_vars=["sample_id", "chain"]).rename(columns={"value":"usage", "variable":segment})
+
+    long_df = df.melt(id_vars=["sample_id", "chain"]).rename(
+        columns={"value": "usage", "variable": segment}
+    )
+    if segment not in {"vj", "vjlen"}:
+        return long_df
+
+    parts = long_df[segment].astype("string").str.split("|", expand=True)
+    expected_parts = 2 if segment == "vj" else 3
+    if parts.shape[1] != expected_parts or parts.isna().any().any():
+        raise ValueError(f"Invalid pipe-delimited {segment} identifier")
+    long_df[segment] = long_df[segment].astype("string")
+    long_df["v"] = parts[0].astype("string")
+    long_df["j"] = parts[1].astype("string")
+    if segment == "vjlen":
+        long_df["len"] = pd.to_numeric(parts[2], errors="raise").astype(int)
+        return long_df[["sample_id", "chain", "v", "j", "len", segment, "usage"]]
+    return long_df[["sample_id", "chain", "v", "j", segment, "usage"]]
 
 
 def cdr3_length_distributions(
@@ -259,6 +278,16 @@ def calc_vjlen_usage_cl(clonoset_in, colnames=None, include_j=True, include_len=
         clonoset[aalen_column] = clonoset[cdr3aa_column].apply(lambda x: len(x))
     
     result = clonoset[[freq_column] + columns_to_join].groupby(columns_to_join).sum().to_dict()[freq_column]
+    if include_j:
+        return {
+            "|".join(map(str, key if isinstance(key, tuple) else (key,))): value
+            for key, value in result.items()
+        }
+    if include_len:
+        return {
+            "|".join(map(str, key if isinstance(key, tuple) else (key,))): value
+            for key, value in result.items()
+        }
     return result
 
 def _print_normalization_message(function_name, cl_filter, seed, iterations):

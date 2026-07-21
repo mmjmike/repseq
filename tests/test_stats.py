@@ -202,6 +202,64 @@ def test_cdr3_length_distributions_nt_lengths(tmp_path):
     assert result.loc[0, "freq"] == 1.0
 
 
+def test_calc_segment_usage_vj_and_vjlen_use_pipe_strings_and_components(tmp_path):
+    filename = tmp_path / "sample.tsv"
+    _write_clonoset(
+        filename,
+        [
+            {
+                "count": 7,
+                "freq": 0.7,
+                "cdr3nt": "TGTGCC",
+                "cdr3aa": "CASS",
+                "v": "TRBV2",
+                "d": ".",
+                "j": "TRBJ1-1",
+            },
+            {
+                "count": 3,
+                "freq": 0.3,
+                "cdr3nt": "TGTGCT",
+                "cdr3aa": "CAS",
+                "v": "TRBV10",
+                "d": ".",
+                "j": "TRBJ2-1",
+            },
+        ],
+    )
+    clonosets = pd.DataFrame(
+        [{"sample_id": "sample1", "chain": "TRB", "filename": str(filename)}]
+    )
+
+    vj = stats.calc_segment_usage(
+        clonosets, segment="vj", table="long", cpu=1, verbose=False
+    )
+    assert list(vj.columns) == ["sample_id", "chain", "v", "j", "vj", "usage"]
+    assert set(vj["vj"]) == {"TRBV2|TRBJ1-1", "TRBV10|TRBJ2-1"}
+    assert str(vj["vj"].dtype) == "string"
+    assert str(vj["v"].dtype) == "string"
+    assert str(vj["j"].dtype) == "string"
+
+    vjlen = stats.calc_segment_usage(
+        clonosets, segment="vjlen", table="long", cpu=1, verbose=False
+    )
+    assert list(vjlen.columns) == [
+        "sample_id", "chain", "v", "j", "len", "vjlen", "usage"
+    ]
+    assert set(vjlen["vjlen"]) == {
+        "TRBV2|TRBJ1-1|4",
+        "TRBV10|TRBJ2-1|3",
+    }
+    assert pd.api.types.is_integer_dtype(vjlen["len"])
+    assert str(vjlen["vjlen"].dtype) == "string"
+
+    vj_wide = stats.calc_segment_usage(
+        clonosets, segment="vj", table="wide", cpu=1, verbose=False
+    )
+    assert all(isinstance(column, str) for column in vj_wide.columns)
+    assert "TRBV2|TRBJ1-1" in vj_wide.columns
+
+
 def test_calc_diversity_stats_passes_cpu_to_generic_calculation(monkeypatch):
     seen = {}
 

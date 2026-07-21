@@ -417,13 +417,17 @@ def _vj_usage_long(sample_count=2):
                 {
                     "sample_id": f"sample{sample_number}",
                     "chain": "TRB",
-                    "vj": ("TRBV10", "TRBJ2-1"),
+                    "v": "TRBV10",
+                    "j": "TRBJ2-1",
+                    "vj": "TRBV10|TRBJ2-1",
                     "usage": 0.2 + sample_number * 0.05,
                 },
                 {
                     "sample_id": f"sample{sample_number}",
                     "chain": "TRB",
-                    "vj": ("TRBV2", "TRBJ1-1"),
+                    "v": "TRBV2",
+                    "j": "TRBJ1-1",
+                    "vj": "TRBV2|TRBJ1-1",
                     "usage": 0.6 - sample_number * 0.05,
                 },
             ]
@@ -439,13 +443,19 @@ def _vjlen_usage_long(sample_ids=("sample0", "sample1")):
                 {
                     "sample_id": sample_id,
                     "chain": "TRB",
-                    "vjlen": ("TRBV2", "TRBJ1-1", 15),
+                    "v": "TRBV2",
+                    "j": "TRBJ1-1",
+                    "len": 15,
+                    "vjlen": "TRBV2|TRBJ1-1|15",
                     "usage": 0.2 + sample_number * 0.2,
                 },
                 {
                     "sample_id": sample_id,
                     "chain": "TRB",
-                    "vjlen": ("TRBV10", "TRBJ2-1", 14),
+                    "v": "TRBV10",
+                    "j": "TRBJ2-1",
+                    "len": 14,
+                    "vjlen": "TRBV10|TRBJ2-1|14",
                     "usage": 0.1 if sample_number == 0 else 0,
                 },
             ]
@@ -469,7 +479,7 @@ def test_vj_usage_keeps_single_dot_at_its_vj_center():
     usage = _vj_usage_long()
     usage.loc[
         (usage["sample_id"] == "sample1")
-        & (usage["vj"] == ("TRBV10", "TRBJ2-1")),
+        & (usage["vj"] == "TRBV10|TRBJ2-1"),
         "usage",
     ] = 0
 
@@ -505,14 +515,14 @@ def test_vj_usage_grouped_values_are_means_and_limit_is_eight():
         rsplot.vj_usage(_vj_usage_long(sample_count=9))
 
 
-def test_vj_usage_accepts_native_wide_tuple_columns():
+def test_vj_usage_accepts_pipe_delimited_wide_columns():
     usage = pd.DataFrame(
         [
             {
                 "sample_id": "sample0",
                 "chain": "TRB",
-                ("TRBV2", "TRBJ1-1"): 0.7,
-                ("TRBV10", "TRBJ2-1"): 0.3,
+                "TRBV2|TRBJ1-1": 0.7,
+                "TRBV10|TRBJ2-1": 0.3,
             }
         ]
     )
@@ -523,6 +533,29 @@ def test_vj_usage_accepts_native_wide_tuple_columns():
         "TRBV2",
         "TRBV10",
     ]
+
+
+def test_vj_usage_rejects_tuple_columns_and_tuple_identifiers():
+    tuple_wide = pd.DataFrame(
+        [{"sample_id": "sample0", "chain": "TRB", ("TRBV2", "TRBJ1-1"): 1.0}]
+    )
+    with pytest.raises(ValueError, match="pipe-delimited string column names"):
+        rsplot.vj_usage(tuple_wide)
+
+    tuple_long = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample0",
+                "chain": "TRB",
+                "v": "TRBV2",
+                "j": "TRBJ1-1",
+                "vj": ("TRBV2", "TRBJ1-1"),
+                "usage": 1.0,
+            }
+        ]
+    )
+    with pytest.raises(ValueError, match="pipe-delimited strings"):
+        rsplot.vj_usage(tuple_long)
 
 
 def test_vjlen_usage_plots_two_sample_frequencies_and_default_style():
@@ -612,7 +645,10 @@ def test_vjlen_usage_rejects_multiple_chains_and_wrong_panel_size():
                     {
                         "sample_id": "sample0",
                         "chain": "TRA",
-                        "vjlen": ("TRAV2", "TRAJ1", 15),
+                        "v": "TRAV2",
+                        "j": "TRAJ1",
+                        "len": 15,
+                        "vjlen": "TRAV2|TRAJ1|15",
                         "usage": 0.1,
                     }
                 ]
