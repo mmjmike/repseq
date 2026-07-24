@@ -257,14 +257,10 @@ def jaccard_index(list1, list2):
     
     return len(intersection) / len(union)
 
-def bray_curtis_dissimilarity(list1, list2):
-    list1 = np.array(list1)
-    list2 = np.array(list2)
-    
-    numerator = np.sum(np.abs(list1 - list2))
-    denominator = np.sum(list1 + list2)
-    
-    return numerator / denominator
+def bray_curtis_dissimilarity(values1, values2):
+    values1, values2 = _normalized_metric_vectors(values1, values2)
+    denominator = np.sum(values1 + values2)
+    return float(np.sum(np.abs(values1 - values2)) / denominator) if denominator else np.nan
 
 def kl_divergence(p, q, epsilon=1e-10):
     """
@@ -345,7 +341,7 @@ def relative_diversity(values1, values2):
 
 
 def pearson_correlation(values1, values2):
-    values1, values2 = _validate_metric_vectors(values1, values2)
+    values1, values2 = _normalized_metric_vectors(values1, values2)
     mask = (values1 > 0) & (values2 > 0)
     if np.sum(mask) < 2 or np.std(values1[mask]) == 0 or np.std(values2[mask]) == 0:
         return np.nan
@@ -353,13 +349,13 @@ def pearson_correlation(values1, values2):
 
 
 def f1_similarity(values1, values2):
-    values1, values2 = _validate_metric_vectors(values1, values2)
+    values1, values2 = _normalized_metric_vectors(values1, values2)
     mask = (values1 > 0) & (values2 > 0)
     return float(np.sqrt(np.sum(values1[mask]) * np.sum(values2[mask])))
 
 
 def f2_similarity(values1, values2):
-    values1, values2 = _validate_metric_vectors(values1, values2)
+    values1, values2 = _normalized_metric_vectors(values1, values2)
     return float(np.sum(np.sqrt(values1 * values2)))
 
 
@@ -390,7 +386,7 @@ def szymkiewicz_simpson_similarity(values1, values2):
 
 
 def l1_distance(values1, values2):
-    values1, values2 = _validate_metric_vectors(values1, values2)
+    values1, values2 = _normalized_metric_vectors(values1, values2)
     return float(np.sum(np.abs(values1 - values2)))
 
 
@@ -400,7 +396,7 @@ def total_variation_distance(values1, values2):
 
 
 def l2_distance(values1, values2):
-    values1, values2 = _validate_metric_vectors(values1, values2)
+    values1, values2 = _normalized_metric_vectors(values1, values2)
     return float(np.linalg.norm(values1 - values2))
 
 

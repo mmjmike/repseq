@@ -35,6 +35,7 @@ nav:
       - MiXCR: usage_mixcr.md
       - Stats: usage_stats.md
       - Intersections: usage_intersections.md
+      - Beta diversity: usage_beta.md
       - Clustering: usage_clustering.md
       - Differential expression: usage_diffexp.md
   - Functions: functions.md

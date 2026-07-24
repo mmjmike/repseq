@@ -9,8 +9,10 @@ from repseq.intersections import intersect_clones_in_samples_batch
 def _full_table():
     return pd.DataFrame({
         "cdr3aa": ["A", "B", "C"],
-        "sample1_count": [0.5, 0.3, 0.2],
-        "sample2_count": [0.4, 0.0, 0.6],
+        "sample1_count": [5, 3, 2],
+        "sample2_count": [8, 0, 12],
+        "sample1_freq": [0.5, 0.3, 0.2],
+        "sample2_freq": [0.4, 0.0, 0.6],
         "sample1": ["s1"] * 3,
         "sample2": ["s2"] * 3,
         "pair": ["s1_vs_s2"] * 3,
@@ -80,13 +82,23 @@ def test_intersection_supports_vj_and_vjlen(tmp_path):
         {"sample_id": "s2", "filename": str(file2)},
     ])
 
-    vj = intersect_clones_in_samples_batch(clonosets, overlap_type="VJ", cpu=1)
+    with pytest.warns(DeprecationWarning, match="always returns counts"):
+        vj = intersect_clones_in_samples_batch(
+            clonosets, overlap_type="VJ", by_freq=True, cpu=1
+        )
     vjlen = intersect_clones_in_samples_batch(clonosets, overlap_type="VJlen", cpu=1)
 
     assert list(vj.columns[:2]) == ["v", "j"]
+    assert list(vj.columns[2:6]) == [
+        "sample1_count", "sample2_count", "sample1_freq", "sample2_freq"
+    ]
     shared_vj = vj[(vj["v"] == "V1") & (vj["j"] == "J1")].iloc[0]
-    assert shared_vj["sample1_count"] == 1
-    assert shared_vj["sample2_count"] == 0.5
+    assert shared_vj["sample1_count"] == 10
+    assert shared_vj["sample2_count"] == 5
+    assert shared_vj["sample1_freq"] == 1
+    assert shared_vj["sample2_freq"] == 0.5
+    assert vj.groupby("pair")["sample1_freq"].sum().iloc[0] == pytest.approx(1)
+    assert vj.groupby("pair")["sample2_freq"].sum().iloc[0] == pytest.approx(1)
     assert list(vjlen.columns[:3]) == ["v", "j", "len"]
     assert set(vjlen["len"]) == {4, 5, 6}
 

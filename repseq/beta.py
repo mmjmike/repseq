@@ -1,4 +1,38 @@
-"""Pairwise beta-diversity metrics for immune repertoires."""
+r"""Pairwise beta-diversity metrics for immune repertoires.
+
+All metric functions receive two raw clonotype-count vectors, ``x`` and ``y``.
+Let ``N_x = sum(x)``, ``N_y = sum(y)``, ``p_i = x_i / N_x``, and
+``q_i = y_i / N_y``. Presence is represented by ``I(x_i > 0)``. Define
+``S_x`` and ``S_y`` as the numbers of present clonotypes and ``S_xy`` as the
+number present in both samples.
+
+Supported metrics:
+
+- ``number_of_intersecting_clonotypes``: ``S_xy``.
+- ``relative_diversity``: ``S_xy / (S_x * S_y)``.
+- ``pearson``: Pearson correlation of ``p`` and ``q`` over shared clonotypes.
+- ``f1``: ``sqrt(sum_shared(p) * sum_shared(q))``.
+- ``f2``: ``sum_i sqrt(p_i * q_i)``.
+- ``jaccard``: ``S_xy / (S_x + S_y - S_xy)``.
+- ``jaccard_distance``: ``1 - jaccard``.
+- ``dice``: ``2 * S_xy / (S_x + S_y)``.
+- ``dice_distance``: ``1 - dice``.
+- ``szymkiewicz_simpson``: ``S_xy / min(S_x, S_y)``.
+- ``bray_curtis``: ``sum_i |p_i - q_i| / sum_i (p_i + q_i)``.
+- ``l1``: ``sum_i |p_i - q_i|``.
+- ``total_variation``: ``0.5 * sum_i |p_i - q_i|``.
+- ``l2``: ``sqrt(sum_i (p_i - q_i)^2)``.
+- ``morisita_horn``: ``2 * sum_i p_i*q_i / (sum_i p_i^2 + sum_i q_i^2)``.
+- ``jensen_shannon``: ``0.5*KL(p || m) + 0.5*KL(q || m)``, where
+  ``m = (p + q) / 2``.
+- ``kl_divergence``: ``sum_i p_i * log(p_i / q_i)``. This metric is
+  directional, so opposite matrix cells may differ.
+- ``hellinger``: ``sqrt(sum_i (sqrt(p_i) - sqrt(q_i))^2) / sqrt(2)``.
+- ``full_table``: the count-first pairwise union table used for calculation.
+
+Presence metrics use the raw count vectors. Frequency-based metrics normalize
+those vectors internally; callers do not need to pre-normalize them.
+"""
 
 from collections import OrderedDict
 
@@ -72,9 +106,30 @@ _ALIASES = {
 }
 
 
-def metrics(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True,
+def metrics(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=None,
             clonosets_df2=None, cl_filter2=None, metrics=None, cpu=None):
-    """Calculate beta-diversity matrices after building the full pair table."""
+    """Calculate beta-diversity matrices from clonoset files.
+
+    The function first builds a full pairwise union table containing raw counts
+    and derived frequencies, then calculates the requested matrices from its
+    count columns.
+
+    Args:
+        clonosets_df (pd.DataFrame): First table of sample IDs and filenames.
+        cl_filter (Filter, optional): Filter for the first sample table.
+        overlap_type (str): Clonotype identity definition.
+        by_freq (bool, optional): Deprecated compatibility argument. Ignored;
+            intersections always use counts.
+        clonosets_df2 (pd.DataFrame, optional): Optional second sample table.
+        cl_filter2 (Filter, optional): Filter for the second sample table.
+        metrics (str or list[str], optional): Metric name or names. ``None``
+            calculates every metric and returns ``full_table`` as well.
+        cpu (int, optional): Number of pair-calculation worker processes.
+
+    Returns:
+        pd.DataFrame or dict[str, pd.DataFrame]: One matrix for a single metric,
+        otherwise a dictionary keyed by canonical metric name.
+    """
     full_table = intersect_clones_in_samples_batch(
         clonosets_df,
         cl_filter=cl_filter,
@@ -93,7 +148,23 @@ def metrics(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True,
 
 
 def metrics_from_table(full_table, metrics=None):
-    """Calculate beta-diversity matrices from an existing full intersection table."""
+    """Calculate beta-diversity matrices from an existing full table.
+
+    ``full_table`` must contain ``sample1_count``, ``sample2_count``,
+    ``sample1``, and ``sample2``. Frequency columns are retained in returned
+    ``full_table`` output but metrics always start from raw count vectors and
+    normalize internally where their definitions require frequencies.
+
+    Args:
+        full_table (pd.DataFrame): Output of
+            :func:`intersect_clones_in_samples_batch`.
+        metrics (str or list[str], optional): Metric name or names. ``None``
+            calculates all metrics and includes the original table.
+
+    Returns:
+        pd.DataFrame or dict[str, pd.DataFrame]: One matrix for a single metric,
+        otherwise a dictionary keyed by canonical metric name.
+    """
     required = {"sample1", "sample2", "sample1_count", "sample2_count"}
     missing = required.difference(full_table.columns)
     if missing:

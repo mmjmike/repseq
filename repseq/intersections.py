@@ -2,6 +2,7 @@ import math
 import pandas as pd
 import numpy as np
 import itertools
+import warnings
 
 from statsmodels.stats.multitest import multipletests
 from scipy.stats import binom, poisson
@@ -17,51 +18,54 @@ from repseq.clone_filter import Filter
 
 
 
-def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True,
+def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=None,
                                       clonosets_df2=None, cl_filter2=None, cpu=None):
-    """
-    Calculating frequencies of intersecting clonotypes between multiple repseq samples.
-    The result of this function may be used for scatterplots of frequencies/counts of 
-    overlapping clonotypes
-    
+    """Build a count-and-frequency table for every requested sample pair.
+
+    Clonotypes are always pooled and intersected using raw counts. Frequencies
+    are calculated after each pairwise union is known, so they sum to one for
+    each sample within each pair.
+
     Args:
-        clonosets_df (pd.DataFrame): contains three columns - `sample_id` and `filename` columns,
-            `filename` - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
-            sample_id's should be all unique in this DF
-        overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence
-            to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
-            to decide if clonotypes are equal
-        by_umi (bool): set `=True` for MiXCR4 clonosets to select count/frequency of clonotypes 
-            in UMI's if they exist in implemented protocol
-        by_freq (bool): default is `True` - this means that the intersect metric is frequency of clonotype, 
-            but not its count
-        cpu (int, optional): number of worker processes. `None` uses the executor default.
-        only_functional (bool): use only functional clonotypes (do not contain stop codons or
-            frameshifts in CDR3 sequences: * or _ symbol in CDR3aa sequence). The frequences are recounted to
-            1 after filtering of non-functional clonotypes
-    
-    Important: when using particular overlap type, similar clonotypes in one particular clonoset are
-    combined into one with summation of counts/frequencies.
+        clonosets_df (pd.DataFrame): Table with unique ``sample_id`` values and
+            clonoset ``filename`` paths.
+        cl_filter (Filter, optional): Filter applied to the first sample table.
+        overlap_type (str): One of ``aa``, ``aaV``, ``aaVJ``, ``nt``, ``ntV``,
+            ``ntVJ``, ``VJ``, or ``VJlen``.
+        by_freq (bool, optional): Deprecated compatibility argument. Its value
+            is ignored because the function always intersects raw counts.
+        clonosets_df2 (pd.DataFrame, optional): Optional second sample table for
+            rectangular pairwise comparisons.
+        cl_filter2 (Filter, optional): Filter applied to the second sample table.
+        cpu (int, optional): Number of worker processes. ``None`` uses the
+            executor default.
 
     Returns:
-        df (pd.DataFrame): dataframe with following columns: `clone`, `sample1_count`, `sample2_count`, `sample1`, `sample2`, `pair`
-            clone - is tuple, containing sequence (aa or nt), plus V or J if they are required by the metric
-            count columns contain freq/count of the clone in sample
-            pair column is made for easy separation of possibly huge DataFrame into overlapping pairs
+        pd.DataFrame: Full pairwise union table. Feature columns are followed by
+        ``sample1_count``, ``sample2_count``, ``sample1_freq``, ``sample2_freq``,
+        ``sample1``, ``sample2``, and ``pair``.
     """
-
-
-    print("Intersecting clones in clonosets\n"+"-"*50)
+    if by_freq is not None:
+        warnings.warn(
+            "`by_freq` is deprecated and ignored; "
+            "intersect_clones_in_samples_batch always returns counts and derived frequencies.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    print("Intersecting clones in clonosets\n" + "-" * 50)
     print(f"Overlap type: {overlap_type}")
-    
-    clonoset_lists, samples_total, two_dataframes, sample_list, sample_list2 = prepare_clonotypes_dfs_for_intersections(clonosets_df, clonosets_df2,
-                                                                                                                        cl_filter, cl_filter2,
-                                                                                                                        overlap_type, by_freq=by_freq,
-                                                                                                                        strict=True)
-    # generating a set of tasks
-    
+
+    clonoset_lists, samples_total, two_dataframes, sample_list, sample_list2 = prepare_clonotypes_dfs_for_intersections(
+        clonosets_df,
+        clonosets_df2,
+        cl_filter,
+        cl_filter2,
+        overlap_type,
+        by_freq=False,
+        strict=True,
+    )
+
     tasks = []
-    
     if two_dataframes:
         for sample1 in sample_list:
             for sample2 in sample_list2:
@@ -69,19 +73,21 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
     else:
         for i in range(samples_total):
             sample1 = sample_list[i]
-            for j in range(samples_total-i-1):
-                sample2 = sample_list[j+i+1]
+            for j in range(samples_total - i - 1):
+                sample2 = sample_list[j + i + 1]
                 tasks.append((sample1, sample2, clonoset_lists))
-    
-    results = run_parallel_calculation(intersect_two_clone_dicts, tasks, "Intersecting clonosets",
-                                       object_name="pairs", cpu=cpu)
 
-    # df = pd.concat(results).index.set_names()
+    results = run_parallel_calculation(
+        intersect_two_clone_dicts,
+        tasks,
+        "Intersecting clonosets",
+        object_name="pairs",
+        cpu=cpu,
+    )
     df = pd.concat(results).reset_index(drop=True)
     df = split_tuple_clone_column(df, overlap_type)
     df.attrs["sample_list"] = sample_list
     df.attrs["sample_list2"] = sample_list2
-
     return df
 
 
@@ -926,16 +932,20 @@ def intersect_two_clone_dicts(args):
     (sample_id_1, sample_id_2, clonoset_dicts) = args
     cl1_dict = clonoset_dicts[sample_id_1]
     cl2_dict = clonoset_dicts[sample_id_2]
+    total1 = sum(cl1_dict.values())
+    total2 = sum(cl2_dict.values())
     all_clones = set(cl1_dict.keys()).union(set(cl2_dict.keys()))
     results = []
     for clone in all_clones:
-        freq1, freq2 = 0, 0
-        if clone in cl1_dict:
-            freq1 = cl1_dict[clone]
-        if clone in cl2_dict:
-            freq2 = cl2_dict[clone]
-        results.append([clone, freq1, freq2])
-    clones_intersect = pd.DataFrame(results, columns = ["clone", "sample1_count", "sample2_count"])
+        count1 = cl1_dict.get(clone, 0)
+        count2 = cl2_dict.get(clone, 0)
+        freq1 = count1 / total1 if total1 else 0
+        freq2 = count2 / total2 if total2 else 0
+        results.append([clone, count1, count2, freq1, freq2])
+    clones_intersect = pd.DataFrame(
+        results,
+        columns=["clone", "sample1_count", "sample2_count", "sample1_freq", "sample2_freq"],
+    )
     clones_intersect["sample1"] = sample_id_1
     clones_intersect["sample2"] = sample_id_2
     clones_intersect["pair"] = f"{sample_id_1}_vs_{sample_id_2}"

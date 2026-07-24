@@ -5,7 +5,7 @@ To see further details, check the [Intersections](functions.md#intersections) mo
 ## Clonoset intersection
 
 `intersect_clones_in_samples_batch` function performs pairwise clonotype overlapping for all clonosets.
-<br>Possible overlap types are [aa, aaV, aaVJ, nt, ntV, ntVJ], aa/nt stands for an amino acid or nucleotide sequence, and V/J/VJ denote a segment type. 
+<br>Possible overlap types are [aa, aaV, aaVJ, nt, ntV, ntVJ, VJ, VJlen]. aa/nt selects an amino acid or nucleotide sequence; VJ uses a segment pair and VJlen additionally uses amino-acid CDR3 length.
 An output table contains clonotype sequence and V/J segments if required, overlapping clonotypes for each pair, and clonosets they belong to.    
 
 !!! tip "clonosets_df and clonosets_df2"
@@ -20,16 +20,13 @@ from repseq import clone_filter as clf
 from repseq import clustering
 
 downsample_filter = clf.Filter(functionality="f", downsample=15000, by_umi=True, seed=100)
-intersect_df = intersections.intersect_clones_in_samples_batch(clonosets_df, cl_filter=downsample_filter, overlap_type="aaV", by_freq=True)
+intersect_df = intersections.intersect_clones_in_samples_batch(clonosets_df, cl_filter=downsample_filter, overlap_type="aaV")
 ```
 
-|    | cdr3aa           | v        |   sample1_count |   sample2_count | sample1            | sample2            | pair                                     |
-|---:|:-----------------|:---------|----------------:|----------------:|:-------------------|:-------------------|:-----------------------------------------|
-|  0 | CASSLGQVNTEAFF   | TRBV12-3 |     6.66667e-05 |     0           | sample1_nCD4_1_TRB | sample2_nCD4_1_TRB | sample1_nCD4_1_TRB_vs_sample2_nCD4_1_TRB |
-|  1 | CSARDPASGRVDTQYF | TRBV20-1 |     0           |     6.66667e-05 | sample1_nCD4_1_TRB | sample2_nCD4_1_TRB | sample1_nCD4_1_TRB_vs_sample2_nCD4_1_TRB |
-|  2 | CASSPKQGNPYEQYF  | TRBV18   |     0           |     6.66667e-05 | sample1_nCD4_1_TRB | sample2_nCD4_1_TRB | sample1_nCD4_1_TRB_vs_sample2_nCD4_1_TRB |
-|  3 | CASSWNPTGGTEAFF  | TRBV5-6  |     0           |     6.66667e-05 | sample1_nCD4_1_TRB | sample2_nCD4_1_TRB | sample1_nCD4_1_TRB_vs_sample2_nCD4_1_TRB |
-|  4 | CASSLLAGGTDTQYF  | TRBV7-2  |     0           |     6.66667e-05 | sample1_nCD4_1_TRB | sample2_nCD4_1_TRB | sample1_nCD4_1_TRB_vs_sample2_nCD4_1_TRB |
+|    | cdr3aa           | v        | sample1_count | sample2_count | sample1_freq | sample2_freq | sample1 | sample2 | pair |
+|---:|:-----------------|:---------|--------------:|--------------:|-------------:|-------------:|:--------|:--------|:-----|
+|  0 | CASSLGQVNTEAFF   | TRBV12-3 |            10 |             0 |     0.666667 |            0 | sample1 | sample2 | sample1_vs_sample2 |
+|  1 | CSARDPASGRVDTQYF | TRBV20-1 |             5 |            12 |     0.333333 |            1 | sample1 | sample2 | sample1_vs_sample2 |
 
 <br>
 
@@ -128,18 +125,6 @@ tcrnet_compared_clns = intersections.tcrnet(clonosets_df_exp, clonoset_df_contro
 
 ## Beta diversity
 
-`repseq.beta.metrics` builds one full pairwise intersection table and calculates
-one or more beta-diversity matrices from it. Pass a metric name, a list of names,
-or leave `metrics=None` to calculate every supported metric plus `full_table`.
-Use `cpu` to control parallel pair calculation.
-
-```python
-from repseq import beta
-
-jaccard = beta.metrics(clonosets_df, metrics="jaccard", cpu=4)
-all_metrics = beta.metrics(clonosets_df, overlap_type="VJlen")
-reused = beta.metrics_from_table(all_metrics["full_table"], metrics=["f2", "bray-curtis"])
-```
-
-In addition to sequence-based overlap types, intersection functions accept `VJ`
-(V/J pair) and `VJlen` (V/J pair plus CDR3 amino-acid length).
+The `repseq.beta` module calculates many metrics from one count-first full
+intersection table. See the dedicated [Beta diversity usage page](usage_beta.md)
+for the complete metric list, formulas, normalization rules, and examples.
