@@ -678,6 +678,11 @@ def test_rarefaction_curve_plots_chain_aware_sample_labels():
     labels = {text.get_text() for text in ax.get_legend().get_texts()}
 
     assert labels == {"ucb_ntreg(TRA)", "ucb_ntreg(TRB)", "unique"}
+    legend = ax.get_legend()
+    assert legend._loc == 2
+    assert legend.get_bbox_to_anchor()._bbox.x0 > 1
+    assert to_rgba(ax.lines[0].get_color()) == to_rgba("#4e79a7")
+    assert to_rgba(ax.lines[1].get_color()) == to_rgba("#a0cde8")
     assert ax.get_xscale() == "log"
     assert ax.get_xlabel() == "Rarefaction depth"
     assert ax.get_ylabel() == "Observed diversity"

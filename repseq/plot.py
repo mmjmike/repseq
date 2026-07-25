@@ -45,6 +45,14 @@ CONVERGENCE_PROPERTIES = [
 ]
 
 
+
+RAREFACTION_COLORS_20 = [
+    "#4e79a7", "#a0cde8", "#f28e2b", "#ffbe7d", "#59a14f",
+    "#8cd17d", "#b6992d", "#f1ce63", "#499894", "#86bcb6",
+    "#e15759", "#ff9d9a", "#79706e", "#bab0ac", "#d37295",
+    "#fabfd2", "#b07aa1", "#d4a6c8", "#9d7660", "#d7b5a6",
+]
+
 GENE_RE = re.compile(
     r"""
     ^
@@ -1758,7 +1766,9 @@ def rarefaction_curve(
             ``rarefaction_depth``, and ``diversity`` columns. If duplicated
             ``sample_id`` values have distinct ``chain`` values, labels are
             shown as ``sample_id(chain)``.
-        palette: Seaborn palette or dict for sample curves.
+        palette: Seaborn palette or dict for sample curves. By default, a
+            contrasting 20-color palette is used for up to 20 samples; larger
+            plots use Seaborn's existing default palette behavior.
         height (float): Figure height.
         aspect (float): Width/height ratio.
         marker (str): Matplotlib marker for observed points.
@@ -1789,6 +1799,9 @@ def rarefaction_curve(
             + ")"
         )
     data = data.sort_values(["_sample_label", "rarefaction_depth"])
+    sample_count = data["_sample_label"].nunique()
+    if palette is None and sample_count <= len(RAREFACTION_COLORS_20):
+        palette = RAREFACTION_COLORS_20[:sample_count]
 
     fig, ax = plt.subplots(figsize=(height * aspect, height))
     sns.lineplot(
@@ -1809,6 +1822,9 @@ def rarefaction_curve(
     legend = ax.get_legend()
     if legend is not None:
         legend.set_title("Sample")
+        legend.set_loc("upper left")
+        legend.set_bbox_to_anchor((1.02, 1))
+        legend.borderaxespad = 0
     fig.tight_layout()
     return _close_and_return(fig)
 

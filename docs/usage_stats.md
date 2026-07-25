@@ -285,9 +285,12 @@ from repseq import plot as rsplot
 fig = rsplot.rarefaction_curve(rarefaction)
 ```
 
-The x-axis is logarithmic by default. When one `sample_id` has several unique
-chains, curves are labeled as `sample_id(chain)`, for example
-`ucb_ntreg(TRA)` and `ucb_ntreg(TRB)`. Set `log_x=False` for a linear x-axis.
+The x-axis is logarithmic by default. The legend is placed to the right of the
+plot. For up to 20 curves, the default uses a fixed high-contrast categorical
+palette rather than a gradient; pass `palette=` to override it. When one
+`sample_id` has several unique chains, curves are labeled as `sample_id(chain)`,
+for example `ucb_ntreg(TRA)` and `ucb_ntreg(TRB)`. Set `log_x=False` for a
+linear x-axis.
 
 
 <br>Calculating convergence for each clonoset in `clonosets_df`. For the
