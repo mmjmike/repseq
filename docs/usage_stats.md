@@ -572,15 +572,17 @@ versus `IGHD3-10` D-segment ambiguity are handled explicitly.
 ### Plotting V-J usage
 
 `rsplot.vj_usage` accepts long or wide output from
-`stats.calc_segment_usage(segment="vj")`. V segments are placed on the x-axis,
-J segments on the y-axis, and marker area represents usage. Larger markers are
+`stats.calc_segment_usage(segment="vj")`. Long tables may contain only the
+pipe-delimited `vj` identifier and usage, only separate `v` and `j` columns and
+usage, or both representations. V segments are placed on the x-axis, J
+segments on the y-axis, and marker area represents usage. Larger markers are
 drawn first, behind smaller markers. Samples or groups use different fill
 colors with black marker borders and stable radial offsets around each V-J
 position.
 
-The long table uses string columns `v`, `j`, and `vj`, where `vj` is the
-pipe-delimited identifier `v|j`. Wide tables use the same pipe-delimited names
-as columns. Tuple identifiers are not supported.
+When present, `vj` is the pipe-delimited identifier `v|j`; optional `v` and
+`j` columns are checked against it. Wide tables use the same pipe-delimited
+identifiers as column names. Tuple identifiers are not supported.
 
 ```py
 vj = stats.calc_segment_usage(
@@ -626,9 +628,10 @@ groups, in every panel. It accepts long or wide output from
 x-axis and the second is the y-axis. The input table must contain exactly one
 chain.
 
-The long table uses string `v`, `j`, and `vjlen` columns plus integer `len`,
-where `vjlen` is `v|j|len`. Wide tables use `v|j|len` as their string column
-names. Tuple identifiers are not supported.
+Long tables may contain the pipe-delimited `vjlen` identifier and usage without
+redundant component columns, separate `v`, `j`, and integer `len` columns with
+usage, or both representations. Here `vjlen` is `v|j|len`. Wide tables use
+`v|j|len` as their string column names. Tuple identifiers are not supported.
 
 ```py
 vjlen = stats.calc_segment_usage(

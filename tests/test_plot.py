@@ -673,8 +673,9 @@ def test_vj_usage_combines_v_and_j_families():
         ]
     )
 
+    legacy_usage = usage.drop(columns=["v", "j"])
     data, _, _ = rsplot._prepare_combination_plot_data(
-        usage,
+        legacy_usage,
         None,
         None,
         None,
@@ -684,13 +685,32 @@ def test_vj_usage_combines_v_and_j_families():
     combined = data.loc[(data["_v"] == "TRBV7") & (data["_j"] == "TRBJ2")]
     assert combined["_value"].iloc[0] == pytest.approx(0.5)
 
-    fig = rsplot.vj_usage(usage, combine_families=True)
+    fig = rsplot.vj_usage(legacy_usage, combine_families=True)
     ax = fig.axes[0]
     assert [tick.get_text() for tick in ax.get_xticklabels()] == ["TRBV7", "TRBV10"]
     assert [tick.get_text() for tick in ax.get_yticklabels()] == ["TRBJ1", "TRBJ2"]
     assert ax.get_xlabel() == "V segment family"
     assert ax.get_ylabel() == "J segment family"
     assert len(ax.collections[0].get_offsets()) == 2
+
+
+def test_vj_usage_accepts_component_only_long_tables():
+    usage = _vj_usage_long().drop(columns="vj")
+
+    fig = rsplot.vj_usage(usage)
+
+    assert [tick.get_text() for tick in fig.axes[0].get_xticklabels()] == [
+        "TRBV2",
+        "TRBV10",
+    ]
+
+
+def test_vj_usage_validates_optional_component_columns():
+    usage = _vj_usage_long()
+    usage.loc[0, "v"] = "TRBV3"
+
+    with pytest.raises(ValueError, match="must match the separate v, j"):
+        rsplot.vj_usage(usage)
 
 
 def test_vj_usage_rejects_tuple_columns_and_tuple_identifiers():
@@ -754,8 +774,9 @@ def test_vjlen_usage_combines_families_within_each_length():
         ]
     )
 
+    legacy_usage = usage.drop(columns=["v", "j", "len"])
     fig = rsplot.vjlen_usage(
-        usage,
+        legacy_usage,
         combine_families=True,
         labels=True,
     )

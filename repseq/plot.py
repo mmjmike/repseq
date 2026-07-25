@@ -1251,20 +1251,19 @@ def _normalize_combination_usage_table(usage_df, combination_type):
     length_column = _column_by_name(data.columns, {"len"})
 
     id_columns = ["sample_id"] + (["chain"] if "chain" in data.columns else [])
+    required_components = [v_column, j_column]
+    if expected_length == 3:
+        required_components.append(length_column)
+
     if combination_column is not None:
-        required_columns = [v_column, j_column, value_column]
-        if expected_length == 3:
-            required_columns.append(length_column)
-        if any(column is None for column in required_columns):
+        if value_column is None:
             raise ValueError(
-                f"Long {combination_type} tables require pipe-delimited "
-                f"{combination_type}, v, j"
-                + (", len" if expected_length == 3 else "")
-                + ", and a value column"
+                f"Long {combination_type} tables require a value column"
             )
-        keep_columns = id_columns + [combination_column, v_column, j_column]
-        if expected_length == 3:
-            keep_columns.append(length_column)
+        component_columns = [
+            column for column in required_components if column is not None
+        ]
+        keep_columns = id_columns + [combination_column] + component_columns
         keep_columns.append(value_column)
         data = data[keep_columns].rename(columns={value_column: "_value"})
         if not data[combination_column].map(lambda value: isinstance(value, str)).all():
@@ -1275,17 +1274,57 @@ def _normalize_combination_usage_table(usage_df, combination_type):
         combinations = data[combination_column].map(
             lambda value: _parse_pipe_usage_combination(value, expected_length)
         )
-        expected_identifiers = (
-            data[v_column].astype(str) + "|" + data[j_column].astype(str)
-        )
-        if expected_length == 3:
-            expected_identifiers += "|" + data[length_column].astype(str)
-        if (data[combination_column].astype(str) != expected_identifiers).any():
+        valid_combinations = combinations.notna()
+        component_mismatch = pd.Series(False, index=data.index)
+        if v_column is not None:
+            parsed_v = combinations.map(
+                lambda combination: combination[0] if combination is not None else None
+            )
+            component_mismatch |= valid_combinations & (
+                data[v_column].astype(str) != parsed_v
+            )
+        if j_column is not None:
+            parsed_j = combinations.map(
+                lambda combination: combination[1] if combination is not None else None
+            )
+            component_mismatch |= valid_combinations & (
+                data[j_column].astype(str) != parsed_j
+            )
+        if expected_length == 3 and length_column is not None:
+            parsed_length = combinations.map(
+                lambda combination: combination[2] if combination is not None else np.nan
+            )
+            provided_length = pd.to_numeric(data[length_column], errors="coerce")
+            component_mismatch |= valid_combinations & (
+                provided_length != parsed_length
+            )
+        if component_mismatch.any():
             raise ValueError(
                 f"{combination_type} values must match the separate v, j"
                 + (", and len" if expected_length == 3 else "")
-                + " columns"
+                + " columns when provided"
             )
+    elif value_column is not None and all(
+        column is not None for column in required_components
+    ):
+        keep_columns = id_columns + required_components + [value_column]
+        data = data[keep_columns].rename(columns={value_column: "_value"})
+        identifiers = data[v_column].astype(str) + "|" + data[j_column].astype(str)
+        if expected_length == 3:
+            identifiers += "|" + data[length_column].astype(str)
+        combinations = identifiers.map(
+            lambda value: _parse_pipe_usage_combination(value, expected_length)
+        )
+    elif any(
+        column is not None
+        for column in [value_column, v_column, j_column, length_column]
+    ):
+        raise ValueError(
+            f"Long {combination_type} tables require either a pipe-delimited "
+            f"{combination_type} column or separate v, j"
+            + (", and len" if expected_length == 3 else "")
+            + " columns, plus a value column"
+        )
     else:
         tuple_columns = [column for column in data.columns if isinstance(column, tuple)]
         if tuple_columns:
