@@ -234,6 +234,8 @@ def test_parse_gene_name_handles_isotypes_dual_genes_and_natural_sorting():
     assert rsplot.parse_gene_name("IGHD3-10")["gene_type"] == "D"
     assert rsplot.parse_gene_name("TRAV8-2DV6")["dual_designation"] == "DV6"
     assert rsplot.parse_gene_name("TRAV8-2/DV6")["dual_designation"] == "DV6"
+    assert rsplot._segment_family("TRBJ2-1", "j") == "TRBJ2"
+    assert rsplot._segment_family("IGHG2", "c") == "IGHG"
     assert rsplot._sort_gene_names(
         ["TRBV12-3-2", "TRBV7-8", "TRBV2", "TRBV12-3-1", "TRBV7-3"]
     ) == ["TRBV2", "TRBV7-3", "TRBV7-8", "TRBV12-3-1", "TRBV12-3-2"]
@@ -272,6 +274,79 @@ def test_segment_usage_detects_wide_table_and_keeps_chain_axes_independent():
     assert [tick.get_text() for tick in heatmaps["TRB"].get_xticklabels()] == [
         "TRBV2"
     ]
+
+
+def test_segment_usage_combines_v_families_within_each_sample():
+    usage = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "TRB", "v": "TRBV7-2", "usage": 0.2},
+            {"sample_id": "sample1", "chain": "TRB", "v": "TRBV7-3", "usage": 0.3},
+            {"sample_id": "sample1", "chain": "TRB", "v": "TRBV10-1", "usage": 0.5},
+            {"sample_id": "sample2", "chain": "TRB", "v": "TRBV7-2", "usage": 0.1},
+            {"sample_id": "sample2", "chain": "TRB", "v": "TRBV7-3", "usage": 0.6},
+            {"sample_id": "sample2", "chain": "TRB", "v": "TRBV10-1", "usage": 0.3},
+        ]
+    )
+
+    fig = rsplot.segment_usage(usage, combine_families=True)
+    heatmap = next(ax for ax in fig.axes if ax.get_title() == "TRB")
+
+    assert [tick.get_text() for tick in heatmap.get_xticklabels()] == [
+        "TRBV7",
+        "TRBV10",
+    ]
+    assert heatmap.get_xlabel() == "Segment Family"
+    np.testing.assert_allclose(
+        np.asarray(heatmap.collections[0].get_array()).reshape(2, 2),
+        [[0.5, 0.5], [0.7, 0.3]],
+    )
+
+
+def test_segment_usage_combines_c_segments_by_isotype():
+    usage = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "IGH", "c": "IGHG1", "usage": 0.2},
+            {"sample_id": "sample1", "chain": "IGH", "c": "IGHG2", "usage": 0.3},
+            {"sample_id": "sample1", "chain": "IGH", "c": "IGHA1", "usage": 0.5},
+        ]
+    )
+
+    fig = rsplot.segment_usage(
+        usage,
+        plot_type="barplot",
+        combine_families=True,
+    )
+    ax = fig.axes[0]
+
+    assert [tick.get_text() for tick in ax.get_xticklabels()] == ["IGHA", "IGHG"]
+    assert ax.get_xlabel() == "Segment Family"
+    np.testing.assert_allclose([patch.get_height() for patch in ax.patches], [0.5, 0.5])
+
+
+def test_segment_usage_combines_families_in_boxplots():
+    usage = _v_usage_long()
+    metadata = pd.DataFrame(
+        [
+            {
+                "sample_id": f"sample{sample_number}",
+                "chain": "TRB",
+                "condition": "control" if sample_number < 2 else "treated",
+            }
+            for sample_number in range(4)
+        ]
+    )
+
+    fig = rsplot.segment_usage(
+        usage,
+        metadata=metadata,
+        plot_type="boxplot",
+        group="condition",
+        combine_families=True,
+    )
+    ax = fig.axes[0]
+
+    assert [tick.get_text() for tick in ax.get_xticklabels()] == ["TRBV2", "TRBV10"]
+    assert ax.get_xlabel() == "Segment Family"
 
 
 def test_segment_usage_grouped_barplot_uses_standard_deviation(monkeypatch):

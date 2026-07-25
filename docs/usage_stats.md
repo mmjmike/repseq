@@ -547,6 +547,20 @@ rsplot.segment_usage(
 )
 ```
 
+Set `combine_families=True` to sum segment usages within each sample before
+plotting segment families. V and J genes are grouped by their numeric family
+(for example, `TRBV7-2` and `TRBV7-3` become `TRBV7`). C genes are grouped by
+isotype, so variants such as `IGHG1` and `IGHG2` are plotted together as
+`IGHG`. This option applies to heatmaps, barplots, and boxplots.
+
+```py
+rsplot.segment_usage(
+    v_usage,
+    plot_type="barplot",
+    combine_families=True,
+)
+```
+
 Segment labels are ordered by receptor system, chain and gene type, followed by
 numeric family, alphabetic subfamily, numeric segment, dual designation,
 subsegment, and allele. AIRR/MiXCR multi-calls use the first gene call for

@@ -605,6 +605,37 @@ def _segment_chain(gene):
     return parsed["system"] + parsed["chain"]
 
 
+def _segment_family(gene, segment_type):
+    parsed = parse_gene_name(gene)
+    if parsed is None or parsed["gene_type"].casefold() != segment_type:
+        raise ValueError(f"Could not determine the segment family for {gene!r}")
+    if segment_type == "c":
+        return parsed["system"] + parsed["chain"] + (
+            parsed["isotype"] or parsed["gene_type"]
+        )
+    if parsed["family"] is None:
+        raise ValueError(f"Could not determine the segment family for {gene!r}")
+    return (
+        parsed["system"]
+        + parsed["chain"]
+        + parsed["gene_type"]
+        + parsed["family"]
+    )
+
+
+def _combine_segment_family_usage(data, segment_type):
+    data = data.copy()
+    data["_segment"] = data["_segment"].map(
+        lambda gene: _segment_family(gene, segment_type)
+    )
+    return (
+        data.groupby(["sample_id", "chain", "_segment"], as_index=False, sort=False)[
+            "_value"
+        ]
+        .sum()
+    )
+
+
 def _normalize_segment_usage_table(segment_usage_df):
     if not isinstance(segment_usage_df, pd.DataFrame):
         raise TypeError("segment_usage_df must be a pandas DataFrame")
@@ -702,8 +733,17 @@ def _normalize_segment_usage_table(segment_usage_df):
     return data, segment_type
 
 
-def _prepare_segment_usage_data(segment_usage_df, metadata, group, split, plot_type):
+def _prepare_segment_usage_data(
+    segment_usage_df,
+    metadata,
+    group,
+    split,
+    plot_type,
+    combine_families,
+):
     data, segment_type = _normalize_segment_usage_table(segment_usage_df)
+    if combine_families:
+        data = _combine_segment_family_usage(data, segment_type)
     max_groups = 3 if plot_type == "heatmap" else 1
     group_columns = _as_list(group, "group", max_len=max_groups)
     split_columns = _as_list(split, "split", max_len=1)
@@ -868,6 +908,7 @@ def _categorical_segment_usage_plot(
     height,
     aspect,
     seed,
+    segment_label,
 ):
     group_column = group_columns[0] if group_columns else None
     series_column = group_column or "_sample_label"
@@ -898,7 +939,7 @@ def _categorical_segment_usage_plot(
                 ax, panel_data, group_column, palette, seed + panel_index
             )
         ax.set_title(title)
-        ax.set_xlabel("Segment")
+        ax.set_xlabel(segment_label)
         ax.set_ylabel("Value")
         sns.despine(ax=ax)
 
@@ -952,6 +993,7 @@ def _heatmap_segment_usage_plot(
     cmap,
     height,
     aspect,
+    segment_label,
 ):
     max_segments = max(panel["_segment"].nunique() for _, panel in panels)
     max_samples = max(panel["_sample_label"].nunique() for _, panel in panels)
@@ -1039,7 +1081,7 @@ def _heatmap_segment_usage_plot(
             yticklabels=True,
         )
         heatmap_ax.set_title(title)
-        heatmap_ax.set_xlabel("Segment")
+        heatmap_ax.set_xlabel(segment_label)
         heatmap_ax.set_ylabel("Sample")
         heatmap_ax.tick_params(axis="x", labelrotation=90)
 
@@ -1069,6 +1111,7 @@ def segment_usage(
     height=3.2,
     aspect=1.2,
     seed=0,
+    combine_families=False,
 ):
     """Plot V, J, or C segment usage from a long or wide statistics table.
 
@@ -1104,6 +1147,11 @@ def segment_usage(
         Base panel height and width multiplier.
     seed : int, default 0
         Random seed used for horizontal jitter in boxplots.
+    combine_families : bool, default False
+        Sum segment usages within each sample and segment family before
+        plotting. V and J genes are grouped by numeric family. C genes are
+        grouped by isotype, so variants such as ``IGHG1`` and ``IGHG2`` are
+        plotted together as ``IGHG``.
 
     Returns
     -------
@@ -1120,7 +1168,9 @@ def segment_usage(
         group,
         split,
         plot_type,
+        combine_families,
     )
+    segment_label = "Segment Family" if combine_families else "Segment"
     if plot_type == "boxplot" and not group_columns:
         warnings.warn(
             "boxplot requires a group column; using barplot instead.",
@@ -1138,6 +1188,7 @@ def segment_usage(
             cmap,
             height,
             aspect,
+            segment_label,
         )
     else:
         fig = _categorical_segment_usage_plot(
@@ -1149,6 +1200,7 @@ def segment_usage(
             height,
             aspect,
             seed,
+            segment_label,
         )
 
     # Inline backends display open pyplot figures and the returned object. A
