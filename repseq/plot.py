@@ -606,6 +606,8 @@ def _segment_chain(gene):
 
 
 def _segment_family(gene, segment_type):
+    if str(gene).strip() in {".", "NA"}:
+        return "NA"
     parsed = parse_gene_name(gene)
     if parsed is None or parsed["gene_type"].casefold() != segment_type:
         raise ValueError(f"Could not determine the segment family for {gene!r}")
@@ -689,7 +691,11 @@ def _normalize_segment_usage_table(segment_usage_df):
         wide_segment_columns = [
             column
             for column in data.columns
-            if column not in id_columns and parse_gene_name(str(column)) is not None
+            if column not in id_columns
+            and (
+                str(column).strip() == "."
+                or parse_gene_name(str(column)) is not None
+            )
         ]
         if not wide_segment_columns:
             raise ValueError(
@@ -716,7 +722,7 @@ def _normalize_segment_usage_table(segment_usage_df):
     if data.empty:
         raise ValueError("No valid segment-usage values were found")
 
-    data["_segment"] = data["_segment"].astype(str)
+    data["_segment"] = data["_segment"].astype(str).replace({".": "NA"})
     inferred_chains = data["_segment"].map(_segment_chain)
     if "chain" not in data.columns:
         data["chain"] = inferred_chains.fillna("Unknown")
@@ -1350,8 +1356,30 @@ def _normalize_combination_usage_table(usage_df, combination_type):
     return data[output_columns]
 
 
-def _prepare_combination_plot_data(usage_df, metadata, group, split, combination_type):
+def _combine_combination_family_usage(data, combination_type):
+    data = data.copy()
+    data["_v"] = data["_v"].map(lambda gene: _segment_family(gene, "v"))
+    data["_j"] = data["_j"].map(lambda gene: _segment_family(gene, "j"))
+    group_columns = ["sample_id", "chain", "_v", "_j"]
+    if combination_type == "vjlen":
+        group_columns.append("_length")
+    return (
+        data.groupby(group_columns, as_index=False, sort=False)["_value"]
+        .sum()
+    )
+
+
+def _prepare_combination_plot_data(
+    usage_df,
+    metadata,
+    group,
+    split,
+    combination_type,
+    combine_families=False,
+):
     data = _normalize_combination_usage_table(usage_df, combination_type)
+    if combine_families:
+        data = _combine_combination_family_usage(data, combination_type)
     group_columns = _as_list(group, "group", max_len=1)
     split_columns = _as_list(split, "split", max_len=2)
     data, metadata_columns, _ = _merge_stats_metadata(data, metadata)
@@ -1440,6 +1468,7 @@ def vj_usage(
     repel=0.18,
     height=5.0,
     aspect=1.2,
+    combine_families=False,
 ):
     """Plot V-J usage as categorical bubbles.
 
@@ -1468,6 +1497,8 @@ def vj_usage(
         Radial displacement around each categorical V-J center.
     height, aspect : float
         Facet dimensions.
+    combine_families : bool, default False
+        Sum usage within each sample by V and J segment family before plotting.
 
     Returns
     -------
@@ -1475,7 +1506,12 @@ def vj_usage(
         A closed figure that renders once in Jupyter.
     """
     data, group_columns, split_columns = _prepare_combination_plot_data(
-        usage_df, metadata, group, split, "vj"
+        usage_df,
+        metadata,
+        group,
+        split,
+        "vj",
+        combine_families,
     )
     grouped = bool(group_columns)
     series_column = group_columns[0] if grouped else "_sample_label"
@@ -1542,8 +1578,12 @@ def vj_usage(
             ax.set_yticklabels(j_order)
             ax.set_xlim(-0.6, len(v_order) - 0.4)
             ax.set_ylim(-0.6, len(j_order) - 0.4)
-            ax.set_xlabel("V segment")
-            ax.set_ylabel("J segment")
+            ax.set_xlabel(
+                "V segment family" if combine_families else "V segment"
+            )
+            ax.set_ylabel(
+                "J segment family" if combine_families else "J segment"
+            )
             ax.grid(color="#e5e5e5", linewidth=0.6, zorder=0)
             ax.set_axisbelow(True)
             ax.set_title(
@@ -1667,6 +1707,7 @@ def vjlen_usage(
     dot_size=45,
     height=4.5,
     aspect=1.0,
+    combine_families=False,
 ):
     """Compare V-J-CDR3-length usage between exactly two series per facet.
 
@@ -1702,6 +1743,9 @@ def vjlen_usage(
         Marker area.
     height, aspect : float
         Facet dimensions.
+    combine_families : bool, default False
+        Sum usage within each sample by V family, J family, and CDR3 length
+        before plotting.
 
     Returns
     -------
@@ -1709,7 +1753,12 @@ def vjlen_usage(
         A closed figure that renders once in Jupyter.
     """
     data, group_columns, split_columns = _prepare_combination_plot_data(
-        usage_df, metadata, group, split, "vjlen"
+        usage_df,
+        metadata,
+        group,
+        split,
+        "vjlen",
+        combine_families,
     )
     chains = _category_order(data["chain"])
     if len(chains) != 1:

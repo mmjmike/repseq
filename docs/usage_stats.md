@@ -551,7 +551,8 @@ Set `combine_families=True` to sum segment usages within each sample before
 plotting segment families. V and J genes are grouped by their numeric family
 (for example, `TRBV7-2` and `TRBV7-3` become `TRBV7`). C genes are grouped by
 isotype, so variants such as `IGHG1` and `IGHG2` are plotted together as
-`IGHG`. This option applies to heatmaps, barplots, and boxplots.
+`IGHG`. Undefined segments represented by `.` are retained and labeled `NA`.
+This option applies to heatmaps, barplots, and boxplots.
 
 ```py
 rsplot.segment_usage(
@@ -609,6 +610,14 @@ rsplot.vj_usage(
 )
 ```
 
+Set `combine_families=True` to sum usage within each sample by V and J family
+before plotting. For example, combinations using `TRBV7-2` or `TRBV7-3` and
+`TRBJ2-1` or `TRBJ2-2` are combined under `TRBV7` and `TRBJ2`.
+
+```py
+rsplot.vj_usage(vj, combine_families=True)
+```
+
 ### Comparing V-J-length usage
 
 `rsplot.vjlen_usage` compares exactly two samples, or the means of exactly two
@@ -656,6 +665,14 @@ rsplot.vjlen_usage(
     labels=True,
     max_labels=20,
 )
+```
+
+Set `combine_families=True` to sum usage within each sample by V family, J
+family, and CDR3 length. Different lengths remain separate points, and optional
+labels use the combined family names.
+
+```py
+rsplot.vjlen_usage(vjlen, combine_families=True)
 ```
 
 Up to two ordered categorical split columns are supported. The first defines

@@ -307,7 +307,8 @@ def test_segment_usage_combines_c_segments_by_isotype():
         [
             {"sample_id": "sample1", "chain": "IGH", "c": "IGHG1", "usage": 0.2},
             {"sample_id": "sample1", "chain": "IGH", "c": "IGHG2", "usage": 0.3},
-            {"sample_id": "sample1", "chain": "IGH", "c": "IGHA1", "usage": 0.5},
+            {"sample_id": "sample1", "chain": "IGH", "c": "IGHA1", "usage": 0.4},
+            {"sample_id": "sample1", "chain": "IGH", "c": ".", "usage": 0.1},
         ]
     )
 
@@ -318,9 +319,41 @@ def test_segment_usage_combines_c_segments_by_isotype():
     )
     ax = fig.axes[0]
 
-    assert [tick.get_text() for tick in ax.get_xticklabels()] == ["IGHA", "IGHG"]
+    assert [tick.get_text() for tick in ax.get_xticklabels()] == [
+        "IGHA",
+        "IGHG",
+        "NA",
+    ]
     assert ax.get_xlabel() == "Segment Family"
-    np.testing.assert_allclose([patch.get_height() for patch in ax.patches], [0.5, 0.5])
+    np.testing.assert_allclose(
+        [patch.get_height() for patch in ax.patches],
+        [0.4, 0.5, 0.1],
+    )
+
+
+def test_segment_usage_renames_dot_segment_in_wide_tables():
+    usage = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample1",
+                "chain": "IGH",
+                "IGHG1": 0.8,
+                ".": 0.2,
+            }
+        ]
+    )
+
+    fig = rsplot.segment_usage(usage)
+    heatmap = next(ax for ax in fig.axes if ax.get_title() == "IGH")
+
+    assert [tick.get_text() for tick in heatmap.get_xticklabels()] == [
+        "IGHG1",
+        "NA",
+    ]
+    np.testing.assert_allclose(
+        np.asarray(heatmap.collections[0].get_array()),
+        [0.8, 0.2],
+    )
 
 
 def test_segment_usage_combines_families_in_boxplots():
@@ -610,6 +643,56 @@ def test_vj_usage_accepts_pipe_delimited_wide_columns():
     ]
 
 
+def test_vj_usage_combines_v_and_j_families():
+    usage = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample0",
+                "chain": "TRB",
+                "v": "TRBV7-2",
+                "j": "TRBJ2-1",
+                "vj": "TRBV7-2|TRBJ2-1",
+                "usage": 0.2,
+            },
+            {
+                "sample_id": "sample0",
+                "chain": "TRB",
+                "v": "TRBV7-3",
+                "j": "TRBJ2-2",
+                "vj": "TRBV7-3|TRBJ2-2",
+                "usage": 0.3,
+            },
+            {
+                "sample_id": "sample0",
+                "chain": "TRB",
+                "v": "TRBV10-1",
+                "j": "TRBJ1-1",
+                "vj": "TRBV10-1|TRBJ1-1",
+                "usage": 0.5,
+            },
+        ]
+    )
+
+    data, _, _ = rsplot._prepare_combination_plot_data(
+        usage,
+        None,
+        None,
+        None,
+        "vj",
+        combine_families=True,
+    )
+    combined = data.loc[(data["_v"] == "TRBV7") & (data["_j"] == "TRBJ2")]
+    assert combined["_value"].iloc[0] == pytest.approx(0.5)
+
+    fig = rsplot.vj_usage(usage, combine_families=True)
+    ax = fig.axes[0]
+    assert [tick.get_text() for tick in ax.get_xticklabels()] == ["TRBV7", "TRBV10"]
+    assert [tick.get_text() for tick in ax.get_yticklabels()] == ["TRBJ1", "TRBJ2"]
+    assert ax.get_xlabel() == "V segment family"
+    assert ax.get_ylabel() == "J segment family"
+    assert len(ax.collections[0].get_offsets()) == 2
+
+
 def test_vj_usage_rejects_tuple_columns_and_tuple_identifiers():
     tuple_wide = pd.DataFrame(
         [{"sample_id": "sample0", "chain": "TRB", ("TRBV2", "TRBJ1-1"): 1.0}]
@@ -643,6 +726,45 @@ def test_vjlen_usage_plots_two_sample_frequencies_and_default_style():
     assert np.allclose(collection.get_facecolors()[0], to_rgba("#d62728", 0.6))
     assert fig.axes[0].get_xlabel() == "sample0"
     assert fig.axes[0].get_ylabel() == "sample1"
+
+
+def test_vjlen_usage_combines_families_within_each_length():
+    usage = pd.DataFrame(
+        [
+            {
+                "sample_id": sample_id,
+                "chain": "TRB",
+                "v": v_gene,
+                "j": j_gene,
+                "len": 15,
+                "vjlen": f"{v_gene}|{j_gene}|15",
+                "usage": usage_value,
+            }
+            for sample_id, values in {
+                "sample0": [
+                    ("TRBV7-2", "TRBJ2-1", 0.2),
+                    ("TRBV7-3", "TRBJ2-2", 0.3),
+                ],
+                "sample1": [
+                    ("TRBV7-2", "TRBJ2-1", 0.4),
+                    ("TRBV7-3", "TRBJ2-2", 0.1),
+                ],
+            }.items()
+            for v_gene, j_gene, usage_value in values
+        ]
+    )
+
+    fig = rsplot.vjlen_usage(
+        usage,
+        combine_families=True,
+        labels=True,
+    )
+    ax = fig.axes[0]
+    offsets = np.asarray(ax.collections[0].get_offsets())
+
+    assert offsets.shape == (1, 2)
+    assert np.allclose(offsets[0], [0.5, 0.5])
+    assert {text.get_text() for text in ax.texts} == {"V7|J2|15"}
 
 
 def test_vjlen_usage_grouped_axes_are_group_means():
