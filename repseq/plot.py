@@ -1742,6 +1742,76 @@ def vjlen_usage(
     return _close_and_return(fig)
 
 
+
+def rarefaction_curve(
+    rarefaction_df,
+    palette=None,
+    height=4,
+    aspect=1.4,
+    marker="o",
+    log_x=True,
+):
+    """Plot rarefaction curves from ``stats.calc_rarefaction_points`` output.
+
+    Args:
+        rarefaction_df (pd.DataFrame): Table with ``sample_id``,
+            ``rarefaction_depth``, and ``diversity`` columns. If duplicated
+            ``sample_id`` values have distinct ``chain`` values, labels are
+            shown as ``sample_id(chain)``.
+        palette: Seaborn palette or dict for sample curves.
+        height (float): Figure height.
+        aspect (float): Width/height ratio.
+        marker (str): Matplotlib marker for observed points.
+        log_x (bool): Use logarithmic x-axis.
+
+    Returns:
+        matplotlib.figure.Figure: Rarefaction curve figure.
+    """
+    required = {"sample_id", "rarefaction_depth", "diversity"}
+    missing = required.difference(rarefaction_df.columns)
+    if missing:
+        raise ValueError(
+            "rarefaction_df must contain columns: " + ", ".join(sorted(required))
+        )
+    data = rarefaction_df.copy()
+    if data.empty:
+        raise ValueError("rarefaction_df is empty")
+    data["_sample_label"] = data["sample_id"].astype(str)
+    if "chain" in data.columns:
+        sample_chains = data[["sample_id", "chain"]].drop_duplicates()
+        chained_sample_ids = sample_chains.groupby("sample_id").size()
+        chained_sample_ids = set(chained_sample_ids[chained_sample_ids > 1].index)
+        use_chain = data["sample_id"].isin(chained_sample_ids)
+        data.loc[use_chain, "_sample_label"] = (
+            data.loc[use_chain, "sample_id"].astype(str)
+            + "("
+            + data.loc[use_chain, "chain"].astype(str)
+            + ")"
+        )
+    data = data.sort_values(["_sample_label", "rarefaction_depth"])
+
+    fig, ax = plt.subplots(figsize=(height * aspect, height))
+    sns.lineplot(
+        data=data,
+        x="rarefaction_depth",
+        y="diversity",
+        hue="_sample_label",
+        marker=marker,
+        palette=palette,
+        estimator=None,
+        sort=True,
+        ax=ax,
+    )
+    if log_x:
+        ax.set_xscale("log")
+    ax.set_xlabel("Rarefaction depth")
+    ax.set_ylabel("Observed diversity")
+    legend = ax.get_legend()
+    if legend is not None:
+        legend.set_title("Sample")
+    fig.tight_layout()
+    return _close_and_return(fig)
+
 def cdr3aa_stats(
     stats_df,
     metadata=None,
@@ -1820,6 +1890,7 @@ __all__ = [
     "segment_usage",
     "vj_usage",
     "vjlen_usage",
+    "rarefaction_curve",
     "cdr3aa_stats",
     "diversity_stats",
     "convergence",

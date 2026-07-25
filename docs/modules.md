@@ -14,6 +14,7 @@ Manipulations with groups of clonosets:
 * Basic clonoset properties, like clone/read/umi counts functional or with OOF/Stops
 * CDR3 amino acid properties: N-counts, physico-chemical properties, Kidera Factors
 * Diversity statistics: observed diversity, (normalized) Shannon-Wiener, chao1
+* Rarefaction curve points with parallel count downsampling
 * Convergence estimate
 * V/D/J/C-gene frequencies or VJ-combinations
 * All calculations are parallelized

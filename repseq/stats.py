@@ -362,6 +362,74 @@ def calc_diversity_stats(clonosets_df, cl_filter=None, iterations=3, seed=None,
     return df
 
 
+
+def calc_rarefaction_points(sample_df, cl_filter=None, iterations=3, seed=0,
+                            drop_small_samples=False, cpu=None, verbose=True):
+    """Calculate observed-diversity points for rarefaction curves.
+
+    Each clonoset is prefiltered once with ``cl_filter``. It is then
+    downsampled repeatedly at depths 32, 100, 316, 1000, ... (half orders of
+    magnitude) below the filtered total count. The final point always contains
+    the complete filtered clonoset count and its observed clonotype diversity.
+
+    Args:
+        sample_df (pd.DataFrame): Table containing ``sample_id`` and
+            ``filename``. ``chain`` is retained when present.
+        cl_filter (Filter, optional): Filter applied before rarefaction.
+        iterations (int): Number of deterministic downsampling iterations per
+            non-final depth. Defaults to 3.
+        seed (hashable): Base seed used to derive a distinct seed for every
+            iteration. Defaults to 0.
+        drop_small_samples (bool): Passed to :func:`generic_calculation` for
+            prefilters containing ``top`` or ``downsample`` limits.
+        cpu (int, optional): Number of parallel worker processes.
+        verbose (bool): Show progress information.
+
+    Returns:
+        pd.DataFrame: Long table with ``sample_id``, optional ``chain``,
+        ``rarefaction_depth``, and mean observed ``diversity``.
+    """
+    if not isinstance(iterations, int) or iterations < 1:
+        raise ValueError("iterations must be a positive integer")
+
+    wide = generic_calculation(
+        sample_df,
+        calculate_rarefaction_points_cl,
+        clonoset_filter=cl_filter,
+        program_name="CalcRarefactionPoints",
+        iterations=1,
+        seed=seed,
+        drop_small_samples=drop_small_samples,
+        cpu=cpu,
+        verbose=verbose,
+        rarefaction_iterations=iterations,
+        rarefaction_seed=seed,
+    )
+    id_columns = ["sample_id"] + (["chain"] if "chain" in wide.columns else [])
+    depth_columns = [column for column in wide.columns if column not in id_columns]
+    result = wide.melt(
+        id_vars=id_columns,
+        value_vars=depth_columns,
+        var_name="rarefaction_depth",
+        value_name="diversity",
+    ).dropna(subset=["diversity"])
+    result["rarefaction_depth"] = result["rarefaction_depth"].astype(int)
+    return result.sort_values(id_columns + ["rarefaction_depth"]).reset_index(drop=True)
+
+
+def calc_rarefaction_curve(sample_df, cl_filter=None, iterations=3, seed=0,
+                           drop_small_samples=False, cpu=None, verbose=True):
+    """Alias for :func:`calc_rarefaction_points`."""
+    return calc_rarefaction_points(
+        sample_df,
+        cl_filter=cl_filter,
+        iterations=iterations,
+        seed=seed,
+        drop_small_samples=drop_small_samples,
+        cpu=cpu,
+        verbose=verbose,
+    )
+
 def calc_convergence(clonosets_df, cl_filter=None, iterations=3, seed=None,
                      drop_small_samples=False, cpu=None, verbose=True):
     if verbose:
@@ -550,6 +618,61 @@ def calculate_diversity_stats_cl(clonoset_in, colnames=None):
                     
     return result
 
+
+
+def _rarefaction_depths(total_count):
+    depths = []
+    exponent = 1.5
+    while True:
+        depth = int(round(10 ** exponent))
+        if depth >= total_count:
+            break
+        if not depths or depth != depths[-1]:
+            depths.append(depth)
+        exponent += 0.5
+    depths.append(int(total_count))
+    return depths
+
+
+def _rarefied_diversity(counts, depth, seed):
+    total_count = int(np.sum(counts))
+    if depth >= total_count:
+        return int(np.sum(counts > 0))
+    sampled_positions = random.Random(seed).sample(range(total_count), depth)
+    clone_indices = np.searchsorted(np.cumsum(counts), sampled_positions, side="right")
+    return int(len(np.unique(clone_indices)))
+
+
+def calculate_rarefaction_points_cl(clonoset_in, rarefaction_iterations=3,
+                                    rarefaction_seed=0, colnames=None):
+    """Calculate rarefaction points for one prefiltered clonoset."""
+    clonoset = clonoset_in.copy()
+    if colnames is None:
+        colnames = get_column_names_from_clonoset(clonoset)
+    counts = clonoset[colnames["count_column"]].to_numpy(dtype=float)
+    if np.any(counts < 0) or not np.allclose(counts, np.round(counts)):
+        raise ValueError("Rarefaction requires non-negative integer clonotype counts")
+    counts = np.round(counts).astype(np.int64)
+    total_count = int(counts.sum())
+    if total_count < 1:
+        return {}
+
+    result = {}
+    iteration_seeds = [
+        rarefaction_seed + iteration if isinstance(rarefaction_seed, int)
+        else f"{rarefaction_seed}_{iteration}"
+        for iteration in range(rarefaction_iterations)
+    ]
+    for depth in _rarefaction_depths(total_count):
+        if depth == total_count:
+            result[depth] = int(np.sum(counts > 0))
+        else:
+            diversities = [
+                _rarefied_diversity(counts, depth, iteration_seed)
+                for iteration_seed in iteration_seeds
+            ]
+            result[depth] = float(np.mean(diversities))
+    return result
 
 def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, program_name="Calculation",
                          iterations=1, seed=None, drop_small_samples=False, verbose=True,

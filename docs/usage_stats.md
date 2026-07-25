@@ -245,6 +245,51 @@ Here `n_i` is a clonotype count, `p_i = n_i / N`, `N = sum(n_i)`,
 `f2` is the number of doubletons.
 
 
+## Rarefaction curves
+
+`stats.calc_rarefaction_points` calculates observed clonotype diversity after
+repeated count downsampling. `cl_filter` is applied first, so all rarefaction
+depths refer to the filtered repertoire. The default three iterations use
+distinct deterministic seeds derived from `seed=0`.
+
+Depths are spaced by half an order of magnitude: 32, 100, 316, 1000, 3162,
+and so on. Only depths below the filtered total count are downsampled. The final
+point is always the full filtered count and its exact observed diversity. For a
+sample with fewer than 32 counts, only that final point is returned.
+
+```py
+rarefaction = stats.calc_rarefaction_points(
+    sample_df=clonosets,
+    cl_filter=func_filter,
+    iterations=3,
+    seed=0,
+    cpu=4,
+)
+```
+
+The output is a long table with `sample_id`, optional `chain`,
+`rarefaction_depth`, and `diversity` columns:
+
+| sample_id | chain | rarefaction_depth | diversity |
+|:----------|:------|------------------:|----------:|
+| sample1   | TRB   |                32 |      24.7 |
+| sample1   | TRB   |               100 |      61.3 |
+| sample1   | TRB   |               316 |     142.0 |
+| sample1   | TRB   |              1000 |     286.0 |
+
+Plot the result with `rsplot.rarefaction_curve`:
+
+```py
+from repseq import plot as rsplot
+
+fig = rsplot.rarefaction_curve(rarefaction)
+```
+
+The x-axis is logarithmic by default. When one `sample_id` has several unique
+chains, curves are labeled as `sample_id(chain)`, for example
+`ucb_ntreg(TRA)` and `ucb_ntreg(TRB)`. Set `log_x=False` for a linear x-axis.
+
+
 <br>Calculating convergence for each clonoset in `clonosets_df`. For the
 most honest comparison, use equal downsampling across samples; this is preferred
 to top-N filtering and much preferred to calculations without normalization.

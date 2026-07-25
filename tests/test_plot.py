@@ -661,3 +661,28 @@ def test_vjlen_usage_rejects_multiple_chains_and_wrong_panel_size():
 
     with pytest.raises(ValueError, match="exactly 2 samples"):
         rsplot.vjlen_usage(_vjlen_usage_long(("s1", "s2", "s3")))
+
+
+def test_rarefaction_curve_plots_chain_aware_sample_labels():
+    rarefaction = pd.DataFrame([
+        {"sample_id": "ucb_ntreg", "chain": "TRA", "rarefaction_depth": 32, "diversity": 10},
+        {"sample_id": "ucb_ntreg", "chain": "TRA", "rarefaction_depth": 100, "diversity": 20},
+        {"sample_id": "ucb_ntreg", "chain": "TRB", "rarefaction_depth": 32, "diversity": 12},
+        {"sample_id": "ucb_ntreg", "chain": "TRB", "rarefaction_depth": 100, "diversity": 25},
+        {"sample_id": "unique", "chain": "TRB", "rarefaction_depth": 32, "diversity": 8},
+        {"sample_id": "unique", "chain": "TRB", "rarefaction_depth": 100, "diversity": 15},
+    ])
+
+    fig = rsplot.rarefaction_curve(rarefaction)
+    ax = fig.axes[0]
+    labels = {text.get_text() for text in ax.get_legend().get_texts()}
+
+    assert labels == {"ucb_ntreg(TRA)", "ucb_ntreg(TRB)", "unique"}
+    assert ax.get_xscale() == "log"
+    assert ax.get_xlabel() == "Rarefaction depth"
+    assert ax.get_ylabel() == "Observed diversity"
+
+
+def test_rarefaction_curve_validates_columns():
+    with pytest.raises(ValueError, match="must contain columns"):
+        rsplot.rarefaction_curve(pd.DataFrame({"sample_id": ["s1"]}))

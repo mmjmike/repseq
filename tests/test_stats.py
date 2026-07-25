@@ -441,3 +441,60 @@ def test_generic_calculation_warns_and_drops_small_samples_when_requested(tmp_pa
     assert "WARNING! top=2 exceeds available clonotypes for samples: small" in captured
     assert "excluded from further calculations" in captured
     assert pd.isna(result.loc[result["sample_id"] == "small", "diversity"].iloc[0])
+
+
+def test_calc_rarefaction_points_uses_half_order_depths_and_endpoint(tmp_path):
+    filename = tmp_path / "sample.tsv"
+    _write_clonoset(
+        filename,
+        [
+            {"count": 700, "freq": 0.7, "cdr3nt": "AAA", "cdr3aa": "CASSA", "v": "V1", "d": ".", "j": "J1"},
+            {"count": 200, "freq": 0.2, "cdr3nt": "BBB", "cdr3aa": "CASSB", "v": "V2", "d": ".", "j": "J2"},
+            {"count": 100, "freq": 0.1, "cdr3nt": "CCC", "cdr3aa": "CASSC", "v": "V3", "d": ".", "j": "J3"},
+        ],
+    )
+    samples = pd.DataFrame([{"sample_id": "sample1", "chain": "TRB", "filename": str(filename)}])
+
+    result = stats.calc_rarefaction_points(
+        sample_df=samples, iterations=3, seed=7, cpu=1, verbose=False
+    )
+
+    assert list(result.columns) == ["sample_id", "chain", "rarefaction_depth", "diversity"]
+    assert result["rarefaction_depth"].tolist() == [32, 100, 316, 1000]
+    assert result.iloc[-1]["diversity"] == 3
+    assert result["chain"].tolist() == ["TRB"] * 4
+    repeated = stats.calc_rarefaction_points(samples, iterations=3, seed=7, cpu=1, verbose=False)
+    pd.testing.assert_frame_equal(result, repeated)
+
+
+def test_calc_rarefaction_points_prefilters_and_retains_duplicate_sample_chains(tmp_path):
+    file_tra = tmp_path / "tra.tsv"
+    file_trb = tmp_path / "trb.tsv"
+    rows = [
+        {"count": 40, "freq": 0.5, "cdr3nt": "AAA", "cdr3aa": "CASS", "v": "V1", "d": ".", "j": "J1"},
+        {"count": 40, "freq": 0.5, "cdr3nt": "BBB", "cdr3aa": "CAS*", "v": "V2", "d": ".", "j": "J2"},
+    ]
+    _write_clonoset(file_tra, rows)
+    _write_clonoset(file_trb, rows)
+    samples = pd.DataFrame([
+        {"sample_id": "ucb_ntreg", "chain": "TRA", "filename": str(file_tra)},
+        {"sample_id": "ucb_ntreg", "chain": "TRB", "filename": str(file_trb)},
+    ])
+
+    result = stats.calc_rarefaction_points(
+        samples,
+        cl_filter=Filter(functionality="f"),
+        iterations=2,
+        cpu=1,
+        verbose=False,
+    )
+
+    assert set(result["chain"]) == {"TRA", "TRB"}
+    assert set(result["rarefaction_depth"]) == {32, 40}
+    endpoints = result[result["rarefaction_depth"] == 40]
+    assert endpoints["diversity"].tolist() == [1, 1]
+
+
+def test_calc_rarefaction_points_rejects_invalid_iterations():
+    with pytest.raises(ValueError, match="positive integer"):
+        stats.calc_rarefaction_points(pd.DataFrame(), iterations=0)
