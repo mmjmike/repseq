@@ -1821,10 +1821,12 @@ def rarefaction_curve(
     ax.set_ylabel("Observed diversity")
     legend = ax.get_legend()
     if legend is not None:
-        legend.set_title("Sample")
-        legend.set_loc("upper left")
-        legend.set_bbox_to_anchor((1.02, 1))
-        legend.borderaxespad = 0
+        ax.legend(
+            title="Sample",
+            loc="upper left",
+            bbox_to_anchor=(1.02, 1),
+            borderaxespad=0,
+        )
     fig.tight_layout()
     return _close_and_return(fig)
 
