@@ -50,6 +50,66 @@ reused = beta.metrics_from_table(
 )
 ```
 
+## Plotting beta-diversity metrics
+
+`rsplot.beta_metric` accepts either the dictionary returned by `beta.metrics`
+or a metric matrix directly. Select a dictionary entry with `metric`. When no
+metric is selected, the function warns, prints the available keys, and returns
+without plotting. A direct matrix is always plotted as-is and the `metric`
+argument is ignored.
+
+```python
+from repseq import plot as rsplot
+
+rsplot.beta_metric(all_results, metric="f2")
+rsplot.beta_metric(jaccard)
+```
+
+The heatmap clusters rows and columns by default. Set `hclust=False` to preserve
+the matrix order. Up to three metadata columns can annotate samples.
+
+```python
+rsplot.beta_metric(
+    all_results,
+    metric="bray_curtis",
+    metadata=metadata,
+    group=["experimental_group", "tissue"],
+    hclust=True,
+)
+```
+
+Set `ignore_diagonal=True` to replace cells comparing a sample with itself by
+`NA`. With `log_values=True`, zero values are replaced by one tenth of the
+smallest positive matrix value before applying log10. `show_values=True` writes
+compact original values in the cells, including `NA`; color still represents
+the transformed value.
+
+## Plotting full beta tables
+
+`rsplot.beta_table` accepts a beta-results dictionary and automatically selects
+`full_table`, or accepts the full table directly.
+
+With `plot_type="dots"`, each pair is a scatterplot of clonotype frequencies.
+Dots have black borders and 0.5 opacity, and a grey dashed identity line is
+drawn behind them. Set `log_scale=True` to use logarithmic axes; zero
+frequencies are placed below the smallest positive frequency using `log_base`.
+For comparisons within one sample set, pair plots occupy the lower triangle and
+F2 values occupy the upper triangle. Comparisons between two sample sets use a
+complete row-by-column tile matrix.
+
+```python
+rsplot.beta_table(all_results, plot_type="dots", log_scale=True)
+```
+
+With `plot_type="diff"`, each pair is a cumulative-frequency matching plot.
+The `top=20` clonotypes with the largest mean frequency receive the existing
+20-color palette, while all remaining clonotypes are grey. Within-set pairs use
+a wrapped facet layout; comparisons between two sample sets use a tile matrix.
+
+```python
+rsplot.beta_table(all_results, plot_type="diff", top=20)
+```
+
 ## Notation and normalization
 
 For raw count vectors $x$ and $y$ over the pairwise clonotype union, define:

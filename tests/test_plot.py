@@ -881,6 +881,188 @@ def test_vjlen_usage_rejects_multiple_chains_and_wrong_panel_size():
         rsplot.vjlen_usage(_vjlen_usage_long(("s1", "s2", "s3")))
 
 
+def _beta_metric_matrix():
+    matrix = pd.DataFrame(
+        [
+            [1.0, 0.0004, 2.5e-6],
+            [0.0004, 1.0, 0.0],
+            [2.5e-6, 0.0, 1.0],
+        ],
+        index=["s1", "s2", "s3"],
+        columns=["s1", "s2", "s3"],
+    )
+    matrix.index.name = "sample1"
+    matrix.columns.name = "sample2"
+    return matrix
+
+
+def _beta_full_table_same_set():
+    rows = []
+    pair_values = {
+        ("s1", "s2"): [(0.6, 0.4), (0.4, 0.6)],
+        ("s1", "s3"): [(0.8, 0.2), (0.2, 0.8)],
+        ("s2", "s3"): [(0.7, 0.5), (0.3, 0.5)],
+    }
+    for (sample1, sample2), values in pair_values.items():
+        for clone_number, (frequency1, frequency2) in enumerate(values):
+            rows.append(
+                {
+                    "clone": f"clone{clone_number}",
+                    "sample1": sample1,
+                    "sample2": sample2,
+                    "sample1_freq": frequency1,
+                    "sample2_freq": frequency2,
+                }
+            )
+    table = pd.DataFrame(rows)
+    table.attrs["sample_list"] = ["s1", "s2", "s3"]
+    table.attrs["sample_list2"] = None
+    return table
+
+
+def _beta_full_table_two_sets():
+    rows = []
+    for row_sample in ["r1", "r2"]:
+        for column_sample in ["c1", "c2"]:
+            rows.extend(
+                [
+                    {
+                        "clone": "clone1",
+                        "sample1": row_sample,
+                        "sample2": column_sample,
+                        "sample1_freq": 0.75,
+                        "sample2_freq": 0.25,
+                    },
+                    {
+                        "clone": "clone2",
+                        "sample1": row_sample,
+                        "sample2": column_sample,
+                        "sample1_freq": 0.25,
+                        "sample2_freq": 0.75,
+                    },
+                ]
+            )
+    table = pd.DataFrame(rows)
+    table.attrs["sample_list"] = ["r1", "r2"]
+    table.attrs["sample_list2"] = ["c1", "c2"]
+    return table
+
+
+def test_beta_metric_dictionary_requires_metric_selection(capsys):
+    beta_results = {"f2": _beta_metric_matrix(), "jaccard": _beta_metric_matrix()}
+
+    with pytest.warns(UserWarning, match="No beta-diversity metric was selected"):
+        fig = rsplot.beta_metric(beta_results)
+
+    assert fig is None
+    output = capsys.readouterr().out
+    assert "f2" in output
+    assert "jaccard" in output
+    assert "metric='<key>'" in output
+
+
+def test_beta_metric_logs_colors_and_displays_original_values_with_metadata():
+    matrix = _beta_metric_matrix()
+    metadata = pd.DataFrame(
+        [
+            {"sample_id": "s1", "condition": "control"},
+            {"sample_id": "s2", "condition": "treated"},
+            {"sample_id": "s3", "condition": "treated"},
+        ]
+    )
+
+    fig = rsplot.beta_metric(
+        {"f2": matrix},
+        metric="f2",
+        metadata=metadata,
+        group="condition",
+        hclust=False,
+        ignore_diagonal=True,
+        log_values=True,
+        show_values=True,
+    )
+    heatmap = next(ax for ax in fig.axes if ax.get_title() == "f2")
+    labels = {text.get_text() for text in heatmap.texts}
+
+    assert "NA" in labels
+    assert "0.0004" in labels
+    assert "2.5e-6" in labels
+    assert "0" in labels
+    assert any(ax.get_ylabel() == "log10(f2)" for ax in fig.axes)
+    assert {text.get_text() for text in fig.legends[0].get_texts()} == {
+        "Condition: control",
+        "Condition: treated",
+    }
+
+
+def test_beta_metric_rejects_more_than_three_annotation_groups():
+    metadata = pd.DataFrame(
+        [{"sample_id": "s1", "a": "a", "b": "b", "c": "c", "d": "d"}]
+    )
+
+    with pytest.raises(ValueError, match="group can contain at most 3"):
+        rsplot.beta_metric(
+            _beta_metric_matrix().iloc[:1, :1],
+            metadata=metadata,
+            group=["a", "b", "c", "d"],
+        )
+
+
+def test_beta_table_dots_uses_lower_triangle_and_upper_f2_values():
+    fig = rsplot.beta_table(
+        {"full_table": _beta_full_table_same_set()},
+        plot_type="dots",
+        log_scale=True,
+    )
+
+    scatter_axes = [ax for ax in fig.axes if ax.collections]
+    assert len(scatter_axes) == 3
+    assert all(
+        collection.get_alpha() == 0.5
+        for ax in scatter_axes
+        for collection in ax.collections
+    )
+    assert all(
+        ax.get_xscale() == "log" and ax.get_yscale() == "log"
+        for ax in scatter_axes
+    )
+    assert sum(
+        text.get_text().startswith("F2")
+        for ax in fig.axes
+        for text in ax.texts
+    ) == 3
+    assert all(
+        any(line.get_linestyle() == "--" for line in ax.lines)
+        for ax in scatter_axes
+    )
+
+
+def test_beta_table_dots_tiles_two_sample_sets():
+    fig = rsplot.beta_table(_beta_full_table_two_sets(), plot_type="dots")
+
+    assert len(fig.axes) == 4
+    assert all(len(ax.collections) == 1 for ax in fig.axes)
+
+
+def test_beta_table_diff_uses_facets_and_matrix_tiles():
+    same_set = rsplot.beta_table(
+        _beta_full_table_same_set(),
+        plot_type="diff",
+        top=2,
+    )
+    visible_same_set = [ax for ax in same_set.axes if ax.get_visible()]
+    assert len(visible_same_set) == 3
+    assert all(ax.patches for ax in visible_same_set)
+
+    two_sets = rsplot.beta_table(
+        _beta_full_table_two_sets(),
+        plot_type="diff",
+        top=2,
+    )
+    assert len(two_sets.axes) == 4
+    assert all(ax.patches for ax in two_sets.axes)
+
+
 def test_rarefaction_curve_plots_chain_aware_sample_labels():
     rarefaction = pd.DataFrame([
         {"sample_id": "ucb_ntreg", "chain": "TRA", "rarefaction_depth": 32, "diversity": 10},

@@ -1891,6 +1891,609 @@ def vjlen_usage(
 
 
 
+def _normalize_beta_metric_key(value):
+    return str(value).strip().casefold().replace("-", "_").replace(" ", "_")
+
+
+def _select_beta_metric_matrix(beta_data, metric):
+    if isinstance(beta_data, dict):
+        keys = list(beta_data)
+        if metric is None:
+            message = (
+                "No beta-diversity metric was selected. Available keys: "
+                + ", ".join(map(str, keys))
+                + ". Pass one with metric='<key>'."
+            )
+            warnings.warn(message, UserWarning, stacklevel=2)
+            print(message)
+            return None, None
+        normalized_keys = {
+            _normalize_beta_metric_key(key): key
+            for key in keys
+        }
+        selected_key = normalized_keys.get(_normalize_beta_metric_key(metric))
+        if selected_key is None:
+            raise ValueError(
+                f"Unknown beta-diversity metric {metric!r}. Available keys: "
+                + ", ".join(map(str, keys))
+            )
+        matrix = beta_data[selected_key]
+        title = str(selected_key)
+    elif isinstance(beta_data, pd.DataFrame):
+        matrix = beta_data
+        title = str(beta_data.attrs.get("metric", "Beta metric"))
+    else:
+        raise TypeError("beta_data must be a metric dictionary or pandas DataFrame")
+
+    if not isinstance(matrix, pd.DataFrame):
+        raise TypeError("The selected beta-diversity metric must be a pandas DataFrame")
+    if matrix.empty:
+        raise ValueError("The beta-diversity metric matrix is empty")
+    numeric = matrix.apply(pd.to_numeric, errors="coerce")
+    invalid = matrix.notna() & numeric.isna()
+    if invalid.any().any():
+        raise ValueError("The beta-diversity metric matrix must contain numeric values")
+    numeric.index = matrix.index
+    numeric.columns = matrix.columns
+    return numeric.astype(float), title
+
+
+def _beta_log_values(values, base=10):
+    values = values.copy()
+    finite = values.to_numpy(dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if np.any(finite < 0):
+        raise ValueError("Log-transformed beta values cannot contain negatives")
+    positive = finite[finite > 0]
+    floor = (
+        float(np.min(positive)) / float(base)
+        if len(positive)
+        else np.finfo(float).tiny
+    )
+    values = values.mask(values == 0, floor)
+    return np.log(values) / np.log(float(base))
+
+
+def _format_beta_value(value):
+    if pd.isna(value):
+        return "NA"
+    value = float(value)
+    if value == 0:
+        return "0"
+    if value.is_integer() and abs(value) < 10000:
+        candidate = f"{value:.1f}"
+        if len(candidate) <= 6:
+            return candidate
+    for precision in range(4, 0, -1):
+        candidate = f"{value:.{precision}g}"
+        candidate = re.sub(r"e([+-])0+(\d+)", r"e\1\2", candidate)
+        candidate = candidate.replace("e+", "e")
+        if len(candidate) <= 6:
+            return candidate
+    return candidate[:6]
+
+
+def _beta_linkage(matrix, axis):
+    values = matrix.to_numpy(dtype=float)
+    if axis == 1:
+        values = values.T
+    if len(values) < 2:
+        return None
+    feature_means = np.nanmean(values, axis=0)
+    overall_mean = np.nanmean(values)
+    if not np.isfinite(overall_mean):
+        overall_mean = 0.0
+    feature_means = np.where(np.isfinite(feature_means), feature_means, overall_mean)
+    missing_rows, missing_columns = np.where(~np.isfinite(values))
+    values = values.copy()
+    values[missing_rows, missing_columns] = feature_means[missing_columns]
+    return linkage(values, method="average", metric="euclidean")
+
+
+def _prepare_beta_annotation_colors(metadata, group_columns, samples):
+    if not group_columns:
+        return None, []
+    if metadata is None:
+        raise ValueError("metadata is required when group columns are used")
+    if "sample_id" not in metadata.columns:
+        raise ValueError("metadata must contain a 'sample_id' column")
+    missing = [column for column in group_columns if column not in metadata.columns]
+    if missing:
+        raise ValueError("group columns not found in metadata: " + ", ".join(missing))
+
+    sample_metadata = metadata[["sample_id"] + group_columns].drop_duplicates()
+    if sample_metadata["sample_id"].duplicated().any():
+        raise ValueError("metadata must have one set of group values per sample_id")
+    sample_metadata = sample_metadata.set_index("sample_id")
+    colors = pd.DataFrame(index=pd.Index(samples), columns=group_columns, dtype=object)
+    handles = []
+    for group_column in group_columns:
+        levels = _category_order(metadata[group_column])
+        color_map = _palette_mapping(levels)
+        values = sample_metadata[group_column].reindex(samples)
+        colors[group_column] = [color_map.get(value, "#d0d0d0") for value in values]
+        handles.extend(
+            Patch(
+                facecolor=color_map[level],
+                label=f"{_caption(group_column)}: {level}",
+            )
+            for level in levels
+        )
+    return colors, handles
+
+
+def beta_metric(
+    beta_data,
+    metric=None,
+    metadata=None,
+    group=None,
+    hclust=True,
+    ignore_diagonal=False,
+    log_values=False,
+    show_values=True,
+    cmap="RdBu_r",
+    height=8,
+    aspect=1.0,
+):
+    """Plot a beta-diversity metric matrix as an annotated heatmap.
+
+    Parameters
+    ----------
+    beta_data : dict or pandas.DataFrame
+        Dictionary returned by ``beta.metrics`` or a numeric metric matrix.
+    metric : str, optional
+        Dictionary key to plot. Ignored when ``beta_data`` is a matrix.
+    metadata : pandas.DataFrame, optional
+        Sample metadata containing ``sample_id``.
+    group : str or sequence of up to three str, optional
+        Metadata columns displayed as row and column annotation strips.
+    hclust : bool, default True
+        Hierarchically cluster rows and columns.
+    ignore_diagonal : bool, default False
+        Replace cells whose row and column sample names match with ``NA``.
+    log_values : bool, default False
+        Color cells by log10 values after replacing zeros with a small floor.
+    show_values : bool, default True
+        Display compact original values, including ``NA``, in heatmap cells.
+    cmap : matplotlib colormap, default "RdBu_r"
+        Heatmap colormap.
+    height, aspect : float
+        Figure height and width multiplier.
+
+    Returns
+    -------
+    matplotlib.figure.Figure or None
+        Closed heatmap figure, or ``None`` when a dictionary metric is omitted.
+    """
+    matrix, title = _select_beta_metric_matrix(beta_data, metric)
+    if matrix is None:
+        return None
+
+    group_columns = _as_list(group, "group", max_len=3)
+    original_values = matrix.copy()
+    if ignore_diagonal:
+        shared_samples = matrix.index.intersection(matrix.columns)
+        for sample in shared_samples:
+            original_values.loc[sample, sample] = np.nan
+    color_values = original_values.copy()
+    if log_values:
+        color_values = _beta_log_values(color_values, base=10)
+
+    row_colors, row_handles = _prepare_beta_annotation_colors(
+        metadata,
+        group_columns,
+        list(matrix.index),
+    )
+    column_colors, column_handles = _prepare_beta_annotation_colors(
+        metadata,
+        group_columns,
+        list(matrix.columns),
+    )
+    row_linkage = _beta_linkage(color_values, axis=0) if hclust else None
+    column_linkage = _beta_linkage(color_values, axis=1) if hclust else None
+    grid = sns.clustermap(
+        color_values,
+        cmap=cmap,
+        mask=color_values.isna(),
+        row_cluster=row_linkage is not None,
+        col_cluster=column_linkage is not None,
+        row_linkage=row_linkage,
+        col_linkage=column_linkage,
+        row_colors=row_colors,
+        col_colors=column_colors,
+        figsize=(height * aspect, height),
+        cbar_kws={"label": f"log10({title})" if log_values else title},
+        xticklabels=True,
+        yticklabels=True,
+    )
+    grid.ax_heatmap.set_title(title)
+    grid.ax_heatmap.set_xlabel(matrix.columns.name or "Sample")
+    grid.ax_heatmap.set_ylabel(matrix.index.name or "Sample")
+    grid.ax_heatmap.tick_params(axis="x", labelrotation=90)
+
+    if show_values:
+        row_order = (
+            grid.dendrogram_row.reordered_ind
+            if grid.dendrogram_row is not None
+            else list(range(len(matrix.index)))
+        )
+        column_order = (
+            grid.dendrogram_col.reordered_ind
+            if grid.dendrogram_col is not None
+            else list(range(len(matrix.columns)))
+        )
+        displayed = original_values.iloc[row_order, column_order]
+        for row_index, row in enumerate(displayed.to_numpy(dtype=float)):
+            for column_index, value in enumerate(row):
+                grid.ax_heatmap.text(
+                    column_index + 0.5,
+                    row_index + 0.5,
+                    _format_beta_value(value),
+                    ha="center",
+                    va="center",
+                    fontsize=7,
+                    color="black",
+                )
+
+    handles = {}
+    for handle in [*row_handles, *column_handles]:
+        handles.setdefault(handle.get_label(), handle)
+    if handles:
+        grid.fig.legend(
+            handles.values(),
+            handles.keys(),
+            loc="upper center",
+            ncol=min(4, len(handles)),
+            frameon=False,
+        )
+        grid.fig.subplots_adjust(top=0.9)
+    return _close_and_return(grid.fig)
+
+
+def _normalize_beta_full_table(beta_data):
+    if isinstance(beta_data, dict):
+        if "full_table" not in beta_data:
+            raise ValueError("beta-diversity dictionary does not contain 'full_table'")
+        table = beta_data["full_table"]
+    elif isinstance(beta_data, pd.DataFrame):
+        table = beta_data
+    else:
+        raise TypeError("beta_data must be a beta.metrics dictionary or DataFrame")
+    if not isinstance(table, pd.DataFrame):
+        raise TypeError("full_table must be a pandas DataFrame")
+    required = {"sample1", "sample2"}
+    missing = required.difference(table.columns)
+    if missing:
+        raise ValueError("full_table is missing columns: " + ", ".join(sorted(missing)))
+    has_frequencies = {"sample1_freq", "sample2_freq"}.issubset(table.columns)
+    has_counts = {"sample1_count", "sample2_count"}.issubset(table.columns)
+    if not has_frequencies and not has_counts:
+        raise ValueError(
+            "full_table needs sample1_freq/sample2_freq or sample1_count/sample2_count"
+        )
+
+    attrs = dict(table.attrs)
+    table = table.copy()
+    table.attrs = attrs
+    if has_frequencies:
+        table["_freq1"] = pd.to_numeric(table["sample1_freq"], errors="coerce")
+        table["_freq2"] = pd.to_numeric(table["sample2_freq"], errors="coerce")
+    else:
+        count1 = pd.to_numeric(table["sample1_count"], errors="coerce")
+        count2 = pd.to_numeric(table["sample2_count"], errors="coerce")
+        pair_columns = ["sample1", "sample2"]
+        total1 = count1.groupby([table[column] for column in pair_columns]).transform("sum")
+        total2 = count2.groupby([table[column] for column in pair_columns]).transform("sum")
+        table["_freq1"] = count1.div(total1.where(total1 != 0, np.nan)).fillna(0)
+        table["_freq2"] = count2.div(total2.where(total2 != 0, np.nan)).fillna(0)
+    if table[["_freq1", "_freq2"]].isna().any().any():
+        raise ValueError("full_table contains missing or non-numeric frequencies")
+    if (table[["_freq1", "_freq2"]] < 0).any().any():
+        raise ValueError("full_table frequencies cannot be negative")
+    return table
+
+
+def _beta_table_layout(table):
+    sample_list = table.attrs.get("sample_list")
+    sample_list2 = table.attrs.get("sample_list2")
+    if sample_list is not None:
+        rows = list(sample_list)
+        if sample_list2 is None:
+            return rows, rows, True
+        return rows, list(sample_list2), False
+
+    sample1_order = list(pd.unique(table["sample1"]))
+    sample2_order = list(pd.unique(table["sample2"]))
+    all_samples = list(dict.fromkeys([*sample1_order, *sample2_order]))
+    unordered_pairs = {
+        frozenset((sample1, sample2))
+        for sample1, sample2 in table[["sample1", "sample2"]].itertuples(index=False)
+        if sample1 != sample2
+    }
+    expected_pairs = len(all_samples) * (len(all_samples) - 1) // 2
+    same_set = bool(expected_pairs and len(unordered_pairs) == expected_pairs)
+    if same_set:
+        return all_samples, all_samples, True
+    return sample1_order, sample2_order, False
+
+
+def _beta_pair_frequencies(table, first_sample, second_sample):
+    direct = table.loc[
+        (table["sample1"] == first_sample) & (table["sample2"] == second_sample)
+    ]
+    if not direct.empty:
+        return direct, direct["_freq1"].to_numpy(float), direct["_freq2"].to_numpy(float)
+    reverse = table.loc[
+        (table["sample1"] == second_sample) & (table["sample2"] == first_sample)
+    ]
+    if not reverse.empty:
+        return reverse, reverse["_freq2"].to_numpy(float), reverse["_freq1"].to_numpy(float)
+    return None, np.array([], dtype=float), np.array([], dtype=float)
+
+
+def _beta_pair_f2(first_values, second_values):
+    if len(first_values) == 0:
+        return np.nan
+    return float(np.sum(np.sqrt(first_values * second_values)))
+
+
+def _draw_beta_dots_panel(
+    ax,
+    table,
+    x_sample,
+    y_sample,
+    log_scale,
+    log_base,
+):
+    pair, x, y = _beta_pair_frequencies(table, x_sample, y_sample)
+    if pair is None:
+        ax.set_visible(False)
+        return
+    if log_scale:
+        positive = np.concatenate([x[x > 0], y[y > 0]])
+        if len(positive) == 0:
+            floor = 1 / float(log_base)
+        else:
+            floor = float(np.min(positive)) / float(log_base)
+        x = np.where(x == 0, floor, x)
+        y = np.where(y == 0, floor, y)
+        lower = floor
+        upper = max(float(np.max(x)), float(np.max(y)), floor * float(log_base))
+        ax.set_xscale("log", base=log_base)
+        ax.set_yscale("log", base=log_base)
+    else:
+        lower = 0.0
+        upper = max(float(np.max(x)), float(np.max(y)), 1e-12)
+    ax.plot(
+        [lower, upper],
+        [lower, upper],
+        color="#888888",
+        linestyle="--",
+        linewidth=0.8,
+        zorder=0,
+    )
+    ax.scatter(
+        x,
+        y,
+        alpha=0.5,
+        facecolors="#4e79a7",
+        edgecolors="black",
+        linewidths=0.5,
+        s=24,
+        zorder=1,
+    )
+    ax.set_xlim(lower, upper * (1.05 if not log_scale else float(log_base) ** 0.05))
+    ax.set_ylim(lower, upper * (1.05 if not log_scale else float(log_base) ** 0.05))
+    ax.set_xlabel(str(x_sample))
+    ax.set_ylabel(str(y_sample))
+    ax.grid(color="#eeeeee", linewidth=0.5)
+    ax.set_axisbelow(True)
+
+
+def _plot_beta_dots(
+    table,
+    row_samples,
+    column_samples,
+    same_set,
+    log_scale,
+    log_base,
+    height,
+    aspect,
+):
+    if log_base <= 1:
+        raise ValueError("log_base must be greater than 1")
+    fig, axes = plt.subplots(
+        len(row_samples),
+        len(column_samples),
+        figsize=(height * aspect * len(column_samples), height * len(row_samples)),
+        squeeze=False,
+    )
+    for row_index, row_sample in enumerate(row_samples):
+        for column_index, column_sample in enumerate(column_samples):
+            ax = axes[row_index, column_index]
+            if same_set and row_index == column_index:
+                ax.text(0.5, 0.5, str(row_sample), ha="center", va="center", fontsize=11)
+                ax.axis("off")
+            elif same_set and row_index < column_index:
+                _, first, second = _beta_pair_frequencies(table, row_sample, column_sample)
+                ax.text(
+                    0.5,
+                    0.5,
+                    "F2\n" + _format_beta_value(_beta_pair_f2(first, second)),
+                    ha="center",
+                    va="center",
+                    fontsize=10,
+                )
+                ax.axis("off")
+            else:
+                _draw_beta_dots_panel(
+                    ax,
+                    table,
+                    column_sample,
+                    row_sample,
+                    log_scale,
+                    log_base,
+                )
+    fig.tight_layout()
+    return fig
+
+
+def _cumulative_intervals(values):
+    values = np.asarray(values, dtype=float)
+    total = float(np.sum(values))
+    normalized = values / total if total > 0 else values
+    order = np.argsort(-normalized, kind="stable")
+    starts = np.zeros(len(values), dtype=float)
+    ends = np.zeros(len(values), dtype=float)
+    cumulative = 0.0
+    for index in order:
+        starts[index] = cumulative
+        cumulative += normalized[index]
+        ends[index] = cumulative
+    return starts, ends
+
+
+def _draw_beta_diff_panel(ax, table, first_sample, second_sample, top):
+    pair, first, second = _beta_pair_frequencies(table, first_sample, second_sample)
+    if pair is None:
+        ax.set_visible(False)
+        return
+    first_starts, first_ends = _cumulative_intervals(first)
+    second_starts, second_ends = _cumulative_intervals(second)
+    mean_frequency = (first + second) / 2
+    top_indices = list(np.argsort(-mean_frequency, kind="stable")[:top])
+    color_map = {
+        index: RAREFACTION_COLORS_20[color_index]
+        for color_index, index in enumerate(top_indices)
+    }
+    draw_order = [index for index in range(len(pair)) if index not in color_map]
+    draw_order.extend(top_indices[::-1])
+    for index in draw_order:
+        color = color_map.get(index, "#bdbdbd")
+        ax.fill(
+            [0, 0, 1, 1],
+            [
+                first_starts[index],
+                first_ends[index],
+                second_ends[index],
+                second_starts[index],
+            ],
+            facecolor=color,
+            edgecolor="white",
+            linewidth=0.25,
+            alpha=0.8 if index in color_map else 0.45,
+        )
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels([str(first_sample), str(second_sample)], rotation=25, ha="right")
+    ax.set_ylabel("Cumulative frequency")
+    ax.grid(False)
+
+
+def _plot_beta_diff(table, row_samples, column_samples, same_set, top, height, aspect):
+    if not 1 <= int(top) <= len(RAREFACTION_COLORS_20):
+        raise ValueError(
+            f"top must be between 1 and {len(RAREFACTION_COLORS_20)}"
+        )
+    top = int(top)
+    if same_set:
+        pairs = [
+            (row_samples[first], row_samples[second])
+            for first in range(len(row_samples))
+            for second in range(first + 1, len(row_samples))
+        ]
+        if not pairs:
+            raise ValueError("beta_table diff plots require at least two samples")
+        columns = min(3, int(np.ceil(np.sqrt(len(pairs)))))
+        rows = int(np.ceil(len(pairs) / columns))
+        fig, axes = plt.subplots(
+            rows,
+            columns,
+            figsize=(height * aspect * columns, height * rows),
+            squeeze=False,
+        )
+        for ax, pair_samples in zip(axes.flat, pairs):
+            _draw_beta_diff_panel(ax, table, pair_samples[0], pair_samples[1], top)
+            ax.set_title(f"{pair_samples[0]} vs {pair_samples[1]}")
+        for ax in list(axes.flat)[len(pairs):]:
+            ax.set_visible(False)
+    else:
+        fig, axes = plt.subplots(
+            len(row_samples),
+            len(column_samples),
+            figsize=(height * aspect * len(column_samples), height * len(row_samples)),
+            squeeze=False,
+        )
+        for row_index, row_sample in enumerate(row_samples):
+            for column_index, column_sample in enumerate(column_samples):
+                ax = axes[row_index, column_index]
+                _draw_beta_diff_panel(ax, table, row_sample, column_sample, top)
+                ax.set_title(f"{row_sample} vs {column_sample}")
+    fig.tight_layout()
+    return fig
+
+
+def beta_table(
+    beta_data,
+    plot_type="dots",
+    log_scale=False,
+    log_base=10,
+    top=20,
+    height=3.2,
+    aspect=1.0,
+):
+    """Plot pairwise clonotype frequencies from beta-diversity full tables.
+
+    Parameters
+    ----------
+    beta_data : dict or pandas.DataFrame
+        Dictionary returned by ``beta.metrics`` or its ``full_table`` directly.
+    plot_type : {"dots", "diff"}, default "dots"
+        Scatterplot matrix or cumulative-frequency matching plots.
+    log_scale : bool, default False
+        Use logarithmic axes for ``dots`` plots.
+    log_base : float, default 10
+        Logarithm base and zero-frequency floor divisor.
+    top : int, default 20
+        Number of high-mean-frequency clonotypes colored in ``diff`` plots.
+    height, aspect : float
+        Per-panel height and width multiplier.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Closed figure that renders once in Jupyter.
+    """
+    table = _normalize_beta_full_table(beta_data)
+    row_samples, column_samples, same_set = _beta_table_layout(table)
+    plot_type = str(plot_type).casefold()
+    if plot_type == "dots":
+        fig = _plot_beta_dots(
+            table,
+            row_samples,
+            column_samples,
+            same_set,
+            bool(log_scale),
+            float(log_base),
+            float(height),
+            float(aspect),
+        )
+    elif plot_type == "diff":
+        fig = _plot_beta_diff(
+            table,
+            row_samples,
+            column_samples,
+            same_set,
+            top,
+            float(height),
+            float(aspect),
+        )
+    else:
+        raise ValueError("plot_type must be one of: dots, diff")
+    return _close_and_return(fig)
+
+
 def rarefaction_curve(
     rarefaction_df,
     palette=None,
@@ -2048,6 +2651,8 @@ __all__ = [
     "segment_usage",
     "vj_usage",
     "vjlen_usage",
+    "beta_metric",
+    "beta_table",
     "rarefaction_curve",
     "cdr3aa_stats",
     "diversity_stats",
