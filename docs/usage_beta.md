@@ -65,8 +65,9 @@ rsplot.beta_metric(all_results, metric="f2")
 rsplot.beta_metric(jaccard)
 ```
 
-The heatmap clusters rows and columns by default. Set `hclust=False` to preserve
-the matrix order. Up to three metadata columns can annotate samples.
+The heatmap uses the default R `pheatmap` blue-to-red `RdYlBu` palette and
+clusters rows and columns by default. Set `hclust=False` to preserve the matrix
+order. Up to three metadata columns can annotate samples.
 
 ```python
 rsplot.beta_metric(

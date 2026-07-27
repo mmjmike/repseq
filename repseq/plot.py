@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from matplotlib.colors import to_rgb
+from matplotlib.colors import LinearSegmentedColormap, to_rgb
 from matplotlib.patches import Patch
 from scipy.cluster.hierarchy import dendrogram, leaves_list, linkage
 
@@ -52,6 +52,21 @@ RAREFACTION_COLORS_20 = [
     "#e15759", "#ff9d9a", "#79706e", "#bab0ac", "#d37295",
     "#fabfd2", "#b07aa1", "#d4a6c8", "#9d7660", "#d7b5a6",
 ]
+
+PHEATMAP_COLORS_7 = [
+    "#4575B4",
+    "#91BFDB",
+    "#E0F3F8",
+    "#FFFFBF",
+    "#FEE090",
+    "#FC8D59",
+    "#D73027",
+]
+PHEATMAP_CMAP = LinearSegmentedColormap.from_list(
+    "pheatmap_default",
+    PHEATMAP_COLORS_7,
+    N=100,
+)
 
 GENE_RE = re.compile(
     r"""
@@ -1113,7 +1128,7 @@ def segment_usage(
     group=None,
     split=None,
     palette=None,
-    cmap="RdBu_r",
+    cmap=PHEATMAP_CMAP,
     height=3.2,
     aspect=1.2,
     seed=0,
@@ -1147,8 +1162,9 @@ def segment_usage(
         rows, with their own segment and sample axes.
     palette : seaborn palette or dict, optional
         Colors for samples, groups, and heatmap annotation categories.
-    cmap : matplotlib colormap, default "RdBu_r"
-        Colormap for usage values in heatmaps.
+    cmap : matplotlib colormap, optional
+        Colormap for usage values in heatmaps. Defaults to the R ``pheatmap``
+        palette.
     height, aspect : float
         Base panel height and width multiplier.
     seed : int, default 0
@@ -2031,7 +2047,7 @@ def beta_metric(
     ignore_diagonal=False,
     log_values=False,
     show_values=True,
-    cmap="RdBu_r",
+    cmap=PHEATMAP_CMAP,
     height=8,
     aspect=1.0,
 ):
@@ -2055,8 +2071,8 @@ def beta_metric(
         Color cells by log10 values after replacing zeros with a small floor.
     show_values : bool, default True
         Display compact original values, including ``NA``, in heatmap cells.
-    cmap : matplotlib colormap, default "RdBu_r"
-        Heatmap colormap.
+    cmap : matplotlib colormap, optional
+        Heatmap colormap. Defaults to the R ``pheatmap`` palette.
     height, aspect : float
         Figure height and width multiplier.
 
@@ -2646,6 +2662,7 @@ __all__ = [
     "CDR3AA_STATS_PROPERTIES",
     "DIVERSITY_STATS_PROPERTIES",
     "CONVERGENCE_PROPERTIES",
+    "PHEATMAP_CMAP",
     "parse_gene_name",
     "plot_stats",
     "segment_usage",

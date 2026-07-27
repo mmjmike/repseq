@@ -265,7 +265,7 @@ def test_segment_usage_detects_wide_table_and_keeps_chain_axes_independent():
 
     heatmaps = {ax.get_title(): ax for ax in fig.axes if ax.get_title()}
     assert set(heatmaps) == {"TRA", "TRB"}
-    assert heatmaps["TRA"].collections[0].cmap.name == "RdBu_r"
+    assert heatmaps["TRA"].collections[0].cmap.name == "pheatmap_default"
     assert fig.number not in plt.get_fignums()
     assert [tick.get_text() for tick in heatmaps["TRA"].get_xticklabels()] == [
         "TRAV2",
@@ -988,6 +988,7 @@ def test_beta_metric_logs_colors_and_displays_original_values_with_metadata():
     assert "0.0004" in labels
     assert "2.5e-6" in labels
     assert "0" in labels
+    assert heatmap.collections[0].cmap.name == "pheatmap_default"
     assert any(ax.get_ylabel() == "log10(f2)" for ax in fig.axes)
     assert {text.get_text() for text in fig.legends[0].get_texts()} == {
         "Condition: control",

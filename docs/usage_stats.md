@@ -512,9 +512,10 @@ rsplot.segment_usage(
 )
 ```
 
-Usage heatmaps use the blue-to-red `RdBu_r` colormap by default. Pass any
-Matplotlib-compatible `cmap` to override it. Annotation legends show category
-values only; the metadata column names remain above the annotation strips.
+Usage heatmaps use the default R `pheatmap` blue-to-red `RdYlBu` palette.
+Pass any Matplotlib-compatible `cmap` to override it. Annotation legends
+show category values only; the metadata column names remain above the annotation
+strips.
 
 Use `plot_type="barplot"` for bars. Without a group, each sample is a separate
 series. With one metadata group, the bars show the group mean with sample
