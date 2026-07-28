@@ -2354,19 +2354,44 @@ def _plot_beta_dots(
     return fig
 
 
-def _cumulative_intervals(values):
-    values = np.asarray(values, dtype=float)
-    total = float(np.sum(values))
-    normalized = values / total if total > 0 else values
-    order = np.argsort(-normalized, kind="stable")
-    starts = np.zeros(len(values), dtype=float)
-    ends = np.zeros(len(values), dtype=float)
-    cumulative = 0.0
-    for index in order:
-        starts[index] = cumulative
-        cumulative += normalized[index]
-        ends[index] = cumulative
-    return starts, ends
+def _beta_clonotype_labels(pair):
+    for column_name in ["cdr3aa", "cdr3nt", "clonotype", "clone"]:
+        column = _column_by_name(pair.columns, {column_name})
+        if column is None:
+            continue
+        return pair[column].map(
+            lambda value: str(value[0])
+            if isinstance(value, tuple) and value
+            else str(value)
+        ).to_numpy(dtype=object)
+    return np.asarray(
+        [f"Clonotype {index + 1}" for index in range(len(pair))],
+        dtype=object,
+    )
+
+
+def _draw_beta_abundance_label(
+    ax,
+    label,
+    lower,
+    upper,
+    first_value,
+    second_value,
+    fontsize,
+):
+    side = 0 if first_value >= second_value else 1
+    if upper[side] <= lower[side]:
+        return
+    ax.text(
+        0.015 if side == 0 else 0.985,
+        (lower[side] + upper[side]) / 2,
+        str(label),
+        ha="left" if side == 0 else "right",
+        va="center",
+        fontsize=fontsize,
+        color="black",
+        clip_on=True,
+    )
 
 
 def _draw_beta_diff_panel(ax, table, first_sample, second_sample, top):
@@ -2374,36 +2399,84 @@ def _draw_beta_diff_panel(ax, table, first_sample, second_sample, top):
     if pair is None:
         ax.set_visible(False)
         return
-    first_starts, first_ends = _cumulative_intervals(first)
-    second_starts, second_ends = _cumulative_intervals(second)
-    mean_frequency = (first + second) / 2
-    top_indices = list(np.argsort(-mean_frequency, kind="stable")[:top])
+
+    shared = (first > 0) & (second > 0)
+    shared_indices = np.flatnonzero(shared)
+    shared_scores = np.sqrt(first[shared_indices] * second[shared_indices])
+    ranked_shared = shared_indices[
+        np.argsort(-shared_scores, kind="stable")
+    ]
+    shown_indices = list(ranked_shared[:top])
+    shown_set = set(shown_indices)
+    hidden_shared = np.asarray(
+        [index for index in shared_indices if index not in shown_set],
+        dtype=int,
+    )
+    non_overlapping = ~shared
+
+    bands = [
+        (
+            "NonOverlapping",
+            float(first[non_overlapping].sum()),
+            float(second[non_overlapping].sum()),
+            "#bdbdbd",
+            8,
+        ),
+        (
+            "NotShown",
+            float(first[hidden_shared].sum()) if len(hidden_shared) else 0.0,
+            float(second[hidden_shared].sum()) if len(hidden_shared) else 0.0,
+            "#777777",
+            8,
+        ),
+    ]
+    clonotype_labels = _beta_clonotype_labels(pair)
     color_map = {
         index: RAREFACTION_COLORS_20[color_index]
-        for color_index, index in enumerate(top_indices)
+        for color_index, index in enumerate(shown_indices)
     }
-    draw_order = [index for index in range(len(pair)) if index not in color_map]
-    draw_order.extend(top_indices[::-1])
-    for index in draw_order:
-        color = color_map.get(index, "#bdbdbd")
+    for index in reversed(shown_indices):
+        bands.append(
+            (
+                clonotype_labels[index],
+                float(first[index]),
+                float(second[index]),
+                color_map[index],
+                6,
+            )
+        )
+
+    lower = np.zeros(2, dtype=float)
+    for label, first_value, second_value, color, fontsize in bands:
+        values = np.asarray([first_value, second_value], dtype=float)
+        if not values.any():
+            continue
+        upper = lower + values
         ax.fill(
             [0, 0, 1, 1],
-            [
-                first_starts[index],
-                first_ends[index],
-                second_ends[index],
-                second_starts[index],
-            ],
+            [lower[0], upper[0], upper[1], lower[1]],
             facecolor=color,
             edgecolor="white",
-            linewidth=0.25,
-            alpha=0.8 if index in color_map else 0.45,
+            linewidth=0.35,
+            alpha=0.9,
         )
+        _draw_beta_abundance_label(
+            ax,
+            label,
+            lower,
+            upper,
+            first_value,
+            second_value,
+            fontsize,
+        )
+        lower = upper
+
+    upper_limit = max(float(lower.max()), 1.0)
     ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
+    ax.set_ylim(0, upper_limit)
     ax.set_xticks([0, 1])
     ax.set_xticklabels([str(first_sample), str(second_sample)], rotation=25, ha="right")
-    ax.set_ylabel("Cumulative frequency")
+    ax.set_ylabel("Cumulative abundance")
     ax.grid(False)
 
 
@@ -2466,13 +2539,14 @@ def beta_table(
     beta_data : dict or pandas.DataFrame
         Dictionary returned by ``beta.metrics`` or its ``full_table`` directly.
     plot_type : {"dots", "diff"}, default "dots"
-        Scatterplot matrix or cumulative-frequency matching plots.
+        Scatterplot matrix or VDJtools-style shared-abundance plots.
     log_scale : bool, default False
         Use logarithmic axes for ``dots`` plots.
     log_base : float, default 10
         Logarithm base and zero-frequency floor divisor.
     top : int, default 20
-        Number of high-mean-frequency clonotypes colored in ``diff`` plots.
+        Number of shared clonotypes ranked by geometric-mean frequency and
+        displayed individually in ``diff`` plots.
     height, aspect : float
         Per-panel height and width multiplier.
 

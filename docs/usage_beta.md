@@ -102,10 +102,14 @@ complete row-by-column tile matrix.
 rsplot.beta_table(all_results, plot_type="dots", log_scale=True)
 ```
 
-With `plot_type="diff"`, each pair is a cumulative-frequency matching plot.
-The `top=20` clonotypes with the largest mean frequency receive the existing
-20-color palette, while all remaining clonotypes are grey. Within-set pairs use
-a wrapped facet layout; comparisons between two sample sets use a tile matrix.
+With `plot_type="diff"`, each pair follows the VDJtools shared-clonotype
+abundance layout. The `top=20` shared clonotypes ranked by geometric-mean
+frequency are shown individually with the existing 20-color palette. Remaining
+shared clonotypes are collapsed into `NotShown`, while clonotypes occurring in
+only one sample are collapsed into `NonOverlapping`. Each displayed clonotype's
+CDR3 amino-acid sequence is written at the sample where it reaches maximum
+abundance. Within-set pairs use a wrapped facet layout; comparisons between two
+sample sets use a tile matrix.
 
 ```python
 rsplot.beta_table(all_results, plot_type="diff", top=20)

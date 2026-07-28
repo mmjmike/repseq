@@ -899,15 +899,15 @@ def _beta_metric_matrix():
 def _beta_full_table_same_set():
     rows = []
     pair_values = {
-        ("s1", "s2"): [(0.6, 0.4), (0.4, 0.6)],
-        ("s1", "s3"): [(0.8, 0.2), (0.2, 0.8)],
-        ("s2", "s3"): [(0.7, 0.5), (0.3, 0.5)],
+        ("s1", "s2"): [(0.4, 0.2), (0.2, 0.4), (0.4, 0.0), (0.0, 0.4)],
+        ("s1", "s3"): [(0.4, 0.2), (0.2, 0.4), (0.4, 0.0), (0.0, 0.4)],
+        ("s2", "s3"): [(0.4, 0.2), (0.2, 0.4), (0.4, 0.0), (0.0, 0.4)],
     }
     for (sample1, sample2), values in pair_values.items():
         for clone_number, (frequency1, frequency2) in enumerate(values):
             rows.append(
                 {
-                    "clone": f"clone{clone_number}",
+                    "cdr3aa": f"CASS{clone_number}",
                     "sample1": sample1,
                     "sample2": sample2,
                     "sample1_freq": frequency1,
@@ -927,14 +927,14 @@ def _beta_full_table_two_sets():
             rows.extend(
                 [
                     {
-                        "clone": "clone1",
+                        "cdr3aa": "CASS1",
                         "sample1": row_sample,
                         "sample2": column_sample,
                         "sample1_freq": 0.75,
                         "sample2_freq": 0.25,
                     },
                     {
-                        "clone": "clone2",
+                        "cdr3aa": "CASS2",
                         "sample1": row_sample,
                         "sample2": column_sample,
                         "sample1_freq": 0.25,
@@ -1049,11 +1049,17 @@ def test_beta_table_diff_uses_facets_and_matrix_tiles():
     same_set = rsplot.beta_table(
         _beta_full_table_same_set(),
         plot_type="diff",
-        top=2,
+        top=1,
     )
     visible_same_set = [ax for ax in same_set.axes if ax.get_visible()]
     assert len(visible_same_set) == 3
     assert all(ax.patches for ax in visible_same_set)
+    for ax in visible_same_set:
+        labels = {text.get_text() for text in ax.texts}
+        assert "NonOverlapping" in labels
+        assert "NotShown" in labels
+        assert "CASS0" in labels
+        assert ax.get_ylabel() == "Cumulative abundance"
 
     two_sets = rsplot.beta_table(
         _beta_full_table_two_sets(),
