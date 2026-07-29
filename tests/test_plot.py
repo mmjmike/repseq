@@ -1047,6 +1047,11 @@ def _beta_metric_matrix():
     return matrix
 
 
+def test_beta_metric_formats_one_without_decimal():
+    assert rsplot._format_beta_value(1.0) == "1"
+    assert rsplot._format_beta_value(2.0) == "2.0"
+
+
 def _beta_full_table_same_set():
     rows = []
     pair_values = {

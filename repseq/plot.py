@@ -2190,6 +2190,8 @@ def _format_beta_value(value):
     value = float(value)
     if value == 0:
         return "0"
+    if value == 1:
+        return "1"
     if value.is_integer() and abs(value) < 10000:
         candidate = f"{value:.1f}"
         if len(candidate) <= 6:
