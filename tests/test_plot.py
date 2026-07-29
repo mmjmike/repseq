@@ -517,6 +517,157 @@ def test_segment_usage_rejects_too_many_boxplot_groups():
         )
 
 
+
+def _cdr3_lengths_long(sample_count=2):
+    rows = []
+    for sample_number in range(sample_count):
+        rows.extend(
+            [
+                {
+                    "sample_id": f"sample{sample_number}",
+                    "chain": "TRB",
+                    "cdr3_length": 3,
+                    "freq": 0.2 + sample_number * 0.2,
+                },
+                {
+                    "sample_id": f"sample{sample_number}",
+                    "chain": "TRB",
+                    "cdr3_length": 4,
+                    "freq": 0.8 - sample_number * 0.2,
+                },
+            ]
+        )
+    return pd.DataFrame(rows)
+
+
+def test_cdr3_length_distributions_plots_long_sample_frequencies():
+    fig = rsplot.cdr3_length_distributions(_cdr3_lengths_long())
+    ax = fig.axes[0]
+
+    assert ax.get_title() == "TRB"
+    assert ax.get_xlabel() == "CDR3 Length"
+    assert ax.get_ylabel() == "Frequency"
+    assert [tick.get_text() for tick in ax.get_xticklabels()] == ["3", "4"]
+    np.testing.assert_allclose(
+        [patch.get_height() for patch in ax.patches],
+        [0.2, 0.8, 0.4, 0.6],
+    )
+    assert fig.number not in plt.get_fignums()
+
+
+def test_cdr3_length_distributions_group_means_have_no_error_bars(monkeypatch):
+    lengths = _cdr3_lengths_long(sample_count=4)
+    metadata = pd.DataFrame(
+        [
+            {
+                "sample_id": f"sample{sample_number}",
+                "chain": "TRB",
+                "condition": "control" if sample_number < 2 else "treated",
+                "tissue": "blood",
+                "sex": "F",
+            }
+            for sample_number in range(4)
+        ]
+    )
+    bar_kwargs = []
+    original_bar = Axes.bar
+
+    def capture_bar(self, *args, **kwargs):
+        bar_kwargs.append(kwargs)
+        return original_bar(self, *args, **kwargs)
+
+    monkeypatch.setattr(Axes, "bar", capture_bar)
+    fig = rsplot.cdr3_length_distributions(
+        lengths,
+        metadata=metadata,
+        group="condition",
+        split=["tissue", "sex"],
+    )
+
+    assert [ax.get_title() for ax in fig.axes] == ["TRB | blood | F"]
+    assert all("yerr" not in kwargs for kwargs in bar_kwargs)
+    np.testing.assert_allclose(
+        [patch.get_height() for patch in fig.axes[0].patches],
+        [0.3, 0.7, 0.7, 0.3],
+    )
+
+
+def test_cdr3_length_distributions_accepts_wide_count_table():
+    lengths = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "TRB", 3: 2, 4: 8},
+            {"sample_id": "sample2", "chain": "TRB", 3: 4, 4: 6},
+        ]
+    )
+
+    fig = rsplot.cdr3_length_distributions(lengths)
+
+    assert fig.axes[0].get_ylabel() == "Count"
+    np.testing.assert_allclose(
+        [patch.get_height() for patch in fig.axes[0].patches],
+        [2, 8, 4, 6],
+    )
+
+
+def test_cdr3_length_distributions_preserves_ordered_two_split_panels():
+    lengths = _cdr3_lengths_long()
+    metadata = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample0",
+                "chain": "TRB",
+                "tissue": "blood",
+                "sex": "M",
+            },
+            {
+                "sample_id": "sample1",
+                "chain": "TRB",
+                "tissue": "tumor",
+                "sex": "F",
+            },
+        ]
+    )
+    metadata["tissue"] = pd.Categorical(
+        metadata["tissue"], categories=["tumor", "blood"], ordered=True
+    )
+    metadata["sex"] = pd.Categorical(
+        metadata["sex"], categories=["F", "M"], ordered=True
+    )
+
+    fig = rsplot.cdr3_length_distributions(
+        lengths,
+        metadata=metadata,
+        split=["tissue", "sex"],
+    )
+
+    assert [ax.get_title() for ax in fig.axes] == [
+        "TRB | tumor | F",
+        "TRB | blood | M",
+    ]
+
+
+def test_cdr3_length_distributions_enforces_group_and_series_limits():
+    metadata = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample0",
+                "chain": "TRB",
+                "condition": "control",
+                "batch": "b1",
+            }
+        ]
+    )
+    with pytest.raises(ValueError, match="group can contain at most 1"):
+        rsplot.cdr3_length_distributions(
+            _cdr3_lengths_long(sample_count=1),
+            metadata=metadata,
+            group=["condition", "batch"],
+        )
+
+    with pytest.warns(UserWarning, match="at most 10 groups"):
+        fig = rsplot.cdr3_length_distributions(_cdr3_lengths_long(sample_count=11))
+    assert fig is None
+
 def _vj_usage_long(sample_count=2):
     rows = []
     for sample_number in range(sample_count):

@@ -475,6 +475,38 @@ rsplot.diversity_stats(
 Ordered pandas categorical columns in metadata keep their order in the x-axis,
 color legend, and split panels.
 
+
+### Plotting CDR3 length distributions
+
+`rsplot.cdr3_length_distributions` accepts the long or wide table returned by
+`stats.cdr3_length_distributions`. Each panel is a bar plot with CDR3 length on
+the x-axis and frequency or count on the y-axis. Chain values, when present,
+are placed in separate panels.
+
+```py
+cdr3_lengths = stats.cdr3_length_distributions(
+    clonosets,
+    cl_filter=func_filter,
+    table="long",
+)
+
+rsplot.cdr3_length_distributions(cdr3_lengths)
+```
+
+One metadata column can group samples, and up to two metadata columns can split
+the figure into panels. Grouped bars show the sample mean without error bars.
+As in categorical segment-usage plots, at most ten samples or groups are shown.
+Ordered categorical metadata controls group and panel order.
+
+```py
+rsplot.cdr3_length_distributions(
+    cdr3_lengths,
+    metadata=metadata,
+    group="experimental_group",
+    split=["tissue", "sex"],
+)
+```
+
 ### Plotting segment usage
 
 `rsplot.segment_usage` accepts both the long and wide tables returned by

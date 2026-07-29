@@ -1232,6 +1232,220 @@ def segment_usage(
     return fig
 
 
+def _normalize_cdr3_length_table(cdr3_length_df):
+    if not isinstance(cdr3_length_df, pd.DataFrame):
+        raise TypeError("cdr3_length_df must be a pandas DataFrame")
+    if "sample_id" not in cdr3_length_df.columns:
+        raise ValueError("cdr3_length_df must contain a 'sample_id' column")
+
+    data = cdr3_length_df.copy()
+    length_column = _column_by_name(data.columns, {"cdr3_length"})
+    value_columns = [
+        column
+        for column in data.columns
+        if isinstance(column, str) and column.casefold() in {"freq", "count"}
+    ]
+    id_columns = ["sample_id"]
+    if "chain" in data.columns:
+        id_columns.append("chain")
+
+    if length_column is not None:
+        if len(value_columns) != 1:
+            raise ValueError(
+                "Long CDR3-length tables must contain exactly one 'freq' or "
+                "'count' column"
+            )
+        value_column = value_columns[0]
+        data = data[id_columns + [length_column, value_column]].rename(
+            columns={length_column: "_length", value_column: "_value"}
+        )
+        value_label = "Frequency" if value_column.casefold() == "freq" else "Count"
+    else:
+        wide_columns = [column for column in data.columns if column not in id_columns]
+        parsed_lengths = pd.to_numeric(pd.Index(wide_columns), errors="coerce")
+        valid_lengths = np.isfinite(parsed_lengths) & (parsed_lengths % 1 == 0)
+        if not wide_columns or not valid_lengths.all():
+            raise ValueError(
+                "Wide CDR3-length tables must contain only integer length columns "
+                "after 'sample_id' and optional 'chain'"
+            )
+        length_mapping = dict(zip(wide_columns, parsed_lengths.astype(int)))
+        data = data.melt(
+            id_vars=id_columns,
+            value_vars=wide_columns,
+            var_name="_length",
+            value_name="_value",
+        )
+        data["_length"] = data["_length"].map(length_mapping)
+        numeric_values = pd.to_numeric(data["_value"], errors="coerce")
+        sample_totals = numeric_values.groupby(
+            [data[column] for column in id_columns], observed=True
+        ).sum()
+        value_label = (
+            "Frequency"
+            if sample_totals.notna().all() and sample_totals.le(1 + 1e-8).all()
+            else "Count"
+        )
+
+    data["_length"] = pd.to_numeric(data["_length"], errors="coerce")
+    data["_value"] = pd.to_numeric(data["_value"], errors="coerce")
+    valid_rows = (
+        data["_length"].notna()
+        & np.isfinite(data["_length"])
+        & (data["_length"] % 1 == 0)
+        & data["_value"].notna()
+        & np.isfinite(data["_value"])
+    )
+    if not valid_rows.all():
+        warnings.warn(
+            f"Dropped {int((~valid_rows).sum())} CDR3-length row(s) with "
+            "missing or non-numeric values.",
+            UserWarning,
+            stacklevel=2,
+        )
+        data = data.loc[valid_rows].copy()
+    if data.empty:
+        raise ValueError("No valid CDR3-length values were found")
+
+    data["_length"] = data["_length"].astype(int)
+    return data, value_label
+
+
+def _cdr3_length_panels(data, split_columns):
+    panel_columns = (["chain"] if "chain" in data.columns else []) + split_columns
+    if not panel_columns:
+        return [("CDR3 Length Distribution", data.copy())]
+
+    levels = [_category_order(data[column]) for column in panel_columns]
+    panels = []
+    for combination in _cartesian_product(levels):
+        panel_data = data
+        for column, value in zip(panel_columns, combination):
+            panel_data = panel_data.loc[panel_data[column] == value]
+        if panel_data.empty:
+            continue
+        panels.append((" | ".join(map(str, combination)), panel_data.copy()))
+    return panels
+
+
+def _draw_cdr3_length_bars(ax, data, group_column, palette):
+    length_order = sorted(pd.unique(data["_length"]))
+    x = np.arange(len(length_order), dtype=float)
+    series_column = group_column or "_sample_label"
+    series_order = _category_order(data[series_column])
+    color_map = _palette_mapping(series_order, palette)
+    width = 0.8 / max(1, len(series_order))
+
+    for index, series in enumerate(series_order):
+        series_data = data.loc[data[series_column] == series]
+        matrix = series_data.pivot_table(
+            index="_sample_label",
+            columns="_length",
+            values="_value",
+            aggfunc="sum",
+            fill_value=0,
+            sort=False,
+        ).reindex(columns=length_order, fill_value=0)
+        values = matrix.mean(axis=0) if group_column else matrix.sum(axis=0)
+        offset = (index - (len(series_order) - 1) / 2) * width
+        ax.bar(
+            x + offset,
+            values.to_numpy(),
+            width=width,
+            color=color_map[series],
+            label=str(series),
+        )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(length_order)
+
+
+def cdr3_length_distributions(
+    cdr3_length_df,
+    metadata=None,
+    group=None,
+    split=None,
+    palette=None,
+    height=3.2,
+    aspect=1.2,
+):
+    """Plot CDR3-length distributions from a long or wide statistics table.
+
+    Parameters
+    ----------
+    cdr3_length_df : pandas.DataFrame
+        Long or wide output from :func:`stats.cdr3_length_distributions`.
+    metadata : pandas.DataFrame, optional
+        Sample metadata with one row per ``sample_id`` or ``sample_id`` plus
+        ``chain``. Grouping and splitting columns must come from this table.
+    group : str, optional
+        One metadata column used to group samples. Bars show the sample mean
+        for each group without error bars. Without a group, each sample is a
+        separate series.
+    split : str or sequence of str, optional
+        Up to two metadata columns used to split plots into panels.
+    palette : optional
+        Any seaborn/matplotlib-compatible palette specification.
+    height, aspect : float
+        Panel height and width scaling.
+
+    Returns
+    -------
+    matplotlib.figure.Figure or None
+        The created figure, or ``None`` when more than ten series are present.
+    """
+    data, value_label = _normalize_cdr3_length_table(cdr3_length_df)
+    group_columns = _as_list(group, "group", max_len=1)
+    split_columns = _as_list(split, "split", max_len=2)
+    data, metadata_columns, _ = _merge_stats_metadata(data, metadata)
+    if metadata is None and (group_columns or split_columns):
+        raise ValueError("metadata is required when group or split columns are used")
+    _validate_metadata_columns(group_columns, metadata_columns, "group")
+    _validate_metadata_columns(split_columns, metadata_columns, "split")
+    data["_sample_label"] = data["sample_id"].astype(str)
+
+    group_column = group_columns[0] if group_columns else None
+    series_column = group_column or "_sample_label"
+    series_count = data[series_column].nunique(dropna=True)
+    if series_count > 10:
+        warnings.warn(
+            "CDR3-length plots support at most 10 groups; "
+            f"found {series_count}. Nothing was plotted.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return None
+
+    panels = _cdr3_length_panels(data, split_columns)
+    max_lengths = max(panel["_length"].nunique() for _, panel in panels)
+    figure_width = max(8, min(24, max_lengths * 0.38 * aspect))
+    fig, axes_array = plt.subplots(
+        len(panels),
+        1,
+        figsize=(figure_width, height * len(panels)),
+        squeeze=False,
+    )
+    axes = list(axes_array[:, 0])
+    for (title, panel_data), ax in zip(panels, axes):
+        _draw_cdr3_length_bars(ax, panel_data, group_column, palette)
+        ax.set_title(title)
+        ax.set_xlabel("CDR3 Length")
+        ax.set_ylabel(value_label)
+        sns.despine(ax=ax)
+
+    _add_figure_legend(
+        fig,
+        axes,
+        _caption(group_column) if group_column else "Sample",
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    plt.close(fig)
+    return fig
+
+
+cdr3_length_distribution = cdr3_length_distributions
+
+
 def _parse_pipe_usage_combination(value, expected_length):
     if not isinstance(value, str):
         return None
@@ -2740,6 +2954,8 @@ __all__ = [
     "parse_gene_name",
     "plot_stats",
     "segment_usage",
+    "cdr3_length_distribution",
+    "cdr3_length_distributions",
     "vj_usage",
     "vjlen_usage",
     "beta_metric",
