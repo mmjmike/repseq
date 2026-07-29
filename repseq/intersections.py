@@ -91,6 +91,174 @@ def intersect_clones_in_samples_batch(clonosets_df, cl_filter=None, overlap_type
     return df
 
 
+def similarity(
+    clonosets_df,
+    cl_filter=None,
+    overlap_type="aaV",
+    by_freq=None,
+    clonosets_df2=None,
+    cl_filter2=None,
+    mismatches=1,
+    result="freq",
+    cpu=None,
+):
+    """Calculate directional clonotype similarity between repertoire samples.
+
+    The S-metric is the total count or frequency of clonotypes in a target
+    sample that are similar to at least one clonotype in a comparison sample.
+    Matrix rows are target samples and columns are comparison samples. A target
+    clonotype contributes once even when it matches several comparison
+    clonotypes; ``result="table"`` retains every matching clonotype pair.
+
+    Similarity definitions are selected with ``overlap_type``: ``aa`` and
+    ``nt`` compare CDR3 sequences, ``aaV``/``ntV`` additionally require equal V
+    segments, ``aaVJ``/``ntVJ`` require equal V and J segments, ``VJ`` ignores
+    CDR3 sequence, and ``VJlen`` additionally requires equal amino-acid CDR3
+    length. ``mismatches`` is the maximum Hamming distance for sequence-based
+    overlap types.
+
+    Parameters
+    ----------
+    clonosets_df : pandas.DataFrame
+        Target sample table with unique ``sample_id`` and ``filename`` columns.
+    cl_filter : Filter, optional
+        Filter applied to target samples.
+    overlap_type : str, default "aaV"
+        One of ``aa``, ``aaV``, ``aaVJ``, ``nt``, ``ntV``, ``ntVJ``, ``VJ``,
+        or ``VJlen``.
+    by_freq : bool, optional
+        Deprecated compatibility argument. The value is ignored.
+    clonosets_df2 : pandas.DataFrame, optional
+        Comparison sample table. When omitted, all target samples are compared
+        directionally with each other.
+    cl_filter2 : Filter, optional
+        Filter applied to comparison samples. Defaults to ``cl_filter``.
+    mismatches : int, default 1
+        Maximum CDR3 Hamming distance for sequence-based comparisons.
+    result : {"freq", "count", "number", "table"}, default "freq"
+        Frequency S-metric, count S-metric, number of matched target
+        clonotypes, or the full table of matching clonotype pairs.
+    cpu : int, optional
+        Number of worker processes.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Directional sample matrix or a matching-clonotype pair table.
+    """
+    if by_freq is not None:
+        warnings.warn(
+            "`by_freq` is deprecated and ignored; use result='freq' or "
+            "result='count' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    overlap_type_to_flags(overlap_type)
+    if not isinstance(mismatches, (int, np.integer)) or isinstance(
+        mismatches,
+        bool,
+    ):
+        raise TypeError("mismatches must be a non-negative integer")
+    if mismatches < 0:
+        raise ValueError("mismatches must be a non-negative integer")
+    result = str(result).casefold()
+    possible_results = {"freq", "count", "number", "table"}
+    if result not in possible_results:
+        raise ValueError(
+            "result must be one of: " + ", ".join(sorted(possible_results))
+        )
+
+    uses_sequence = overlap_type_uses_sequence(overlap_type)
+    effective_mismatches = int(mismatches) if uses_sequence else 0
+    print("Calculating clonotype similarity\n" + "-" * 50)
+    print(f"Overlap type: {overlap_type}")
+    if uses_sequence:
+        print(f"Maximum mismatches: {effective_mismatches}")
+
+    clonoset_lists, _, two_dataframes, sample_list, sample_list2 = (
+        prepare_clonotypes_dfs_for_intersections(
+            clonosets_df,
+            clonosets_df2,
+            cl_filter,
+            cl_filter2,
+            overlap_type,
+            by_freq=False,
+            strict=not uses_sequence,
+        )
+    )
+    column_samples = sample_list2 if two_dataframes else sample_list
+
+    if result == "table":
+        tasks = [
+            (
+                target_sample,
+                comparison_sample,
+                clonoset_lists,
+                overlap_type,
+                effective_mismatches,
+                "table",
+            )
+            for target_sample in sample_list
+            for comparison_sample in column_samples
+            if two_dataframes or target_sample != comparison_sample
+        ]
+        pair_tables = (
+            run_parallel_calculation(
+                _similarity_pair_worker,
+                tasks,
+                "Calculating similarity",
+                object_name="pairs",
+                cpu=cpu,
+            )
+            if tasks
+            else []
+        )
+        table = (
+            pd.concat(pair_tables, ignore_index=True)
+            if pair_tables
+            else pd.DataFrame(columns=_similarity_table_columns())
+        )
+        table.attrs["sample_list"] = sample_list
+        table.attrs["sample_list2"] = sample_list2
+        table.attrs["result"] = "table"
+        table.attrs["overlap_type"] = overlap_type
+        table.attrs["mismatches"] = effective_mismatches
+        return table
+
+    tasks = [
+        (
+            target_sample,
+            comparison_sample,
+            clonoset_lists,
+            overlap_type,
+            effective_mismatches,
+            result,
+        )
+        for target_sample in sample_list
+        for comparison_sample in column_samples
+    ]
+    values = run_parallel_calculation(
+        _similarity_pair_worker,
+        tasks,
+        "Calculating similarity",
+        object_name="pairs",
+        cpu=cpu,
+    )
+    matrix = pd.DataFrame(0.0, index=sample_list, columns=column_samples)
+    for target_sample, comparison_sample, value in values:
+        matrix.loc[target_sample, comparison_sample] = value
+    if result in {"count", "number"}:
+        matrix = matrix.astype(int)
+    matrix.index.name = "sample1"
+    matrix.columns.name = "sample2"
+    matrix.attrs["sample_list"] = sample_list
+    matrix.attrs["sample_list2"] = sample_list2
+    matrix.attrs["result"] = result
+    matrix.attrs["overlap_type"] = overlap_type
+    matrix.attrs["mismatches"] = effective_mismatches
+    return matrix
+
+
 def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, strict_presence=False, by_freq=False):
     """
     Creates a table that shows how many times each unique clonotype appears across different clonosets. It processes a given dataset of clonotypes (clonosets_df) 
@@ -927,6 +1095,139 @@ def clone_dict_to_len_vj_format(clone_dict):
         else:
             len_vj_dict[new_key].append(clone_value)
     return len_vj_dict
+
+def _similarity_table_columns():
+    return [
+        "clone1",
+        "clone2",
+        "sample1_count",
+        "sample2_count",
+        "sample1_freq",
+        "sample2_freq",
+        "mismatches",
+        "sample1",
+        "sample2",
+        "pair",
+    ]
+
+
+def _similarity_total_count(clonoset_dict, uses_sequence):
+    if not uses_sequence:
+        return float(sum(clonoset_dict.values()))
+    return float(
+        sum(clone[-1] for clones in clonoset_dict.values() for clone in clones)
+    )
+
+
+def _similarity_sequence_matches(target_dict, comparison_dict, mismatches):
+    for target_key, target_clones in target_dict.items():
+        comparison_clones = comparison_dict.get(target_key, [])
+        if not comparison_clones:
+            continue
+        clone_suffix = target_key[1:]
+        for target_clone in target_clones:
+            target_sequence = target_clone[0]
+            target_identity = (target_sequence, *clone_suffix)
+            target_count = target_clone[-1]
+            for comparison_clone in comparison_clones:
+                comparison_sequence = comparison_clone[0]
+                distance = sum(
+                    first != second
+                    for first, second in zip(target_sequence, comparison_sequence)
+                )
+                if distance <= mismatches:
+                    yield (
+                        target_identity,
+                        (comparison_sequence, *clone_suffix),
+                        target_count,
+                        comparison_clone[-1],
+                        distance,
+                    )
+
+
+def _similarity_exact_matches(target_dict, comparison_dict):
+    for target_clone, target_count in target_dict.items():
+        if target_clone in comparison_dict:
+            yield (
+                target_clone,
+                target_clone,
+                target_count,
+                comparison_dict[target_clone],
+                0,
+            )
+
+
+def _similarity_pair_matches(
+    target_dict,
+    comparison_dict,
+    overlap_type,
+    mismatches,
+):
+    if overlap_type_uses_sequence(overlap_type):
+        return _similarity_sequence_matches(
+            target_dict,
+            comparison_dict,
+            mismatches,
+        )
+    return _similarity_exact_matches(target_dict, comparison_dict)
+
+
+def _similarity_pair_worker(args):
+    (
+        target_sample,
+        comparison_sample,
+        clonoset_dicts,
+        overlap_type,
+        mismatches,
+        result,
+    ) = args
+    target_dict = clonoset_dicts[target_sample]
+    comparison_dict = clonoset_dicts[comparison_sample]
+    uses_sequence = overlap_type_uses_sequence(overlap_type)
+    target_total = _similarity_total_count(target_dict, uses_sequence)
+    comparison_total = _similarity_total_count(comparison_dict, uses_sequence)
+    matches = _similarity_pair_matches(
+        target_dict,
+        comparison_dict,
+        overlap_type,
+        mismatches,
+    )
+
+    if result == "table":
+        rows = [
+            [
+                target_clone,
+                comparison_clone,
+                target_count,
+                comparison_count,
+                target_count / target_total if target_total else 0,
+                comparison_count / comparison_total if comparison_total else 0,
+                distance,
+                target_sample,
+                comparison_sample,
+                f"{target_sample}_vs_{comparison_sample}",
+            ]
+            for (
+                target_clone,
+                comparison_clone,
+                target_count,
+                comparison_count,
+                distance,
+            ) in matches
+        ]
+        return pd.DataFrame(rows, columns=_similarity_table_columns())
+
+    matched_target_counts = {}
+    for target_clone, _, target_count, _, _ in matches:
+        matched_target_counts.setdefault(target_clone, target_count)
+    if result == "number":
+        value = len(matched_target_counts)
+    else:
+        value = float(sum(matched_target_counts.values()))
+        if result == "freq":
+            value = value / target_total if target_total else 0.0
+    return target_sample, comparison_sample, value
+
 
 def intersect_two_clone_dicts(args):
     (sample_id_1, sample_id_2, clonoset_dicts) = args

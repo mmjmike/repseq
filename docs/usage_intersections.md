@@ -1,5 +1,65 @@
 # Usage: intersections between clonosets
 
+## Directional clonotype similarity
+
+`intersections.similarity` calculates the directional S-metric for exact or
+mismatch-tolerant clonotype comparisons. Rows are target samples and columns
+are comparison samples. A target clonotype contributes once to a matrix value
+when it is similar to at least one comparison clonotype, even if several
+comparison clonotypes match it.
+
+```py
+from repseq import intersections
+
+similarity_frequency = intersections.similarity(
+    clonosets_df,
+    cl_filter=downsample_filter,
+    overlap_type="aaV",
+    mismatches=1,
+    result="freq",
+    cpu=4,
+)
+```
+
+Similarity definitions are:
+
+- `aa` or `nt`: compare CDR3 amino-acid or nucleotide sequences;
+- `aaV` or `ntV`: additionally require the same V segment;
+- `aaVJ` or `ntVJ`: additionally require the same V and J segments;
+- `VJ`: compare V/J combinations and ignore CDR3 sequence;
+- `VJlen`: compare V/J combinations and amino-acid CDR3 length.
+
+For sequence-based overlap types, `mismatches` is the maximum CDR3 Hamming
+distance. It is ignored for `VJ` and `VJlen`.
+
+The `result` argument controls the output:
+
+- `freq`: total target-sample frequency of clonotypes with at least one match;
+- `count`: total target-sample count of clonotypes with at least one match;
+- `number`: number of distinct target clonotypes with at least one match;
+- `table`: every matching target/comparison clonotype pair, including counts,
+  frequencies, Hamming distance, sample identifiers, and pair identifier.
+
+```py
+similarity_counts = intersections.similarity(
+    clonosets_df,
+    overlap_type="ntVJ",
+    mismatches=2,
+    result="count",
+)
+
+similarity_pairs = intersections.similarity(
+    clonosets_df,
+    overlap_type="aa",
+    mismatches=1,
+    result="table",
+)
+```
+
+Pass `clonosets_df2` and optionally `cl_filter2` for a rectangular comparison.
+The first dataframe remains the target set in matrix rows, and the second
+becomes the comparison set in columns.
+
 To see further details, check the [Intersections](functions.md#intersections) module.
 
 ## Clonoset intersection
