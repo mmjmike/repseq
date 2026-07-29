@@ -268,9 +268,9 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
         clonosets_df (pd.DataFrame): contains three columns - `sample_id` and `filename` columns,
             `filename` - full path to clonoset file. Clonoset file may be of MiXCR3/MiXCR4 or VDJtools format
             sample_id's should be all unique in this DF
-        overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`. aa/nt define which CDR3 sequence
-            to use (amino acid or nucleotide). V/J in the overlap_type define whether to check V or J segments
-            to decide if clonotypes are equal
+        overlap_type (str): possible values are `aa`, `aaV`, `aaVJ`, `nt`, `ntV`, `ntVJ`, `VJ`, and `VJlen`.
+            aa/nt define which CDR3 sequence to use (amino acid or nucleotide). V/J in the overlap_type define whether
+            to check V or J segments to decide if clonotypes are equal. `VJ` and `VJlen` do not compare sequences.
         mismatches (int): Max number of single-letter mismatches in clonotypes sequences 
             for them to be treated similar, i.e. hamming distance.
         only_functional (bool): use only functional clonotypes (do not contain stop codons or
@@ -284,20 +284,22 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
             but not its count
     
     Returns:
-        df (pd.DataFrame): dataframe containing clonotype counts with sample names as columns and all possible clonotypes (given the overlap_type) as rows. 
+        df (pd.DataFrame): dataframe containing a pipe-delimited `clonotype` column, its component columns,
+            and one count or frequency column per sample.
     """
 
     
     print("Creating clonotypes count table\n"+"-"*50)
     print(f"Overlap type: {overlap_type}")
-    aa, check_v, check_j = overlap_type_to_flags(overlap_type)
+    effective_mismatches = mismatches if overlap_type_uses_sequence(overlap_type) else 0
     clonoset_dicts = convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=cl_filter,
-                                                        overlap_type=overlap_type, by_freq=by_freq, strict=not bool(mismatches))
+                                                        overlap_type=overlap_type, by_freq=by_freq,
+                                                        strict=not bool(effective_mismatches))
     unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts)
     
     tasks = []
     for sample_id in clonoset_dicts:
-        task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], mismatches, strict_presence]
+        task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], effective_mismatches, strict_presence]
         tasks.append(task)
     
     results = run_parallel_calculation(count_table_mp, tasks, "Counting features", object_name="clonosets")
@@ -305,8 +307,8 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
     for result in results:
         result_dict.update(result)
     count_table = pd.DataFrame(result_dict)
-    count_table.index = unique_clonotypes
-    return count_table
+    count_table.insert(0, "clone", unique_clonotypes)
+    return format_clonotype_columns(count_table, overlap_type)
 
 
 
@@ -465,8 +467,9 @@ def tcrnet(clonosets_df_exp, clonosets_df_control, cl_filter=None, cl_filter_c=N
             for them to be treated similar, i.e. hamming distance.
     
     Returns:
-        df (pd.DataFrame): dataframe with following columns: `fold`, `p_value_b`, `p_value_p`, `p_value_b_adj`, `p_value_p_adj`, `log10_b_adj`, `log10_p_adj`, `log2_fc`. `p` in `p_value` 
-        stands for `poisson`, `b` for `binomial`, `adj` for multiple testing correction, and `log2_fc`for log2 fold change 
+        df (pd.DataFrame): dataframe beginning with a pipe-delimited `clonotype` column and its component columns,
+            followed by neighbour counts and statistics. `p` in `p_value` stands for `poisson`, `b` for `binomial`,
+            `adj` for multiple testing correction, and `log2_fc` for log2 fold change.
     """
     
     print("Running TCRnet neighbour count\n"+"-"*50)
@@ -494,6 +497,7 @@ def tcrnet(clonosets_df_exp, clonosets_df_control, cl_filter=None, cl_filter_c=N
     results = list(itertools.chain.from_iterable(results)) # unpack results from several workers
 
     df = pd.DataFrame(results, columns=["clone", "count_exp", "count_control", "group_count_exp", "group_count_control"])
+    df = format_clonotype_columns(df, overlap_type)
     df = tcrnet_stats_calc(df)
     return df
 
@@ -1272,6 +1276,37 @@ def split_tuple_clone_column(df, overlap_type):
         df["j"] = df[clone_column].apply(lambda clone: clone[2])
     feature_columns = [seq_column] + (["v"] if check_v else []) + (["j"] if check_j else [])
     return df[feature_columns + [column for column in df.columns if column not in feature_columns + [clone_column]]]
+
+
+def format_clonotype_columns(df, overlap_type, clone_column="clone"):
+    """Replace a tuple clone column with string and component columns."""
+    aa, check_v, check_j = overlap_type_to_flags(overlap_type)
+    clonotypes = df[clone_column]
+
+    if overlap_type in {"VJ", "VJlen"}:
+        component_columns = ["v", "j"]
+        if overlap_type == "VJlen":
+            component_columns.append("len")
+    else:
+        component_columns = ["cdr3aa" if aa else "cdr3nt"]
+        if check_v:
+            component_columns.append("v")
+        if check_j:
+            component_columns.append("j")
+
+    clone_position = df.columns.get_loc(clone_column)
+    result = df.drop(columns=clone_column).copy()
+    result.insert(
+        clone_position,
+        "clonotype",
+        clonotypes.apply(lambda clone: "|".join(str(value) for value in clone)),
+    )
+    for offset, component_column in enumerate(component_columns, start=1):
+        values = clonotypes.apply(lambda clone, index=offset - 1: clone[index])
+        if component_column == "len":
+            values = values.astype(int)
+        result.insert(clone_position + offset, component_column, values)
+    return result
 
 
 def find_overlapping_clones_in_two_clone_dicts(args):

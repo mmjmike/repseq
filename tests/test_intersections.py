@@ -187,3 +187,117 @@ def test_similarity_validates_arguments_and_deprecates_by_freq(monkeypatch):
         intersections.similarity(samples, mismatches=1.5)
     with pytest.warns(DeprecationWarning, match="deprecated and ignored"):
         intersections.similarity(samples, by_freq=True)
+
+
+@pytest.mark.parametrize(
+    ("overlap_type", "clonoset_dicts", "expected_columns", "expected_row"),
+    [
+        (
+            "aaVJ",
+            {
+                "s1": {("AAA", "V1", "J1"): 5},
+                "s2": {("AAA", "V1", "J1"): 3},
+            },
+            ["clonotype", "cdr3aa", "v", "j", "s1", "s2"],
+            {
+                "clonotype": "AAA|V1|J1",
+                "cdr3aa": "AAA",
+                "v": "V1",
+                "j": "J1",
+                "s1": 5,
+                "s2": 3,
+            },
+        ),
+        (
+            "VJ",
+            {
+                "s1": {("V1", "J1"): 5},
+                "s2": {("V1", "J1"): 3},
+            },
+            ["clonotype", "v", "j", "s1", "s2"],
+            {
+                "clonotype": "V1|J1",
+                "v": "V1",
+                "j": "J1",
+                "s1": 5,
+                "s2": 3,
+            },
+        ),
+        (
+            "VJlen",
+            {
+                "s1": {("V1", "J1", 15): 5},
+                "s2": {("V1", "J1", 15): 3},
+            },
+            ["clonotype", "v", "j", "len", "s1", "s2"],
+            {
+                "clonotype": "V1|J1|15",
+                "v": "V1",
+                "j": "J1",
+                "len": 15,
+                "s1": 5,
+                "s2": 3,
+            },
+        ),
+    ],
+)
+def test_count_table_returns_string_clonotype_and_component_columns(
+    monkeypatch,
+    overlap_type,
+    clonoset_dicts,
+    expected_columns,
+    expected_row,
+):
+    conversion_args = {}
+
+    def fake_convert(*args, **kwargs):
+        conversion_args.update(kwargs)
+        return clonoset_dicts
+
+    monkeypatch.setattr(intersections, "convert_clonosets_to_compact_dicts", fake_convert)
+    monkeypatch.setattr(intersections, "run_parallel_calculation", _run_sequential)
+
+    table = intersections.count_table(
+        _dummy_samples(["s1", "s2"]),
+        overlap_type=overlap_type,
+        mismatches=2 if overlap_type in {"VJ", "VJlen"} else 0,
+    )
+
+    assert list(table.columns) == expected_columns
+    assert isinstance(table.index, pd.RangeIndex)
+    assert table.iloc[0].to_dict() == expected_row
+    if overlap_type in {"VJ", "VJlen"}:
+        assert conversion_args["strict"] is True
+
+
+def test_tcrnet_returns_string_clonotype_and_component_columns(monkeypatch):
+    monkeypatch.setattr(
+        intersections,
+        "pool_clonotypes_from_clonosets_df",
+        lambda clonosets_df, cl_filter=None: clonosets_df.attrs["pool_name"],
+    )
+
+    def fake_prepare(clonoset, **kwargs):
+        if clonoset == "experimental":
+            return {(3, "V1", "J1"): [("AAA", 2), ("AAT", 1)]}
+        return {(3, "V1", "J1"): [("AAA", 1)]}
+
+    monkeypatch.setattr(intersections, "prepare_clonoset_for_intersection", fake_prepare)
+    monkeypatch.setattr(intersections, "run_parallel_calculation", _run_sequential)
+
+    experimental = _dummy_samples(["experimental"])
+    experimental.attrs["pool_name"] = "experimental"
+    control = _dummy_samples(["control"])
+    control.attrs["pool_name"] = "control"
+
+    table = intersections.tcrnet(
+        experimental,
+        control,
+        overlap_type="aaVJ",
+        mismatches=1,
+    )
+
+    assert list(table.columns[:4]) == ["clonotype", "cdr3aa", "v", "j"]
+    assert "clone" not in table.columns
+    assert set(table["clonotype"]) == {"AAA|V1|J1", "AAT|V1|J1"}
+    assert all(isinstance(clonotype, str) for clonotype in table["clonotype"])
