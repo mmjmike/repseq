@@ -270,6 +270,124 @@ def test_count_table_returns_string_clonotype_and_component_columns(
         assert conversion_args["strict"] is True
 
 
+def test_count_table_uses_only_custom_clonotypes_in_dataframe_order(monkeypatch):
+    clonoset_dicts = {
+        "s1": {
+            ("AAA", "V1", "J1"): 5,
+            ("IGNORED", "V2", "J2"): 9,
+        },
+        "s2": {
+            ("AAA", "V1", "J1"): 3,
+        },
+    }
+    monkeypatch.setattr(
+        intersections,
+        "convert_clonosets_to_compact_dicts",
+        lambda *args, **kwargs: clonoset_dicts,
+    )
+    monkeypatch.setattr(intersections, "run_parallel_calculation", _run_sequential)
+    custom_clonotypes = pd.DataFrame(
+        [
+            {"cdr3aa": "ABSENT", "v": "V3", "j": "J3"},
+            {"cdr3aa": "AAA", "v": "V1", "j": "J1"},
+            {"cdr3aa": "AAA", "v": "V1", "j": "J1"},
+        ]
+    )
+
+    table = intersections.count_table(
+        _dummy_samples(["s1", "s2"]),
+        overlap_type="aaVJ",
+        custom_clonotypes_df=custom_clonotypes,
+    )
+
+    assert table.to_dict("records") == [
+        {
+            "clonotype": "ABSENT|V3|J3",
+            "cdr3aa": "ABSENT",
+            "v": "V3",
+            "j": "J3",
+            "s1": 0,
+            "s2": 0,
+        },
+        {
+            "clonotype": "AAA|V1|J1",
+            "cdr3aa": "AAA",
+            "v": "V1",
+            "j": "J1",
+            "s1": 5,
+            "s2": 3,
+        },
+    ]
+
+
+@pytest.mark.parametrize(
+    ("overlap_type", "custom_row", "expected_clonotype"),
+    [
+        ("aa", {"cdr3aa": "AAA"}, ("AAA",)),
+        ("aaV", {"cdr3aa": "AAA", "v": "V1"}, ("AAA", "V1")),
+        ("aaVJ", {"cdr3aa": "AAA", "v": "V1", "j": "J1"}, ("AAA", "V1", "J1")),
+        ("nt", {"cdr3nt": "GCT"}, ("GCT",)),
+        ("ntV", {"cdr3nt": "GCT", "v": "V1"}, ("GCT", "V1")),
+        ("ntVJ", {"cdr3nt": "GCT", "v": "V1", "j": "J1"}, ("GCT", "V1", "J1")),
+        ("VJ", {"v": "V1", "j": "J1"}, ("V1", "J1")),
+        ("VJlen", {"cdr3aa": "AAA", "v": "V1", "j": "J1"}, ("V1", "J1", 3)),
+    ],
+)
+def test_custom_clonotype_columns_follow_overlap_type(
+    overlap_type,
+    custom_row,
+    expected_clonotype,
+):
+    custom_clonotypes = pd.DataFrame([custom_row])
+
+    assert intersections._clonotypes_from_custom_dataframe(
+        custom_clonotypes,
+        overlap_type,
+    ) == [expected_clonotype]
+
+
+def test_count_table_custom_clonotypes_reports_schema_errors(monkeypatch):
+    def fail_if_clonosets_are_read(*args, **kwargs):
+        raise AssertionError("clonosets should not be read after invalid custom input")
+
+    monkeypatch.setattr(
+        intersections,
+        "convert_clonosets_to_compact_dicts",
+        fail_if_clonosets_are_read,
+    )
+
+    with pytest.raises(ValueError) as error:
+        intersections.count_table(
+            _dummy_samples(["s1"]),
+            overlap_type="aaVJ",
+            custom_clonotypes_df=pd.DataFrame({"cdr3aa": ["AAA"], "v": ["V1"]}),
+        )
+
+    message = str(error.value)
+    assert "overlap_type='aaVJ'" in message
+    assert "Missing required columns: j" in message
+    assert "Required columns: cdr3aa, v, j" in message
+    assert "Available columns: cdr3aa, v" in message
+    assert "Supported schemas:" in message
+
+
+@pytest.mark.parametrize(
+    ("custom_clonotypes", "error_type", "message"),
+    [
+        ([{"cdr3aa": "AAA"}], TypeError, "must be a pandas DataFrame"),
+        (pd.DataFrame({"cdr3aa": [None]}), ValueError, "contains missing values"),
+        (pd.DataFrame({"cdr3aa": [123]}), TypeError, "must be strings"),
+    ],
+)
+def test_custom_clonotypes_validates_dataframe_values(
+    custom_clonotypes,
+    error_type,
+    message,
+):
+    with pytest.raises(error_type, match=message):
+        intersections._clonotypes_from_custom_dataframe(custom_clonotypes, "aa")
+
+
 def test_tcrnet_returns_string_clonotype_and_component_columns(monkeypatch):
     monkeypatch.setattr(
         intersections,

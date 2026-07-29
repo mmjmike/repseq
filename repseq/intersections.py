@@ -259,7 +259,8 @@ def similarity(
     return matrix
 
 
-def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, strict_presence=False, by_freq=False):
+def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, strict_presence=False,
+                by_freq=False, custom_clonotypes_df=None):
     """
     Creates a table that shows how many times each unique clonotype appears across different clonosets. It processes a given dataset of clonotypes (clonosets_df) 
     and generates a frequency/count table based on a specified overlap type.
@@ -282,6 +283,11 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
             but not its count
         by_freq (bool): default is `True` - this means that the intersect metric is frequency of clonotype, 
             but not its count
+        custom_clonotypes_df (pd.DataFrame, optional): clonotypes to include in the table instead of
+            collecting all unique clonotypes from the input clonosets. Required columns depend on
+            `overlap_type`: `cdr3aa` or `cdr3nt` for sequence-based overlap types, `v` when V is used,
+            and `j` when J is used. `VJlen` requires `cdr3aa`, `v`, and `j`; CDR3 length is derived
+            from `cdr3aa`.
     
     Returns:
         df (pd.DataFrame): dataframe containing a pipe-delimited `clonotype` column, its component columns,
@@ -292,10 +298,15 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
     print("Creating clonotypes count table\n"+"-"*50)
     print(f"Overlap type: {overlap_type}")
     effective_mismatches = mismatches if overlap_type_uses_sequence(overlap_type) else 0
+    custom_clonotypes = None
+    if custom_clonotypes_df is not None:
+        custom_clonotypes = _clonotypes_from_custom_dataframe(custom_clonotypes_df, overlap_type)
     clonoset_dicts = convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=cl_filter,
                                                         overlap_type=overlap_type, by_freq=by_freq,
                                                         strict=not bool(effective_mismatches))
-    unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts)
+    unique_clonotypes = custom_clonotypes
+    if unique_clonotypes is None:
+        unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts)
     
     tasks = []
     for sample_id in clonoset_dicts:
@@ -309,6 +320,79 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
     count_table = pd.DataFrame(result_dict)
     count_table.insert(0, "clone", unique_clonotypes)
     return format_clonotype_columns(count_table, overlap_type)
+
+
+def _clonotypes_from_custom_dataframe(custom_clonotypes_df, overlap_type):
+    required_columns_by_overlap_type = {
+        "aa": ["cdr3aa"],
+        "aaV": ["cdr3aa", "v"],
+        "aaVJ": ["cdr3aa", "v", "j"],
+        "nt": ["cdr3nt"],
+        "ntV": ["cdr3nt", "v"],
+        "ntVJ": ["cdr3nt", "v", "j"],
+        "VJ": ["v", "j"],
+        "VJlen": ["cdr3aa", "v", "j"],
+    }
+    required_columns = required_columns_by_overlap_type[overlap_type]
+    schema_description = "; ".join(
+        f"{name}: {', '.join(columns)}"
+        for name, columns in required_columns_by_overlap_type.items()
+    )
+
+    if not isinstance(custom_clonotypes_df, pd.DataFrame):
+        raise TypeError(
+            "`custom_clonotypes_df` must be a pandas DataFrame. "
+            f"Required columns for overlap_type='{overlap_type}': {', '.join(required_columns)}. "
+            f"Supported schemas: {schema_description}."
+        )
+
+    missing_columns = [
+        column for column in required_columns if column not in custom_clonotypes_df.columns
+    ]
+    if missing_columns:
+        available_columns = ", ".join(map(str, custom_clonotypes_df.columns)) or "none"
+        raise ValueError(
+            f"`custom_clonotypes_df` does not match overlap_type='{overlap_type}'. "
+            f"Missing required columns: {', '.join(missing_columns)}. "
+            f"Required columns: {', '.join(required_columns)}. "
+            f"Available columns: {available_columns}. "
+            f"Supported schemas: {schema_description}."
+        )
+
+    required_values = custom_clonotypes_df[required_columns]
+    missing_value_mask = required_values.isna()
+    if missing_value_mask.any().any():
+        invalid_locations = []
+        for row_index, row in missing_value_mask.iterrows():
+            columns = [column for column in required_columns if row[column]]
+            if columns:
+                invalid_locations.append(f"index {row_index}: {', '.join(columns)}")
+        raise ValueError(
+            f"`custom_clonotypes_df` contains missing values in columns required for "
+            f"overlap_type='{overlap_type}' ({'; '.join(invalid_locations)}). "
+            f"Every row must provide: {', '.join(required_columns)}."
+        )
+
+    non_string_locations = []
+    for row_index, row in required_values.iterrows():
+        columns = [column for column in required_columns if not isinstance(row[column], str)]
+        if columns:
+            non_string_locations.append(f"index {row_index}: {', '.join(columns)}")
+    if non_string_locations:
+        raise TypeError(
+            f"`custom_clonotypes_df` values required for overlap_type='{overlap_type}' must be "
+            f"strings ({'; '.join(non_string_locations)}). Required columns: "
+            f"{', '.join(required_columns)}."
+        )
+
+    if overlap_type == "VJlen":
+        clonotypes = [
+            (row.v, row.j, len(row.cdr3aa))
+            for row in required_values.itertuples(index=False)
+        ]
+    else:
+        clonotypes = list(required_values.itertuples(index=False, name=None))
+    return list(dict.fromkeys(clonotypes))
 
 
 
