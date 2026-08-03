@@ -14,6 +14,21 @@ def test_find_all_mixcr_clonosets_finds_mixcr_exported_files(tmp_path):
     assert result.loc[0, "filename"] == str(filename)
 
 
+def test_find_all_mixcr_clonosets_finds_gzipped_exported_files(tmp_path):
+    filenames = {
+        tmp_path / "sample1.clonotypes.TRB.txt.gz",
+        tmp_path / "sample2.clones_TRA.tsv.gz",
+    }
+    for filename in filenames:
+        filename.write_bytes(b"")
+
+    result = clonosets.find_all_mixcr_clonosets(str(tmp_path))
+
+    assert set(result["sample_id"]) == {"sample1", "sample2"}
+    assert set(result["chain"]) == {"TRB", "TRA"}
+    assert set(result["filename"]) == {str(filename) for filename in filenames}
+
+
 def test_find_all_exported_clonosets_warns_and_delegates(tmp_path):
     filename = tmp_path / "sample1.clones_TRB.tsv"
     filename.write_text("cloneId\tcloneCount\n0\t1\n")

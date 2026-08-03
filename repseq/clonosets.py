@@ -76,13 +76,13 @@ def find_all_exported_clonosets_in_folder(folder, chain=None, show_offtarget=Tru
     all_files = os.listdir(folder)
     files = []
     for f in all_files:
-        old_match = re.match(r"(\S+)\.clonotypes\.([A-Z]+)(?:\W\S+)*\.txt", f)
+        old_match = re.match(r"(\S+)\.clonotypes\.([A-Z]+)(?:\W\S+)*\.txt(?:\.gz)?$", f)
         if old_match is not None:
             sample_id = old_match.group(1)
             sample_chain = old_match.group(2)
             # print(f"{f}: old_match")
         else:
-            new_match = re.match(r"(\S+)\.clones_([A-Z]+)(?:\W\S+)*\.tsv", f)
+            new_match = re.match(r"(\S+)\.clones_([A-Z]+)(?:\W\S+)*\.tsv(?:\.gz)?$", f)
             if new_match is not None:
                 sample_id = new_match.group(1)
                 sample_chain = new_match.group(2)
