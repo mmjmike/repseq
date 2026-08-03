@@ -191,11 +191,11 @@ Calc stats for clonoset size in clones, reads and UMIs
 clonoset_stats = stats.calc_clonoset_stats(clonosets)
 ```
 
-|    | sample_id          | chain   |   clones |   clones_func |   clones_func_singletons |   clones_func_non_singletons |   clones_nonfunc |   clones_nonfunc_freq |   reads |   reads_func |   reads_nonfunc |   reads_nonfunc_freq |    umi |   umi_func |   umi_nonfunc |   umi_nonfunc_freq |
-|---:|:-------------------|:--------|---------:|--------------:|-------------------------:|-----------------------------:|-----------------:|----------------------:|--------:|-------------:|----------------:|---------------------:|-------:|-----------:|--------------:|-------------------:|
-|  0 | sample1_nCD4_1_TRB | TRB     |   145012 |        135644 |                    49523 |                        86121 |             9368 |             0.0646016 | 1566949 |      1509856 |           57093 |            0.0364358 | 349587 |     337223 |         12364 |          0.0353674 |
-|  1 | sample2_nCD4_1_TRB | TRB     |   134150 |        126556 |                    48485 |                        78071 |             7594 |             0.0566083 |  772217 |       746989 |           25228 |            0.0326696 | 312575 |     302754 |          9821 |          0.0314197 |
-|  2 | sample3_nCD4_1_TRB | TRB     |    68965 |         64585 |                    24802 |                        39783 |             4380 |             0.0635105 |  793340 |       766721 |           26619 |            0.0335531 | 163789 |     158403 |          5386 |          0.0328838 |
+|    | sample_id          | chain   |   clones |   clones_func |   clones_func_singletons |   clones_func_non_singletons |   clones_nonfunc |   clones_nonfunc_freq |   reads |   reads_func |   reads_nonfunc |   reads_nonfunc_freq |    umi |   umi_func |   umi_nonfunc |   umi_nonfunc_freq |   reads_per_umi |
+|---:|:-------------------|:--------|---------:|--------------:|-------------------------:|-----------------------------:|-----------------:|----------------------:|--------:|-------------:|----------------:|---------------------:|-------:|-----------:|--------------:|-------------------:|----------------:|
+|  0 | sample1_nCD4_1_TRB | TRB     |   145012 |        135644 |                    49523 |                        86121 |             9368 |             0.0646016 | 1566949 |      1509856 |           57093 |            0.0364358 | 349587 |     337223 |         12364 |          0.0353674 |            4.48 |
+|  1 | sample2_nCD4_1_TRB | TRB     |   134150 |        126556 |                    48485 |                        78071 |             7594 |             0.0566083 |  772217 |       746989 |           25228 |            0.0326696 | 312575 |     302754 |          9821 |          0.0314197 |            2.47 |
+|  2 | sample3_nCD4_1_TRB | TRB     |    68965 |         64585 |                    24802 |                        39783 |             4380 |             0.0635105 |  793340 |       766721 |           26619 |            0.0335531 | 163789 |     158403 |          5386 |          0.0328838 |            4.84 |
 
 <br>Calculating CDR3 properties. In this example, only functional clonotypes (=no frameshifts or stops) are used.
 

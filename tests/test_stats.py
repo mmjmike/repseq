@@ -45,6 +45,65 @@ def test_calc_clonoset_stats_handles_clonoset_without_umi_columns(tmp_path):
     assert result.loc[0, "clones_func"] == 1
     assert result.loc[0, "reads_func"] == 2
     assert pd.isna(result.loc[0, "umi"])
+    assert pd.isna(result.loc[0, "reads_per_umi"])
+    assert result.columns[-1] == "reads_per_umi"
+
+
+def test_calc_clonoset_stats_calculates_reads_per_umi_per_sample(tmp_path):
+    umi_filename = tmp_path / "sample_with_umi.tsv"
+    no_umi_filename = tmp_path / "sample_without_umi.tsv"
+    _write_clonoset(
+        umi_filename,
+        [
+            {
+                "count": 7,
+                "uniqueUMICount": 2,
+                "freq": 0.7,
+                "cdr3nt": "TGTGCC",
+                "cdr3aa": "CASSLG",
+                "v": "TRBV1",
+                "d": ".",
+                "j": "TRBJ1",
+            },
+            {
+                "count": 3,
+                "uniqueUMICount": 1,
+                "freq": 0.3,
+                "cdr3nt": "TGTGCT",
+                "cdr3aa": "CASRLG",
+                "v": "TRBV2",
+                "d": ".",
+                "j": "TRBJ2",
+            },
+        ],
+    )
+    _write_clonoset(
+        no_umi_filename,
+        [
+            {
+                "count": 4,
+                "freq": 1.0,
+                "cdr3nt": "TGTGCA",
+                "cdr3aa": "CASSLA",
+                "v": "TRBV3",
+                "d": ".",
+                "j": "TRBJ1",
+            }
+        ],
+    )
+    clonosets = pd.DataFrame(
+        [
+            {"sample_id": "with_umi", "chain": "TRB", "filename": str(umi_filename)},
+            {"sample_id": "without_umi", "chain": "TRB", "filename": str(no_umi_filename)},
+        ]
+    )
+
+    result = stats.calc_clonoset_stats(clonosets, verbose=False, cpu=1)
+
+    result = result.set_index("sample_id")
+    assert result.loc["with_umi", "reads_per_umi"] == 3.33
+    assert pd.isna(result.loc["without_umi", "reads_per_umi"])
+    assert result.columns[-1] == "reads_per_umi"
 
 
 def test_generic_calculation_passes_cpu_to_parallel_runner(monkeypatch, tmp_path):

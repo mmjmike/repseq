@@ -60,6 +60,9 @@ def calc_clonoset_stats(clonosets_df, cl_filter=None, verbose=True, cpu=None):
                         "umi_nonfunc": int})
  
     df = df.astype(convert_dict)
+    df["reads_per_umi"] = (df["reads"] / df["umi"]).round(2).where(
+        df["umi"].notna() & df["umi"].ne(0)
+    )
     return df
 
 def calc_segment_usage(clonosets_df, segment="v", cl_filter=None, table="long", by_count=False,
