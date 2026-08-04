@@ -175,7 +175,8 @@ def calc_statistics(
     log2fc_zero_value : real number, default 100
         Absolute finite log2-fold-change used when exactly one mean is zero.
     presence_threshold : real number, default 1
-        Detection threshold used by ``fisher`` and ``hurdle``.
+        Counts below this threshold are treated as zero during statistical
+        calculations. Original count values are preserved in the output.
     sample_totals : mapping or pandas.Series, optional
         Per-sample library totals used by count-aware methods. By default,
         totals are calculated from all rows of ``count_table``.
@@ -231,6 +232,21 @@ def calc_statistics(
         raise ValueError("Sample count columns must contain only finite values")
     if (values < 0).any():
         raise ValueError("Sample count columns must contain non-negative values")
+    effective_values = values.copy()
+    thresholded_values = (effective_values < presence_threshold) & (
+        effective_values != 0
+    )
+    effective_values[effective_values < presence_threshold] = 0
+    if verbose:
+        print(
+            f"Analysis count threshold: {presence_threshold}. Values below "
+            "this threshold are treated as zero for statistical calculations."
+        )
+        print(
+            f"Non-zero count values replaced with zero: "
+            f"{int(thresholded_values.sum())}. Original counts will be preserved "
+            "in the output table."
+        )
 
     count_aware_methods = {
         "fisher_count",
@@ -270,9 +286,11 @@ def calc_statistics(
         columns=["_row_position", *STATISTICS_COLUMNS]
     )
     if len(passed_positions):
-        tested_values = values[passed_positions]
+        tested_values = effective_values[passed_positions]
+        original_tested_values = values[passed_positions]
         tasks = _build_statistics_tasks(
             tested_values=tested_values,
+            original_tested_values=original_tested_values,
             passed_positions=passed_positions,
             groups=setup["groups"],
             group_sample_indices=setup["group_sample_indices"],
@@ -542,9 +560,10 @@ def _validate_statistics_parameters(
     random_state,
     negative_binomial_alpha,
 ):
-    parameters = [("log2fc_zero_value", log2fc_zero_value, False)]
-    if method in {"fisher", "hurdle"}:
-        parameters.append(("presence_threshold", presence_threshold, True))
+    parameters = [
+        ("log2fc_zero_value", log2fc_zero_value, False),
+        ("presence_threshold", presence_threshold, True),
+    ]
     if method in {"hurdle", "permutation"}:
         parameters.extend(
             [
@@ -594,6 +613,7 @@ def _resolve_sample_totals(count_table, sample_columns, sample_totals):
 
 def _build_statistics_tasks(
     tested_values,
+    original_tested_values,
     passed_positions,
     groups,
     group_sample_indices,
@@ -628,6 +648,7 @@ def _build_statistics_tasks(
         tasks.append(
             {
                 "values": tested_values,
+                "original_values": original_tested_values,
                 "row_positions": passed_positions,
                 "target_group": target_group,
                 "background_group": background_group,
@@ -651,10 +672,13 @@ def _build_statistics_tasks(
 
 def _calculate_statistics_task(task):
     values = task["values"]
+    original_values = task["original_values"]
     target_indices = task["target_indices"]
     background_indices = task["background_indices"]
     target_values = values[:, target_indices]
     background_values = values[:, background_indices]
+    original_target_values = original_values[:, target_indices]
+    original_background_values = original_values[:, background_indices]
     target_means = target_values.mean(axis=1)
     background_means = background_values.mean(axis=1)
     log2fc = np.array(
@@ -669,11 +693,12 @@ def _calculate_statistics_task(task):
         background_values=background_values,
     )
     enriched_in = np.full(len(values), task["target_group"], dtype=object)
-    mean_group_count = target_means.copy()
+    mean_group_count = original_target_values.mean(axis=1)
     if task["two_sided"]:
         background_enriched = background_means > target_means
         enriched_in[background_enriched] = task["background_group"]
-        mean_group_count[background_enriched] = background_means[
+        original_background_means = original_background_values.mean(axis=1)
+        mean_group_count[background_enriched] = original_background_means[
             background_enriched
         ]
         log2fc = np.abs(log2fc)
@@ -695,7 +720,7 @@ def _calculate_method_p_values(task, target_values, background_values):
     if method == "mann_whitney":
         return np.array(
             [
-                scipy.stats.mannwhitneyu(target, background, alternative=alternative).pvalue
+                _mann_whitney_p_value(target, background, alternative)
                 for target, background in zip(target_values, background_values)
             ]
         )
@@ -717,6 +742,15 @@ def _calculate_method_p_values(task, target_values, background_values):
     if method == "permutation":
         return _permutation_p_values(task)
     raise RuntimeError(f"Unsupported method reached calculation: {method}")
+
+
+def _mann_whitney_p_value(target, background, alternative):
+    p_value = scipy.stats.mannwhitneyu(
+        target,
+        background,
+        alternative=alternative,
+    ).pvalue
+    return 1.0 if np.isnan(p_value) else float(p_value)
 
 
 def _fisher_presence_p_values(target_values, background_values, threshold, alternative):

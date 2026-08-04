@@ -167,9 +167,25 @@ Group-vs-all calculations are dispatched through
 
 ## Statistical methods
 
+`presence_threshold` is a common analysis parameter for every method. Before
+statistics are calculated, represented sample counts lower than this threshold
+are set to zero in an internal analysis matrix. The original count-table values
+are not modified and are returned unchanged. `log2FC` and statistical tests use
+the thresholded values, while `mean_group_count` reports the mean of the real,
+unmodified counts for the selected `enriched_in` group.
+
+```py
+result = rsde.calc_statistics(
+    count_table,
+    samples_metadata,
+    method="mann_whitney",
+    presence_threshold=2,
+)
+```
+
 | Method | Test | Method-specific parameters | Suggested role |
 |:-------|:-----|:---------------------------|:---------------|
-| `mann_whitney` | Mann–Whitney U test on replicate counts | None | General replicate-level abundance comparison; default |
+| `mann_whitney` | Mann–Whitney U test on replicate counts | None beyond common parameters | General replicate-level abundance comparison; default |
 | `fisher` | Fisher exact test on detected/not-detected replicates | `presence_threshold` | Robust recurrence evidence for sparse clonotypes |
 | `fisher_count` | Fisher exact test on aggregated feature and non-feature counts | `sample_totals` | Secondary aggregated UMI/count evidence |
 | `hurdle` | Recurrence Fisher test plus positive-abundance Mann–Whitney test | `presence_threshold`, `sample_totals`, `hurdle_combine_method`, `cpm_scale`, `pseudocount` | Combined recurrence and abundance evidence |

@@ -180,6 +180,8 @@ def test_calc_statistics_two_groups_preserves_rows_and_prefilter_status(capsys):
     assert "Group 'B' (2 samples): ['b1', 'b2']" in output
     assert "ignored_sample" in output
     assert "2 of 3 features will be tested" in output
+    assert "Analysis count threshold: 1" in output
+    assert "Original counts will be preserved" in output
     assert "Combining group-comparison result tables" in output
     assert "Adjusting p-values for multiple testing using 'fdr_bh'" in output
     assert "Simplifying statistics" in output
@@ -209,6 +211,44 @@ def test_calc_statistics_without_prefilter_analyzes_all_features():
     )
 
     assert result["method"].notna().all()
+
+
+def test_presence_threshold_changes_analysis_but_preserves_real_counts():
+    count_table = pd.DataFrame(
+        {
+            "feature": ["low_count_feature"],
+            "a1": [1.0],
+            "a2": [1.0],
+            "b1": [0.0],
+            "b2": [0.0],
+        }
+    )
+
+    unthresholded = rsde.calc_statistics(
+        count_table,
+        _two_group_metadata(),
+        method="mann_whitney",
+        presence_threshold=0,
+        cpu=1,
+        verbose=False,
+    )
+    thresholded = rsde.calc_statistics(
+        count_table,
+        _two_group_metadata(),
+        method="mann_whitney",
+        presence_threshold=2,
+        cpu=1,
+        verbose=False,
+    )
+
+    assert unthresholded.loc[0, "log2FC"] == 100
+    assert thresholded.loc[0, "log2FC"] == 0
+    assert thresholded.loc[0, "p_val"] == 1
+    assert thresholded.loc[0, "mean_group_count"] == 1
+    pd.testing.assert_frame_equal(
+        thresholded[["feature", "a1", "a2", "b1", "b2"]],
+        count_table,
+    )
 
 
 def test_calc_statistics_preserves_dataframe_attributes():
@@ -426,7 +466,6 @@ def test_calc_statistics_ignores_parameters_for_other_methods():
         _statistics_count_table(),
         _two_group_metadata(),
         method="mann_whitney",
-        presence_threshold=-1,
         sample_totals={"not": "usable"},
         hurdle_combine_method="not-a-method",
         cpm_scale=-1,
@@ -439,6 +478,17 @@ def test_calc_statistics_ignores_parameters_for_other_methods():
     )
 
     assert result.loc[:1, "method"].tolist() == ["mann_whitney"] * 2
+
+
+def test_calc_statistics_validates_presence_threshold_for_mann_whitney():
+    with pytest.raises(ValueError, match="presence_threshold"):
+        rsde.calc_statistics(
+            _statistics_count_table(),
+            _two_group_metadata(),
+            method="mann_whitney",
+            presence_threshold=-1,
+            verbose=False,
+        )
 
 
 def test_calc_statistics_validates_p_adjust_method_when_no_features_pass():
