@@ -197,6 +197,40 @@ clonoset_stats = stats.calc_clonoset_stats(clonosets)
 |  1 | sample2_nCD4_1_TRB | TRB     |   134150 |        126556 |                    48485 |                        78071 |             7594 |             0.0566083 |  772217 |       746989 |           25228 |            0.0326696 | 312575 |     302754 |          9821 |          0.0314197 |            2.47 |
 |  2 | sample3_nCD4_1_TRB | TRB     |    68965 |         64585 |                    24802 |                        39783 |             4380 |             0.0635105 |  793340 |       766721 |           26619 |            0.0335531 | 163789 |     158403 |          5386 |          0.0328838 |            4.84 |
 
+Plot the result with `rsplot.clonoset_stats`. Without grouping or custom
+properties, reads, clones, and available UMI counts are shown as overlaid bars:
+the total is behind the narrower functional count. Labels above the bars use
+`total(functional)` notation. `reads_per_umi` is shown as an ordinary bar plot.
+If every UMI value is missing, the UMI panel is omitted; if only some are
+missing, only samples with UMI values appear in that panel.
+
+```py
+rsplot.clonoset_stats(clonoset_stats)
+rsplot.clonoset_stats(
+    clonoset_stats,
+    metadata=metadata,
+    split=["tissue", "sex"],
+)
+```
+
+With a group, the function uses the standard statistics boxplots. The default
+properties are `reads`, `reads_per_umi` when that column is present,
+`clones_func`, and `umi_func` when it contains at least one value. Passing
+`properties` also selects the standard statistics plotting behavior.
+
+```py
+rsplot.clonoset_stats(
+    clonoset_stats,
+    metadata=metadata,
+    group="experimental_group",
+)
+
+rsplot.clonoset_stats(
+    clonoset_stats,
+    properties=["reads_func", "clones_func"],
+)
+```
+
 <br>Calculating CDR3 properties. In this example, only functional clonotypes (=no frameshifts or stops) are used.
 
 basic stats for CDR3 regions. CDR3 amino acid sequence properties (both full sequence and central 5-residue sequence (closer to N-term in case of even length))

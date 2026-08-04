@@ -214,6 +214,144 @@ def test_split_panels_only_show_samples_from_their_subset():
     assert labels_by_panel["control"] == ["sample2"]
 
 
+def _clonoset_stats_df():
+    return pd.DataFrame(
+        [
+            {
+                "sample_id": "sample1",
+                "chain": "TRB",
+                "reads": 150,
+                "reads_func": 120,
+                "reads_per_umi": 3.0,
+                "clones": 15,
+                "clones_func": 12,
+                "umi": 50,
+                "umi_func": 40,
+            },
+            {
+                "sample_id": "sample2",
+                "chain": "TRB",
+                "reads": 100,
+                "reads_func": 90,
+                "reads_per_umi": np.nan,
+                "clones": 10,
+                "clones_func": 8,
+                "umi": np.nan,
+                "umi_func": np.nan,
+            },
+        ]
+    )
+
+
+def test_clonoset_stats_default_overlays_total_and_functional_bars():
+    grid = rsplot.clonoset_stats(_clonoset_stats_df())
+    axes = {ax.get_title(): ax for ax in grid.axes.flat}
+
+    assert set(axes) == {"Reads", "Reads Per Umi", "Clones", "Umi"}
+    np.testing.assert_allclose(
+        [patch.get_height() for patch in axes["Reads"].patches],
+        [150, 100, 120, 90],
+    )
+    assert [text.get_text() for text in axes["Reads"].texts] == [
+        "150(120)",
+        "100(90)",
+    ]
+    assert [tick.get_text() for tick in axes["Umi"].get_xticklabels()] == [
+        "sample1"
+    ]
+    assert [text.get_text() for text in axes["Umi"].texts] == ["50(40)"]
+
+
+def test_clonoset_stats_skips_umi_panel_when_all_values_are_missing():
+    stats_df = _clonoset_stats_df()
+    stats_df[["umi", "umi_func", "reads_per_umi"]] = np.nan
+
+    grid = rsplot.clonoset_stats(stats_df)
+
+    assert {ax.get_title() for ax in grid.axes.flat} == {
+        "Reads",
+        "Reads Per Umi",
+        "Clones",
+    }
+
+
+def test_clonoset_stats_grouped_defaults_follow_available_columns(monkeypatch):
+    captured = []
+
+    def capture_plot_stats(stats_df, **kwargs):
+        captured.append(kwargs)
+        return "grid"
+
+    monkeypatch.setattr(rsplot, "plot_stats", capture_plot_stats)
+    stats_df = _clonoset_stats_df()
+
+    assert rsplot.clonoset_stats(stats_df, group="condition") == "grid"
+    assert captured[-1]["properties"] == [
+        "reads",
+        "reads_per_umi",
+        "clones_func",
+        "umi_func",
+    ]
+
+    stats_df["umi_func"] = np.nan
+    assert rsplot.clonoset_stats(stats_df, group="condition") == "grid"
+    assert captured[-1]["properties"] == [
+        "reads",
+        "reads_per_umi",
+        "clones_func",
+    ]
+
+
+def test_clonoset_stats_custom_properties_use_standard_plot(monkeypatch):
+    captured = {}
+
+    def capture_plot_stats(stats_df, **kwargs):
+        captured.update(kwargs)
+        return "grid"
+
+    monkeypatch.setattr(rsplot, "plot_stats", capture_plot_stats)
+
+    assert (
+        rsplot.clonoset_stats(_clonoset_stats_df(), properties=["reads_func"])
+        == "grid"
+    )
+    assert captured["properties"] == ["reads_func"]
+    assert captured["group"] is None
+
+
+def test_clonoset_stats_default_supports_two_ordered_splits():
+    metadata = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample1",
+                "chain": "TRB",
+                "tissue": "blood",
+                "sex": "M",
+            },
+            {
+                "sample_id": "sample2",
+                "chain": "TRB",
+                "tissue": "tumor",
+                "sex": "F",
+            },
+        ]
+    )
+    metadata["tissue"] = pd.Categorical(
+        metadata["tissue"], categories=["tumor", "blood"], ordered=True
+    )
+    metadata["sex"] = pd.Categorical(
+        metadata["sex"], categories=["F", "M"], ordered=True
+    )
+
+    grid = rsplot.clonoset_stats(
+        _clonoset_stats_df(),
+        metadata=metadata,
+        split=["tissue", "sex"],
+    )
+
+    column_titles = [ax.get_title() for ax in grid.axes[0]]
+    assert column_titles == ["Reads | tumor | F", "Reads | blood | M"]
+
 def _v_usage_long(sample_count=4):
     rows = []
     for sample_number in range(sample_count):
@@ -515,7 +653,6 @@ def test_segment_usage_rejects_too_many_boxplot_groups():
             plot_type="boxplot",
             group=["condition", "batch"],
         )
-
 
 
 def _cdr3_lengths_long(sample_count=2):

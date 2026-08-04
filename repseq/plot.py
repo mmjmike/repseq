@@ -590,6 +590,223 @@ def plot_stats(
     return grid
 
 
+def _default_grouped_clonoset_properties(stats_df):
+    properties = ["reads"]
+    if "reads_per_umi" in stats_df.columns:
+        properties.append("reads_per_umi")
+    properties.append("clones_func")
+    if "umi_func" in stats_df.columns and stats_df["umi_func"].notna().any():
+        properties.append("umi_func")
+    return properties
+
+
+def _format_clonoset_bar_value(value):
+    value = float(value)
+    if value.is_integer():
+        return str(int(value))
+    return f"{value:g}"
+
+
+def _prepare_default_clonoset_plot_data(stats_df, metadata, split):
+    split_columns = _as_list(split, "split", max_len=2)
+    data, metadata_columns, merge_keys = _merge_stats_metadata(stats_df, metadata)
+    if metadata is None and split_columns:
+        raise ValueError("metadata is required when split columns are used")
+    _validate_metadata_columns(split_columns, metadata_columns, "split")
+
+    descriptors = [
+        ("reads", "reads_func", "Reads"),
+    ]
+    if "reads_per_umi" in data.columns:
+        descriptors.append(("reads_per_umi", None, "Reads Per Umi"))
+    descriptors.append(("clones", "clones_func", "Clones"))
+    if "umi" in data.columns and data["umi"].notna().any():
+        descriptors.append(("umi", "umi_func", "Umi"))
+
+    required_columns = {
+        column
+        for total_column, functional_column, _ in descriptors
+        for column in (total_column, functional_column)
+        if column is not None
+    }
+    missing_columns = sorted(required_columns.difference(data.columns))
+    if missing_columns:
+        raise ValueError(
+            f"stats_df does not contain clonoset-stat column(s): {missing_columns}"
+        )
+
+    id_columns = list(dict.fromkeys(merge_keys + split_columns))
+    sample_labels = _make_sample_labels(data)
+    sample_order = list(sample_labels.categories)
+    plot_parts = []
+    for total_column, functional_column, property_label in descriptors:
+        columns = id_columns + [total_column]
+        if functional_column is not None:
+            columns.append(functional_column)
+        part = data[columns].copy()
+        part["_sample_label"] = sample_labels
+        part["property_label"] = property_label
+        part["total"] = pd.to_numeric(part[total_column], errors="coerce")
+        part["functional"] = (
+            pd.to_numeric(part[functional_column], errors="coerce")
+            if functional_column is not None
+            else np.nan
+        )
+        part["_paired"] = functional_column is not None
+        if functional_column is not None:
+            part = part.loc[part["total"].notna() & part["functional"].notna()]
+        plot_parts.append(
+            part[
+                id_columns
+                + [
+                    "_sample_label",
+                    "property_label",
+                    "total",
+                    "functional",
+                    "_paired",
+                ]
+            ]
+        )
+
+    plot_data = pd.concat(plot_parts, ignore_index=True)
+    property_order = [descriptor[2] for descriptor in descriptors]
+    plot_data["_sample_label"] = pd.Categorical(
+        plot_data["_sample_label"], categories=sample_order, ordered=True
+    )
+    plot_data["property_label"] = pd.Categorical(
+        plot_data["property_label"], categories=property_order, ordered=True
+    )
+
+    panel_column = None
+    if len(split_columns) == 1:
+        panel_column = split_columns[0]
+    elif len(split_columns) == 2:
+        panel_column = "_split_panel"
+        plot_data[panel_column] = (
+            plot_data[split_columns[0]].astype(str)
+            + " | "
+            + plot_data[split_columns[1]].astype(str)
+        )
+        plot_data[panel_column] = pd.Categorical(
+            plot_data[panel_column],
+            categories=_interaction_order(plot_data, split_columns),
+            ordered=True,
+        )
+
+    return plot_data, property_order, panel_column
+
+
+def _draw_default_clonoset_panel(data, colors, **kwargs):
+    ax = kwargs.get("ax", plt.gca())
+    sample_order = _category_order(data["_sample_label"])
+    paired = bool(data["_paired"].iloc[0])
+
+    if not paired:
+        sns.barplot(
+            data=data,
+            x="_sample_label",
+            y="total",
+            order=sample_order,
+            errorbar=None,
+            color=colors["Total"],
+            ax=ax,
+        )
+        ax.tick_params(axis="x", rotation=90)
+        return
+
+    values = (
+        data.groupby("_sample_label", observed=True)[["total", "functional"]]
+        .first()
+        .reindex(sample_order)
+    )
+    x = np.arange(len(sample_order), dtype=float)
+    ax.bar(
+        x,
+        values["total"].to_numpy(),
+        width=0.8,
+        color=colors["Total"],
+        label="Total",
+    )
+    ax.bar(
+        x,
+        values["functional"].to_numpy(),
+        width=0.52,
+        color=colors["Functional"],
+        label="Functional",
+    )
+    for position, total, functional in zip(
+        x, values["total"], values["functional"]
+    ):
+        label = (
+            f"{_format_clonoset_bar_value(total)}"
+            f"({_format_clonoset_bar_value(functional)})"
+        )
+        ax.annotate(
+            label,
+            xy=(position, total),
+            xytext=(0, 3),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+    ax.set_xticks(x)
+    ax.set_xticklabels(sample_order, rotation=90)
+    maximum = values["total"].max()
+    if pd.notna(maximum) and maximum >= 0:
+        ax.set_ylim(top=max(1, maximum * 1.15))
+
+
+def _plot_default_clonoset_stats(
+    stats_df,
+    metadata,
+    split,
+    palette,
+    height,
+    aspect,
+):
+    plot_data, property_order, panel_column = _prepare_default_clonoset_plot_data(
+        stats_df, metadata, split
+    )
+    color_map = _palette_mapping(["Total", "Functional"], palette)
+    row, col, col_wrap = _facet_layout(property_order, panel_column)
+    grid = sns.FacetGrid(
+        plot_data,
+        row=row,
+        col=col,
+        col_wrap=col_wrap,
+        sharex=False,
+        sharey=False,
+        height=height,
+        aspect=aspect,
+        despine=True,
+    )
+    grid.map_dataframe(_draw_default_clonoset_panel, colors=color_map)
+    grid.set_axis_labels("Sample", "Value")
+
+    if row is not None and col is not None:
+        grid.set_titles(row_template="{row_name}", col_template="{col_name}")
+    elif col is not None:
+        grid.set_titles("{col_name}")
+    elif row is not None:
+        grid.set_titles("{row_name}")
+    else:
+        grid.axes.flat[0].set_title(property_order[0])
+
+    handles = [
+        Patch(facecolor=color_map[level], label=level)
+        for level in ("Total", "Functional")
+    ]
+    grid.fig.legend(
+        handles=handles,
+        loc="upper center",
+        ncol=2,
+        frameon=False,
+    )
+    grid.fig.tight_layout(rect=(0, 0, 1, 0.92))
+    return grid
+
+
 def _column_by_name(columns, names):
     names = {name.casefold() for name in names}
     matches = [
@@ -2120,7 +2337,6 @@ def vjlen_usage(
     return _close_and_return(fig)
 
 
-
 def _normalize_beta_metric_key(value):
     return str(value).strip().casefold().replace("-", "_").replace(" ", "_")
 
@@ -2879,6 +3095,55 @@ def rarefaction_curve(
     fig.tight_layout()
     return _close_and_return(fig)
 
+def clonoset_stats(
+    stats_df,
+    metadata=None,
+    properties=None,
+    group=None,
+    split=None,
+    palette=None,
+    height=3.2,
+    aspect=1.2,
+):
+    """Plot clonoset size statistics with optional sample metadata.
+
+    Grouped plots use the standard statistics renderer. Their default
+    properties are ``reads``, ``reads_per_umi`` when present, ``clones_func``,
+    and ``umi_func`` when it contains at least one value. Custom properties
+    always use the standard renderer as well.
+
+    Without a group or custom properties, reads, clones, and available UMI
+    counts are drawn as overlaid total and functional bars. Labels above the
+    bars show ``total(functional)``. ``reads_per_umi`` remains an ordinary bar
+    plot, and samples without UMI counts are omitted from the UMI panel.
+    """
+    if group is not None or properties is not None:
+        selected_properties = (
+            _default_grouped_clonoset_properties(stats_df)
+            if properties is None
+            else properties
+        )
+        return plot_stats(
+            stats_df,
+            metadata=metadata,
+            properties=selected_properties,
+            group=group,
+            split=split,
+            palette=palette,
+            height=height,
+            aspect=aspect,
+        )
+
+    return _plot_default_clonoset_stats(
+        stats_df,
+        metadata=metadata,
+        split=split,
+        palette=palette,
+        height=height,
+        aspect=aspect,
+    )
+
+
 def cdr3aa_stats(
     stats_df,
     metadata=None,
@@ -2963,6 +3228,7 @@ __all__ = [
     "beta_metric",
     "beta_table",
     "rarefaction_curve",
+    "clonoset_stats",
     "cdr3aa_stats",
     "diversity_stats",
     "convergence",
