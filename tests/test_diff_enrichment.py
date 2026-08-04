@@ -103,3 +103,343 @@ def test_prefilter_rejects_existing_status_column():
 
     with pytest.raises(ValueError, match="already contains"):
         rsde.prefilter(count_table, verbose=False)
+
+
+def _two_group_metadata():
+    return pd.DataFrame(
+        {
+            "sample_id": ["a1", "a2", "b1", "b2"],
+            "group": ["A", "A", "B", "B"],
+        }
+    )
+
+
+def _statistics_count_table(prefilter=True):
+    data = {
+        "feature": ["f1", "f2", "f3"],
+        "annotation": ["first", "second", "filtered"],
+        "a1": [8, 0, 100],
+        "a2": [8, 0, 100],
+        "b1": [2, 4, 0],
+        "b2": [2, 4, 0],
+        "ignored_sample": [20, 20, 20],
+    }
+    if prefilter:
+        data = {
+            "feature": data.pop("feature"),
+            "annotation": data.pop("annotation"),
+            "prefilter_pass": [True, True, False],
+            **data,
+        }
+    return pd.DataFrame(data)
+
+
+def test_calc_statistics_two_groups_preserves_rows_and_prefilter_status(capsys):
+    count_table = _statistics_count_table()
+
+    result = rsde.calc_statistics(
+        count_table,
+        _two_group_metadata(),
+        cpu=1,
+    )
+
+    assert list(result.columns) == [
+        "feature",
+        "annotation",
+        "prefilter_pass",
+        "enriched_in",
+        "method",
+        "log2FC",
+        "p_val",
+        "p_adj",
+        "a1",
+        "a2",
+        "b1",
+        "b2",
+        "ignored_sample",
+    ]
+    assert result["feature"].tolist() == ["f1", "f2", "f3"]
+    assert result.loc[0, "enriched_in"] == "A"
+    assert result.loc[0, "log2FC"] == pytest.approx(2)
+    assert result.loc[1, "enriched_in"] == "B"
+    assert result.loc[1, "log2FC"] == 100
+    assert result.loc[:1, "method"].tolist() == ["mann_whitney"] * 2
+    assert result.loc[2, rsde.STATISTICS_COLUMNS].isna().all()
+    pd.testing.assert_frame_equal(
+        result.drop(columns=rsde.STATISTICS_COLUMNS),
+        count_table,
+    )
+
+    output = capsys.readouterr().out
+    assert "Differential enrichment analysis started" in output
+    assert "Groups detected: 2" in output
+    assert "Group 'A' (2 samples): ['a1', 'a2']" in output
+    assert "Group 'B' (2 samples): ['b1', 'b2']" in output
+    assert "ignored_sample" in output
+    assert "2 of 3 features will be tested" in output
+
+
+def test_calc_statistics_without_prefilter_analyzes_all_features():
+    result = rsde.calc_statistics(
+        _statistics_count_table(prefilter=False),
+        _two_group_metadata(),
+        cpu=1,
+        verbose=False,
+    )
+
+    assert result["method"].notna().all()
+
+
+def test_calc_statistics_preserves_dataframe_attributes():
+    count_table = _statistics_count_table()
+    count_table.attrs["source"] = "count_table"
+
+    result = rsde.calc_statistics(
+        count_table,
+        _two_group_metadata(),
+        cpu=1,
+        verbose=False,
+    )
+
+    assert result.attrs == {"source": "count_table"}
+
+
+def _three_group_inputs():
+    count_table = pd.DataFrame(
+        {
+            "feature": ["enriched_a", "enriched_b", "filtered"],
+            "prefilter_pass": [True, True, False],
+            "a1": [10, 0, 3],
+            "a2": [10, 0, 3],
+            "b1": [0, 10, 3],
+            "b2": [0, 10, 3],
+            "c1": [0, 0, 3],
+            "c2": [0, 0, 3],
+        }
+    )
+    metadata = pd.DataFrame(
+        {
+            "sample_id": ["a1", "a2", "b1", "b2", "c1", "c2"],
+            "group": ["A", "A", "B", "B", "C", "C"],
+        }
+    )
+    return count_table, metadata
+
+
+def test_calc_statistics_multigroup_simplifies_to_best_group():
+    count_table, metadata = _three_group_inputs()
+
+    result = rsde.calc_statistics(
+        count_table,
+        metadata,
+        method="fisher",
+        presence_threshold=2,
+        cpu=1,
+        verbose=False,
+    )
+
+    assert result["feature"].tolist() == ["enriched_a", "enriched_b", "filtered"]
+    assert result.loc[:1, "enriched_in"].tolist() == ["A", "B"]
+    assert result.loc[:1, "log2FC"].tolist() == [100, 100]
+    assert result.loc[2, rsde.STATISTICS_COLUMNS].isna().all()
+
+
+def test_calc_statistics_multigroup_expands_passed_features_and_parallelizes(monkeypatch):
+    count_table, metadata = _three_group_inputs()
+    seen_tasks = []
+
+    def run_sequential(function, tasks, *args, **kwargs):
+        seen_tasks.extend(tasks)
+        return [function(task) for task in tasks]
+
+    monkeypatch.setattr(rsde, "run_parallel_calculation", run_sequential)
+
+    result = rsde.calc_statistics(
+        count_table,
+        metadata,
+        method="fisher",
+        simplify=False,
+        verbose=False,
+    )
+
+    assert len(seen_tasks) == 3
+    assert len(result) == 7
+    assert result.loc[result["feature"].eq("enriched_a"), "enriched_in"].tolist() == [
+        "A",
+        "B",
+        "C",
+    ]
+    assert result.loc[result["feature"].eq("filtered"), "method"].isna().all()
+
+
+def test_calc_statistics_reports_default_feature_column_duplicates():
+    count_table = _statistics_count_table().copy()
+    count_table.index = [10, 11, 12]
+    count_table["feature"] = ["duplicate", "duplicate", "unique"]
+
+    with pytest.raises(
+        ValueError,
+        match=r"'feature'.*non-unique.*'duplicate'.*\[10, 11\]",
+    ):
+        rsde.calc_statistics(
+            count_table,
+            _two_group_metadata(),
+            verbose=False,
+        )
+
+
+def test_calc_statistics_reports_duplicate_missing_feature_indices():
+    count_table = _statistics_count_table().copy()
+    count_table.index = [4, 5, 6]
+    count_table["feature"] = [None, None, "unique"]
+
+    with pytest.raises(ValueError, match=r"non-unique.*\[4, 5\]"):
+        rsde.calc_statistics(
+            count_table,
+            _two_group_metadata(),
+            verbose=False,
+        )
+
+
+def test_calc_statistics_accepts_explicit_unique_feature_column():
+    count_table = _statistics_count_table().copy()
+    count_table.insert(1, "unique_id", [1, 2, 3])
+    count_table["feature"] = "same annotation"
+
+    result = rsde.calc_statistics(
+        count_table,
+        _two_group_metadata(),
+        feature_column="unique_id",
+        cpu=1,
+        verbose=False,
+    )
+
+    assert result["unique_id"].tolist() == [1, 2, 3]
+
+
+@pytest.mark.parametrize(
+    ("metadata", "message"),
+    [
+        (pd.DataFrame({"sample_id": ["a1"]}), "must contain columns"),
+        (
+            pd.DataFrame(
+                {
+                    "sample_id": ["a1", "a2", "b1", "b1"],
+                    "group": ["A", "A", "B", "B"],
+                }
+            ),
+            "must be unique",
+        ),
+        (
+            pd.DataFrame(
+                {
+                    "sample_id": ["a1", "a2", "missing", "b2"],
+                    "group": ["A", "A", "B", "B"],
+                }
+            ),
+            "absent from count_table",
+        ),
+        (
+            pd.DataFrame(
+                {
+                    "sample_id": ["a1", "a2", "b1", "b2"],
+                    "group": ["A", "A", "A", "A"],
+                }
+            ),
+            "at least 2 groups",
+        ),
+        (
+            pd.DataFrame(
+                {
+                    "sample_id": ["a1", "a2", "b1"],
+                    "group": ["A", "A", "B"],
+                }
+            ),
+            "Each group must contain at least 2 samples",
+        ),
+    ],
+)
+def test_calc_statistics_validates_metadata(metadata, message):
+    with pytest.raises(ValueError, match=message):
+        rsde.calc_statistics(
+            _statistics_count_table(),
+            metadata,
+            verbose=False,
+        )
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "mann_whitney",
+        "fisher",
+        "fisher_count",
+        "hurdle",
+        "quasi_binomial",
+        "negative_binomial",
+        "permutation",
+    ],
+)
+def test_calc_statistics_supported_methods_return_standard_columns(method):
+    result = rsde.calc_statistics(
+        _statistics_count_table(),
+        _two_group_metadata(),
+        method=method,
+        n_permutations=20,
+        random_state=7,
+        cpu=1,
+        verbose=False,
+    )
+
+    assert list(result.loc[:1, "method"]) == [method, method]
+    assert result.loc[:1, "p_val"].between(0, 1).all()
+    assert result.loc[:1, "p_adj"].between(0, 1).all()
+
+
+def test_calc_statistics_ignores_parameters_for_other_methods():
+    result = rsde.calc_statistics(
+        _statistics_count_table(),
+        _two_group_metadata(),
+        method="mann_whitney",
+        presence_threshold=-1,
+        sample_totals={"not": "usable"},
+        hurdle_combine_method="not-a-method",
+        cpm_scale=-1,
+        pseudocount=-1,
+        n_permutations=0,
+        random_state="not-an-integer",
+        negative_binomial_alpha=-1,
+        cpu=1,
+        verbose=False,
+    )
+
+    assert result.loc[:1, "method"].tolist() == ["mann_whitney"] * 2
+
+
+def test_calc_statistics_validates_p_adjust_method_when_no_features_pass():
+    count_table = _statistics_count_table().assign(prefilter_pass=False)
+
+    with pytest.raises(ValueError, match="Invalid p_adjust_method"):
+        rsde.calc_statistics(
+            count_table,
+            _two_group_metadata(),
+            p_adjust_method="not-a-method",
+            verbose=False,
+        )
+
+
+def test_simplify_keeps_lowest_p_value_per_feature_position():
+    statistics = pd.DataFrame(
+        {
+            "_row_position": [0, 0, 1, 1],
+            "enriched_in": ["A", "B", "A", "B"],
+            "method": ["fisher"] * 4,
+            "log2FC": [2, 1, 3, 4],
+            "p_val": [0.2, 0.1, 0.01, 0.02],
+            "p_adj": [0.2, 0.2, 0.04, 0.04],
+        }
+    )
+
+    result = rsde.simplify(statistics)
+
+    assert result["enriched_in"].tolist() == ["B", "A"]
