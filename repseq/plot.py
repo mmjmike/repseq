@@ -492,6 +492,7 @@ def plot_stats(
     palette=None,
     height=3.2,
     aspect=1.2,
+    zero_bottom=False,
 ):
     """Plot a wide statistics table with optional sample metadata.
 
@@ -521,6 +522,8 @@ def plot_stats(
         Any seaborn/matplotlib-compatible palette specification.
     height, aspect : float
         Facet size arguments passed to :class:`seaborn.FacetGrid`.
+    zero_bottom : bool
+        If ``True``, set the lower y-axis limit of every panel to zero.
 
     Returns
     -------
@@ -586,6 +589,9 @@ def plot_stats(
         grid.axes.flat[0].set_title(_caption(properties[0]))
 
     _deduplicate_legend(grid, hue_column if len(group_columns) == 2 else None)
+    if zero_bottom:
+        for ax in grid.axes.flat:
+            ax.set_ylim(bottom=0)
     grid.tight_layout()
     return grid
 
@@ -730,7 +736,7 @@ def _draw_default_clonoset_panel(data, colors, **kwargs):
     ax.bar(
         x,
         values["functional"].to_numpy(),
-        width=0.52,
+        width=0.8,
         color=colors["Functional"],
         label="Functional",
     )
@@ -768,7 +774,11 @@ def _plot_default_clonoset_stats(
     plot_data, property_order, panel_column = _prepare_default_clonoset_plot_data(
         stats_df, metadata, split
     )
-    color_map = _palette_mapping(["Total", "Functional"], palette)
+    if palette is None:
+        shades = sns.color_palette("Blues", n_colors=4)
+        color_map = {"Total": shades[1], "Functional": shades[3]}
+    else:
+        color_map = _palette_mapping(["Total", "Functional"], palette)
     row, col, col_wrap = _facet_layout(property_order, panel_column)
     grid = sns.FacetGrid(
         plot_data,
@@ -3113,7 +3123,8 @@ def clonoset_stats(
     always use the standard renderer as well.
 
     Without a group or custom properties, reads, clones, and available UMI
-    counts are drawn as overlaid total and functional bars. Labels above the
+    counts are drawn as equal-width overlaid total and functional bars. Labels
+    above the
     bars show ``total(functional)``. ``reads_per_umi`` remains an ordinary bar
     plot, and samples without UMI counts are omitted from the UMI panel.
     """
@@ -3132,6 +3143,7 @@ def clonoset_stats(
             palette=palette,
             height=height,
             aspect=aspect,
+            zero_bottom=group is not None,
         )
 
     return _plot_default_clonoset_stats(
@@ -3187,6 +3199,7 @@ def diversity_stats(
         palette=palette,
         height=height,
         aspect=aspect,
+        zero_bottom=True,
     )
 
 

@@ -199,7 +199,8 @@ clonoset_stats = stats.calc_clonoset_stats(clonosets)
 
 Plot the result with `rsplot.clonoset_stats`. Without grouping or custom
 properties, reads, clones, and available UMI counts are shown as overlaid bars:
-the total is behind the narrower functional count. Labels above the bars use
+the lighter total is behind an equal-width, darker functional count. Labels
+above the bars use
 `total(functional)` notation. `reads_per_umi` is shown as an ordinary bar plot.
 If every UMI value is missing, the UMI panel is omitted; if only some are
 missing, only samples with UMI values appear in that panel.
@@ -213,8 +214,9 @@ rsplot.clonoset_stats(
 )
 ```
 
-With a group, the function uses the standard statistics boxplots. The default
-properties are `reads`, `reads_per_umi` when that column is present,
+With a group, the function uses the standard statistics boxplots and fixes all
+y-axis lower limits at zero. The default properties are `reads`,
+`reads_per_umi` when that column is present,
 `clones_func`, and `umi_func` when it contains at least one value. Passing
 `properties` also selects the standard statistics plotting behavior.
 

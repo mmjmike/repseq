@@ -248,10 +248,17 @@ def test_clonoset_stats_default_overlays_total_and_functional_bars():
     axes = {ax.get_title(): ax for ax in grid.axes.flat}
 
     assert set(axes) == {"Reads", "Reads Per Umi", "Clones", "Umi"}
+    read_patches = axes["Reads"].patches
     np.testing.assert_allclose(
-        [patch.get_height() for patch in axes["Reads"].patches],
+        [patch.get_height() for patch in read_patches],
         [150, 100, 120, 90],
     )
+    np.testing.assert_allclose([patch.get_width() for patch in read_patches], 0.8)
+    total_color = read_patches[0].get_facecolor()[:3]
+    functional_color = read_patches[2].get_facecolor()[:3]
+    assert sum(total_color) > sum(functional_color)
+    assert total_color[2] > total_color[0]
+    assert functional_color[2] > functional_color[0]
     assert [text.get_text() for text in axes["Reads"].texts] == [
         "150(120)",
         "100(90)",
@@ -351,6 +358,53 @@ def test_clonoset_stats_default_supports_two_ordered_splits():
 
     column_titles = [ax.get_title() for ax in grid.axes[0]]
     assert column_titles == ["Reads | tumor | F", "Reads | blood | M"]
+
+
+def test_clonoset_stats_grouped_boxplots_start_at_zero():
+    metadata = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "TRB", "condition": "control"},
+            {"sample_id": "sample2", "chain": "TRB", "condition": "control"},
+        ]
+    )
+
+    grid = rsplot.clonoset_stats(
+        _clonoset_stats_df(),
+        metadata=metadata,
+        group="condition",
+    )
+
+    assert all(ax.get_ylim()[0] == 0 for ax in grid.axes.flat)
+
+
+def test_diversity_stats_always_start_at_zero():
+    grid = rsplot.diversity_stats(_stats_df(), properties=["diversity"])
+
+    assert grid.axes.flat[0].get_ylim()[0] == 0
+
+
+def test_other_stats_boxplots_keep_automatic_y_limits():
+    stats_df = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "metric": 10},
+            {"sample_id": "sample2", "metric": 20},
+        ]
+    )
+    metadata = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "condition": "control"},
+            {"sample_id": "sample2", "condition": "control"},
+        ]
+    )
+
+    grid = rsplot.cdr3aa_stats(
+        stats_df,
+        metadata=metadata,
+        properties=["metric"],
+        group="condition",
+    )
+
+    assert grid.axes.flat[0].get_ylim()[0] > 0
 
 def _v_usage_long(sample_count=4):
     rows = []
