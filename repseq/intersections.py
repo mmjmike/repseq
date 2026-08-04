@@ -304,12 +304,13 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
     clonoset_dicts = convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=cl_filter,
                                                         overlap_type=overlap_type, by_freq=by_freq,
                                                         strict=not bool(effective_mismatches))
+    sample_ids = clonosets_df["sample_id"].tolist()
     unique_clonotypes = custom_clonotypes
     if unique_clonotypes is None:
         unique_clonotypes = find_unique_clonotypes_in_clonoset_dicts(clonoset_dicts)
     
     tasks = []
-    for sample_id in clonoset_dicts:
+    for sample_id in sample_ids:
         task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], effective_mismatches, strict_presence]
         tasks.append(task)
     
@@ -317,7 +318,7 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
     result_dict = dict()
     for result in results:
         result_dict.update(result)
-    count_table = pd.DataFrame(result_dict)
+    count_table = pd.DataFrame(result_dict, columns=sample_ids)
     count_table.insert(0, "clone", unique_clonotypes)
     return format_clonotype_columns(count_table, overlap_type)
 

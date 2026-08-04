@@ -320,6 +320,27 @@ def test_count_table_uses_only_custom_clonotypes_in_dataframe_order(monkeypatch)
     ]
 
 
+def test_count_table_preserves_input_sample_order(monkeypatch):
+    clonoset_dicts = {
+        "s1": {("AAA",): 1},
+        "s2": {("AAA",): 2},
+    }
+    monkeypatch.setattr(
+        intersections,
+        "convert_clonosets_to_compact_dicts",
+        lambda *args, **kwargs: clonoset_dicts,
+    )
+    monkeypatch.setattr(intersections, "run_parallel_calculation", _run_sequential)
+
+    table = intersections.count_table(
+        _dummy_samples(["s2", "s1"]),
+        overlap_type="aa",
+    )
+
+    assert list(table.columns) == ["clonotype", "cdr3aa", "s2", "s1"]
+    assert table.loc[0, ["s2", "s1"]].tolist() == [2, 1]
+
+
 @pytest.mark.parametrize(
     ("overlap_type", "custom_row", "expected_clonotype"),
     [
