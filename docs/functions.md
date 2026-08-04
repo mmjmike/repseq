@@ -29,6 +29,11 @@
 #### ::: diffexp
     options:
            show_root_toc_entry: false
+
+## **diff_enrichment**
+#### ::: diff_enrichment
+    options:
+           show_root_toc_entry: false
     
 ## **intersections**
 #### ::: intersections

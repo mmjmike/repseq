@@ -13,7 +13,14 @@ from .common_functions import run_parallel_calculation
 
 
 PREFILTER_COLUMN = "prefilter_pass"
-STATISTICS_COLUMNS = ["enriched_in", "method", "log2FC", "p_val", "p_adj"]
+STATISTICS_COLUMNS = [
+    "enriched_in",
+    "method",
+    "mean_group_count",
+    "log2FC",
+    "p_val",
+    "p_adj",
+]
 SUPPORTED_METHODS = {
     "mann_whitney",
     "fisher",
@@ -192,8 +199,9 @@ def calc_statistics(
     Returns
     -------
     pandas.DataFrame
-        The input table with ``enriched_in``, ``method``, ``log2FC``,
-        ``p_val``, and ``p_adj`` inserted before its numeric columns.
+        The input table with ``enriched_in``, ``method``,
+        ``mean_group_count``, ``log2FC``, ``p_val``, and ``p_adj`` inserted
+        before its numeric columns.
     """
     setup = _prepare_statistics_setup(
         count_table,
@@ -287,21 +295,46 @@ def calc_statistics(
             verbose=verbose,
             cpu=cpu,
         )
+        if verbose:
+            print("Combining group-comparison result tables.")
         statistics = pd.concat(result_tables, ignore_index=True)
+        if verbose:
+            print(
+                "Adjusting p-values for multiple testing "
+                f"using {p_adjust_method!r}."
+            )
         statistics["p_adj"] = _adjust_p_values(
             statistics["p_val"],
             method=p_adjust_method,
         )
+    elif verbose:
+        print("No features passed prefiltering; statistical tests were skipped.")
 
-    if simplify and len(statistics):
-        statistics = simplify_statistics(statistics)
+    if simplify:
+        if verbose:
+            print(
+                "Simplifying statistics by selecting the lowest-p-value "
+                "comparison for each feature."
+            )
+        if len(statistics):
+            statistics = simplify_statistics(statistics)
+    elif verbose:
+        print(
+            "Statistics simplification is disabled; retaining all group "
+            "comparisons."
+        )
 
-    return _assemble_statistics_output(
+    if verbose:
+        print("Assembling the final differential enrichment output table.")
+    result = _assemble_statistics_output(
         count_table,
         statistics,
         pass_mask=pass_mask,
         simplify=simplify,
     )
+    if verbose:
+        print("Differential enrichment analysis completed.")
+    return result
 
 
 def simplify_statistics(statistics):
@@ -636,15 +669,20 @@ def _calculate_statistics_task(task):
         background_values=background_values,
     )
     enriched_in = np.full(len(values), task["target_group"], dtype=object)
+    mean_group_count = target_means.copy()
     if task["two_sided"]:
         background_enriched = background_means > target_means
         enriched_in[background_enriched] = task["background_group"]
+        mean_group_count[background_enriched] = background_means[
+            background_enriched
+        ]
         log2fc = np.abs(log2fc)
     return pd.DataFrame(
         {
             "_row_position": task["row_positions"],
             "enriched_in": enriched_in,
             "method": task["method"],
+            "mean_group_count": mean_group_count,
             "log2FC": log2fc,
             "p_val": p_values,
         }

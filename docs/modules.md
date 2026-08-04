@@ -44,6 +44,11 @@ This module implements different immune repertoire clustering analyses:
 
 Finds differentially expressing clonotypes/clusters of clonotypes in CFSE-assays or similar experiments.
 
+## [Differential Enrichment](usage_diff_enrichment.md)
+
+Finds clonotypes or other repertoire features enriched in experimental groups
+using recurrence, abundance, count-model, or permutation-based statistics.
+
 ## [Clone Filter](functions.md#clone_filter)
 
 Easy filtering of clonosets by one Filter object, integrated with other analysis procedures.
@@ -68,6 +73,5 @@ Easy filtering of clonosets by one Filter object, integrated with other analysis
 
 As MiXCR is the leading software for generating clonoset tables from raw FastQ files this module helps to run MiXCR 4 batch analyses locally or with the SLURM queue manager.
 <br>Easy accumulation of most sensible processing data from json-reports of MiXCR into one table.
-
 
 

@@ -149,6 +149,7 @@ def test_calc_statistics_two_groups_preserves_rows_and_prefilter_status(capsys):
         "prefilter_pass",
         "enriched_in",
         "method",
+        "mean_group_count",
         "log2FC",
         "p_val",
         "p_adj",
@@ -160,8 +161,10 @@ def test_calc_statistics_two_groups_preserves_rows_and_prefilter_status(capsys):
     ]
     assert result["feature"].tolist() == ["f1", "f2", "f3"]
     assert result.loc[0, "enriched_in"] == "A"
+    assert result.loc[0, "mean_group_count"] == 8
     assert result.loc[0, "log2FC"] == pytest.approx(2)
     assert result.loc[1, "enriched_in"] == "B"
+    assert result.loc[1, "mean_group_count"] == 4
     assert result.loc[1, "log2FC"] == 100
     assert result.loc[:1, "method"].tolist() == ["mann_whitney"] * 2
     assert result.loc[2, rsde.STATISTICS_COLUMNS].isna().all()
@@ -177,6 +180,24 @@ def test_calc_statistics_two_groups_preserves_rows_and_prefilter_status(capsys):
     assert "Group 'B' (2 samples): ['b1', 'b2']" in output
     assert "ignored_sample" in output
     assert "2 of 3 features will be tested" in output
+    assert "Combining group-comparison result tables" in output
+    assert "Adjusting p-values for multiple testing using 'fdr_bh'" in output
+    assert "Simplifying statistics" in output
+    assert "Assembling the final differential enrichment output table" in output
+    assert "Differential enrichment analysis completed" in output
+
+
+def test_calc_statistics_reports_when_simplification_is_disabled(capsys):
+    rsde.calc_statistics(
+        _statistics_count_table(),
+        _two_group_metadata(),
+        simplify=False,
+        cpu=1,
+    )
+
+    output = capsys.readouterr().out
+    assert "Statistics simplification is disabled" in output
+    assert "Assembling the final differential enrichment output table" in output
 
 
 def test_calc_statistics_without_prefilter_analyzes_all_features():
@@ -240,6 +261,7 @@ def test_calc_statistics_multigroup_simplifies_to_best_group():
 
     assert result["feature"].tolist() == ["enriched_a", "enriched_b", "filtered"]
     assert result.loc[:1, "enriched_in"].tolist() == ["A", "B"]
+    assert result.loc[:1, "mean_group_count"].tolist() == [10, 10]
     assert result.loc[:1, "log2FC"].tolist() == [100, 100]
     assert result.loc[2, rsde.STATISTICS_COLUMNS].isna().all()
 
@@ -269,6 +291,9 @@ def test_calc_statistics_multigroup_expands_passed_features_and_parallelizes(mon
         "B",
         "C",
     ]
+    assert result.loc[
+        result["feature"].eq("enriched_a"), "mean_group_count"
+    ].tolist() == [10, 0, 0]
     assert result.loc[result["feature"].eq("filtered"), "method"].isna().all()
 
 
@@ -434,6 +459,7 @@ def test_simplify_keeps_lowest_p_value_per_feature_position():
             "_row_position": [0, 0, 1, 1],
             "enriched_in": ["A", "B", "A", "B"],
             "method": ["fisher"] * 4,
+            "mean_group_count": [5, 4, 8, 7],
             "log2FC": [2, 1, 3, 4],
             "p_val": [0.2, 0.1, 0.01, 0.02],
             "p_adj": [0.2, 0.2, 0.04, 0.04],
