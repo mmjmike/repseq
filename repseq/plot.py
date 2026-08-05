@@ -2480,6 +2480,257 @@ def _prepare_beta_annotation_colors(metadata, group_columns, samples):
     return colors, handles
 
 
+def _groups_are_contiguous(groups):
+    seen = set()
+    previous = object()
+    for group in groups:
+        if group != previous:
+            if group in seen:
+                return False
+            seen.add(group)
+            previous = group
+    return True
+
+
+def _de_sample_order(sample_columns, sample_groups, group_order):
+    groups = [sample_groups[sample] for sample in sample_columns]
+    if _groups_are_contiguous(groups):
+        return list(sample_columns)
+    group_positions = {group: index for index, group in enumerate(group_order)}
+    return sorted(
+        sample_columns,
+        key=lambda sample: group_positions[sample_groups[sample]],
+    )
+
+
+def _de_group_boundaries(sample_order, sample_groups):
+    return [
+        index
+        for index in range(1, len(sample_order))
+        if sample_groups[sample_order[index - 1]] != sample_groups[sample_order[index]]
+    ]
+
+
+def de_heatmap(
+    statistics_table,
+    samples_metadata,
+    feature_column=None,
+    log_values=False,
+    show_values=True,
+    cmap=PHEATMAP_CMAP,
+    group_palette=None,
+    height=8,
+    aspect=1.0,
+):
+    """Plot differential-enrichment counts with matched group annotations.
+
+    Parameters
+    ----------
+    statistics_table : pandas.DataFrame
+        A user-filtered table returned by ``diff_enrichment.calc_statistics``.
+        It must contain ``enriched_in`` and numeric sample count columns.
+    samples_metadata : pandas.DataFrame
+        Sample metadata containing unique ``sample_id`` and ``group`` columns.
+    feature_column : hashable, optional
+        Column used for heatmap row labels. Defaults to the first column.
+    log_values : bool, default False
+        Color cells by log10 counts after replacing zeros with one tenth of the
+        smallest positive value.
+    show_values : bool, default True
+        Display compact original count values in heatmap cells.
+    cmap : matplotlib colormap, optional
+        Heatmap colormap. Defaults to the R ``pheatmap`` palette.
+    group_palette : palette name, sequence, or dict, optional
+        Colors shared by sample-group and ``enriched_in`` annotations.
+    height, aspect : float
+        Figure height and width multiplier.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Closed annotated heatmap figure.
+    """
+    if not isinstance(statistics_table, pd.DataFrame):
+        raise TypeError("statistics_table must be a pandas DataFrame")
+    if statistics_table.empty:
+        raise ValueError("statistics_table is empty")
+    if not isinstance(samples_metadata, pd.DataFrame):
+        raise TypeError("samples_metadata must be a pandas DataFrame")
+    required_metadata_columns = {"sample_id", "group"}
+    missing_metadata_columns = required_metadata_columns.difference(
+        samples_metadata.columns
+    )
+    if missing_metadata_columns:
+        raise ValueError(
+            "samples_metadata must contain columns 'sample_id' and 'group'; "
+            f"missing: {sorted(missing_metadata_columns)}"
+        )
+    if "enriched_in" not in statistics_table.columns:
+        raise ValueError("statistics_table must contain an 'enriched_in' column")
+    if statistics_table["enriched_in"].isna().any():
+        raise ValueError(
+            "statistics_table['enriched_in'] contains missing values; filter "
+            "out rows without differential-enrichment statistics before plotting"
+        )
+    if samples_metadata["sample_id"].isna().any():
+        raise ValueError("samples_metadata['sample_id'] must not contain missing values")
+    if samples_metadata["group"].isna().any():
+        raise ValueError("samples_metadata['group'] must not contain missing values")
+    duplicated_samples = samples_metadata["sample_id"].duplicated(keep=False)
+    if duplicated_samples.any():
+        duplicates = samples_metadata.loc[duplicated_samples, "sample_id"].tolist()
+        raise ValueError(
+            "samples_metadata['sample_id'] values must be unique; duplicated values: "
+            f"{duplicates}"
+        )
+
+    feature_column = (
+        statistics_table.columns[0]
+        if feature_column is None
+        else feature_column
+    )
+    if feature_column not in statistics_table.columns:
+        raise ValueError(f"feature_column {feature_column!r} is not in statistics_table")
+
+    metadata = samples_metadata.set_index("sample_id")
+    metadata_groups = set(metadata["group"])
+    enriched_groups = list(pd.unique(statistics_table["enriched_in"]))
+    missing_enriched_groups = [
+        group for group in enriched_groups if group not in metadata_groups
+    ]
+    if missing_enriched_groups:
+        raise ValueError(
+            "The following enriched_in groups are absent from "
+            f"samples_metadata['group']: {missing_enriched_groups}"
+        )
+
+    numeric_columns = list(
+        statistics_table.select_dtypes(include="number").columns
+    )
+    metadata_sample_ids = set(samples_metadata["sample_id"])
+    sample_columns = [
+        column
+        for column in statistics_table.columns
+        if column in metadata_sample_ids and column in numeric_columns
+    ]
+    if not sample_columns:
+        raise ValueError(
+            "No numeric count-table columns match samples_metadata['sample_id']"
+        )
+    non_numeric_samples = [
+        column
+        for column in statistics_table.columns
+        if column in metadata_sample_ids and column not in numeric_columns
+    ]
+    if non_numeric_samples:
+        raise ValueError(
+            "Sample count columns must be numeric; non-numeric samples: "
+            f"{non_numeric_samples}"
+        )
+
+    sample_groups = metadata.loc[sample_columns, "group"].to_dict()
+    represented_metadata = metadata.loc[sample_columns].reset_index()
+    group_order = _category_order(represented_metadata["group"])
+    sample_order = _de_sample_order(
+        sample_columns,
+        sample_groups,
+        group_order,
+    )
+    matrix = statistics_table[sample_order].apply(pd.to_numeric, errors="coerce")
+    invalid = statistics_table[sample_order].notna() & matrix.isna()
+    if invalid.any().any():
+        raise ValueError("Sample count columns must contain numeric values")
+    matrix.index = pd.Index(
+        statistics_table[feature_column].astype(str),
+        name=str(feature_column),
+    )
+    original_values = matrix.astype(float)
+    color_values = original_values.copy()
+    if log_values:
+        color_values = _beta_log_values(color_values, base=10)
+
+    color_levels = _category_order(samples_metadata["group"])
+    color_map = _palette_mapping(color_levels, palette=group_palette)
+    row_colors = pd.DataFrame(
+        {
+            "Enriched in": [
+                color_map[group]
+                for group in statistics_table["enriched_in"]
+            ]
+        },
+        index=matrix.index,
+    )
+    column_colors = pd.DataFrame(
+        {
+            "Group": [color_map[sample_groups[sample]] for sample in sample_order]
+        },
+        index=pd.Index(sample_order),
+    )
+
+    grid = sns.clustermap(
+        color_values,
+        cmap=cmap,
+        mask=color_values.isna(),
+        row_cluster=False,
+        col_cluster=False,
+        row_colors=row_colors,
+        col_colors=column_colors,
+        figsize=(height * aspect, height),
+        cbar_kws={"label": "log10(Count)" if log_values else "Count"},
+        xticklabels=True,
+        yticklabels=True,
+    )
+    grid.ax_heatmap.set_title("Differential enrichment")
+    grid.ax_heatmap.set_xlabel("Sample")
+    grid.ax_heatmap.set_ylabel(str(feature_column))
+    grid.ax_heatmap.tick_params(axis="x", labelrotation=90)
+
+    for boundary in _de_group_boundaries(sample_order, sample_groups):
+        grid.ax_heatmap.axvline(
+            boundary,
+            color="white",
+            linewidth=4,
+            zorder=10,
+            clip_on=False,
+        )
+        if grid.ax_col_colors is not None:
+            grid.ax_col_colors.axvline(
+                boundary,
+                color="white",
+                linewidth=4,
+                zorder=10,
+                clip_on=False,
+            )
+
+    if show_values:
+        for row_index, row in enumerate(original_values.to_numpy(dtype=float)):
+            for column_index, value in enumerate(row):
+                grid.ax_heatmap.text(
+                    column_index + 0.5,
+                    row_index + 0.5,
+                    _format_beta_value(value),
+                    ha="center",
+                    va="center",
+                    fontsize=7,
+                    color="black",
+                )
+
+    handles = [
+        Patch(facecolor=color_map[group], label=str(group))
+        for group in color_levels
+    ]
+    if handles:
+        grid.fig.legend(
+            handles=handles,
+            title="Group",
+            loc="upper center",
+            ncol=min(4, len(handles)),
+            frameon=False,
+        )
+        grid.fig.subplots_adjust(top=0.9)
+    return _close_and_return(grid.fig)
+
+
 def beta_metric(
     beta_data,
     metric=None,

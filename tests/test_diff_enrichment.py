@@ -186,7 +186,7 @@ def test_calc_statistics_two_groups_preserves_rows_and_prefilter_status(capsys):
     assert "Adjusting p-values for multiple testing using 'fdr_bh'" in output
     assert "Simplifying statistics" in output
     assert "Assembling the final differential enrichment output table" in output
-    assert "Differential enrichment analysis completed" in output
+    assert "Differential enrichment analysis finished successfully" in output
 
 
 def test_calc_statistics_reports_when_simplification_is_disabled(capsys):

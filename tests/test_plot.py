@@ -1356,6 +1356,116 @@ def test_beta_metric_rejects_more_than_three_annotation_groups():
         )
 
 
+def _de_heatmap_inputs(sample_order=None):
+    sample_order = sample_order or ["a1", "b1", "a2", "b2"]
+    sample_values = {
+        "a1": [5, 0],
+        "a2": [4, 0],
+        "b1": [0, 6],
+        "b2": [0, 7],
+    }
+    statistics_table = pd.DataFrame(
+        {
+            "feature": ["feature_a", "feature_b"],
+            "enriched_in": ["A", "B"],
+            "method": ["mann_whitney", "mann_whitney"],
+            "mean_group_count": [4.5, 6.5],
+            "log2FC": [100, 100],
+            "p_val": [0.01, 0.02],
+            "p_adj": [0.02, 0.02],
+            **{sample: sample_values[sample] for sample in sample_order},
+        }
+    )
+    metadata = pd.DataFrame(
+        {
+            "sample_id": ["a1", "a2", "b1", "b2"],
+            "group": ["A", "A", "B", "B"],
+        }
+    )
+    return statistics_table, metadata
+
+
+def test_de_heatmap_groups_interleaved_samples_and_matches_annotation_colors():
+    statistics_table, metadata = _de_heatmap_inputs()
+
+    fig = rsplot.de_heatmap(
+        statistics_table,
+        metadata,
+        log_values=True,
+        show_values=True,
+    )
+
+    heatmap = next(
+        ax for ax in fig.axes if ax.get_title() == "Differential enrichment"
+    )
+    row_annotation = next(
+        ax for ax in fig.axes if [tick.get_text() for tick in ax.get_xticklabels()] == ["Enriched in"]
+    )
+    column_annotation = next(
+        ax for ax in fig.axes if [tick.get_text() for tick in ax.get_yticklabels()] == ["Group"]
+    )
+
+    assert [tick.get_text() for tick in heatmap.get_xticklabels()] == [
+        "a1",
+        "a2",
+        "b1",
+        "b2",
+    ]
+    assert [tick.get_text() for tick in heatmap.get_yticklabels()] == [
+        "feature_a",
+        "feature_b",
+    ]
+    assert heatmap.collections[0].cmap.name == "pheatmap_default"
+    assert any(np.array_equal(line.get_xdata(), [2, 2]) for line in heatmap.lines)
+    assert any(
+        np.array_equal(line.get_xdata(), [2, 2])
+        for line in column_annotation.lines
+    )
+    np.testing.assert_allclose(
+        row_annotation.collections[0].get_facecolors(),
+        column_annotation.collections[0].get_facecolors()[[0, 2]],
+    )
+    assert {text.get_text() for text in heatmap.texts} >= {
+        "0",
+        "4.0",
+        "5.0",
+        "6.0",
+        "7.0",
+    }
+    assert any(ax.get_ylabel() == "log10(Count)" for ax in fig.axes)
+    assert [text.get_text() for text in fig.legends[0].get_texts()] == ["A", "B"]
+
+
+def test_de_heatmap_preserves_samples_when_groups_are_already_contiguous():
+    statistics_table, metadata = _de_heatmap_inputs(
+        sample_order=["b1", "b2", "a1", "a2"]
+    )
+
+    fig = rsplot.de_heatmap(
+        statistics_table,
+        metadata,
+        show_values=False,
+    )
+    heatmap = next(
+        ax for ax in fig.axes if ax.get_title() == "Differential enrichment"
+    )
+
+    assert [tick.get_text() for tick in heatmap.get_xticklabels()] == [
+        "b1",
+        "b2",
+        "a1",
+        "a2",
+    ]
+
+
+def test_de_heatmap_requires_enriched_groups_in_metadata():
+    statistics_table, metadata = _de_heatmap_inputs()
+    statistics_table.loc[0, "enriched_in"] = "MissingGroup"
+
+    with pytest.raises(ValueError, match="enriched_in groups are absent"):
+        rsplot.de_heatmap(statistics_table, metadata)
+
+
 def test_beta_table_dots_uses_lower_triangle_and_upper_f2_values():
     fig = rsplot.beta_table(
         {"full_table": _beta_full_table_same_set()},

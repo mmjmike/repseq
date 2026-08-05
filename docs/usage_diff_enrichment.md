@@ -9,6 +9,7 @@ import pandas as pd
 
 from repseq import diff_enrichment as rsde
 from repseq import intersections
+from repseq import plot as rsplot
 ```
 
 ## Input data
@@ -343,6 +344,57 @@ long_result = rsde.calc_statistics(
     method="fisher",
     presence_threshold=2,
     simplify=False,
+)
+```
+
+## Differential-enrichment heatmap
+
+After filtering the statistics table to the features of interest, plot their
+original sample counts with `rsplot.de_heatmap`:
+
+```py
+filtered_result = result[
+    result["prefilter_pass"]
+    & (result["p_adj"] < 0.05)
+    & (result["log2FC"] >= 2)
+].copy()
+
+fig = rsplot.de_heatmap(
+    filtered_result,
+    samples_metadata,
+    feature_column="clonotype",
+    log_values=True,
+)
+```
+
+The function identifies count columns by matching numeric table columns to
+`samples_metadata["sample_id"]`. Statistical columns such as `log2FC`,
+`p_val`, and `p_adj` are therefore not plotted.
+
+Samples are displayed together by `group`. If the count-table columns already
+contain contiguous group blocks, their existing order is preserved. If groups
+are interleaved, samples are stably regrouped without changing their order
+within each group. White vertical gaps separate adjacent sample groups.
+
+The top annotation strip shows the sample group and the left annotation strip
+shows each feature's `enriched_in` group. Both strips use the same group-to-color
+mapping. Every non-missing `enriched_in` value must occur in
+`samples_metadata["group"]`.
+
+`log_values=True` follows the same rule as `rsplot.beta_metric`: zeros are
+replaced by one tenth of the smallest positive plotted count before applying
+log10. Cell labels, when `show_values=True`, always display the original count
+values. The default heatmap colors are the R `pheatmap` blue-to-red palette.
+
+```py
+fig = rsplot.de_heatmap(
+    filtered_result,
+    samples_metadata,
+    show_values=False,
+    group_palette={
+        "Pep1": "#1f77b4",
+        "Control": "#ff7f0e",
+    },
 )
 ```
 
