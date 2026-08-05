@@ -447,8 +447,8 @@ class Clusters(list):
         is_count = "count" in clonoset.columns
         if igh:
             clonoset["c"] = clonoset["c"].apply(lambda x: self._split_c(x).split("(")[0])
-        if is_count:
-            clonoset["count"] = 1
+        # if is_count:
+        #     clonoset["count"] = 1
 
         nodes_by_len={}
         list_of_all_nodes = []
