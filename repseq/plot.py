@@ -2526,7 +2526,7 @@ def de_heatmap(
     statistics_table,
     samples_metadata,
     feature_column=None,
-    log_values=False,
+    log_values=True,
     show_values=True,
     cmap=PHEATMAP_CMAP,
     group_palette=None,
@@ -2544,7 +2544,7 @@ def de_heatmap(
         Sample metadata containing unique ``sample_id`` and ``group`` columns.
     feature_column : hashable, optional
         Column used for heatmap row labels. Defaults to the first column.
-    log_values : bool, default False
+    log_values : bool, default True
         Color cells by log10 counts after replacing zeros with one tenth of the
         smallest positive value.
     show_values : bool, default True

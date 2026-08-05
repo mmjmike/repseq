@@ -381,7 +381,8 @@ shows each feature's `enriched_in` group. Both strips use the same group-to-colo
 mapping. Every non-missing `enriched_in` value must occur in
 `samples_metadata["group"]`.
 
-`log_values=True` follows the same rule as `rsplot.beta_metric`: zeros are
+`log_values=True` is the default and follows the same rule as
+`rsplot.beta_metric`: zeros are
 replaced by one tenth of the smallest positive plotted count before applying
 log10. Cell labels, when `show_values=True`, always display the original count
 values. Integer-valued counts are written in full without a trailing `.0` or
