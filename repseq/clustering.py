@@ -270,6 +270,52 @@ class Clusters(list):
         return pd.DataFrame(results, columns=properties_list)
 
 
+    def to_count_table(self, by_freq=False):
+        """Create a wide table of cluster abundance by sample.
+
+        Args:
+            by_freq (bool): If ``True``, sum node frequencies. Otherwise, sum
+                node counts.
+
+        Returns:
+            pd.DataFrame: Cluster identifiers and consensus properties followed
+                by one abundance column per sample.
+        """
+        property_columns = [
+            "cluster_id",
+            "concensus_cdr3aa",
+            "concensus_v",
+            "concensus_j",
+        ]
+        count_table = self.properties[property_columns].copy()
+
+        sample_ids = []
+        clonosets_df = getattr(self, "clonosets_df", None)
+        if isinstance(clonosets_df, pd.DataFrame) and "sample_id" in clonosets_df.columns:
+            sample_ids.extend(clonosets_df["sample_id"].drop_duplicates().tolist())
+        elif isinstance(self.clonotypes, pd.DataFrame) and "sample_id" in self.clonotypes.columns:
+            sample_ids.extend(self.clonotypes["sample_id"].drop_duplicates().tolist())
+
+        for cluster in self.clusters:
+            for node in cluster:
+                if node.sample_id not in sample_ids:
+                    sample_ids.append(node.sample_id)
+
+        value_attribute = "freq" if by_freq else "count"
+        values_by_sample = {sample_id: [] for sample_id in sample_ids}
+        for cluster in self.clusters:
+            cluster_values = {sample_id: 0 for sample_id in sample_ids}
+            for node in cluster:
+                cluster_values[node.sample_id] += getattr(node, value_attribute)
+            for sample_id in sample_ids:
+                values_by_sample[sample_id].append(cluster_values[sample_id])
+
+        for sample_id, values in values_by_sample.items():
+            count_table[sample_id] = values
+
+        return count_table
+
+
     def split(self, method="leiden", resolution=0.5, threshold=1e-07, seed=1):
         """
         Performs a community detection on pre-calculated clusters. Available methods are `louvain` and `leiden`. 
