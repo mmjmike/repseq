@@ -301,12 +301,12 @@ class Clusters(list):
                 if node.sample_id not in sample_ids:
                     sample_ids.append(node.sample_id)
 
-        value_attribute = "freq" if by_freq else "count"
         values_by_sample = {sample_id: [] for sample_id in sample_ids}
         for cluster in self.clusters:
             cluster_values = {sample_id: 0 for sample_id in sample_ids}
             for node in cluster:
-                cluster_values[node.sample_id] += getattr(node, value_attribute)
+                value = node.freq if by_freq else node.count
+                cluster_values[node.sample_id] += value
             for sample_id in sample_ids:
                 values_by_sample[sample_id].append(cluster_values[sample_id])
 
