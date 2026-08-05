@@ -351,7 +351,7 @@ def calc_statistics(
         simplify=simplify,
     )
     if verbose:
-        print("Differential enrichment analysis completed.")
+        print("Differential enrichment analysis finished successfully!")
     return result
 
 
