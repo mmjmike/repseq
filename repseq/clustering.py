@@ -288,6 +288,13 @@ class Clusters(list):
             "concensus_j",
         ]
         count_table = self.properties[property_columns].copy()
+        count_table.insert(
+            1,
+            "consensus",
+            count_table[["concensus_cdr3aa", "concensus_v", "concensus_j"]]
+            .astype(str)
+            .agg("|".join, axis=1),
+        )
 
         sample_ids = []
         clonosets_df = getattr(self, "clonosets_df", None)

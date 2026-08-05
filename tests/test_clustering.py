@@ -37,6 +37,7 @@ def test_to_count_table_sums_counts_by_cluster_and_sample():
     expected = pd.DataFrame(
         {
             "cluster_id": ["cluster_0", "cluster_1"],
+            "consensus": ["CASS|TRBV1|TRBJ1", "CATS|TRBV2|TRBJ2"],
             "concensus_cdr3aa": ["CASS", "CATS"],
             "concensus_v": ["TRBV1", "TRBV2"],
             "concensus_j": ["TRBJ1", "TRBJ2"],
@@ -54,6 +55,7 @@ def test_to_count_table_sums_frequencies_when_requested():
 
     assert count_table.columns.tolist() == [
         "cluster_id",
+        "consensus",
         "concensus_cdr3aa",
         "concensus_v",
         "concensus_j",
