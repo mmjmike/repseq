@@ -2431,6 +2431,17 @@ def _format_beta_value(value):
     return candidate[:6]
 
 
+def _format_de_heatmap_value(value, all_values_are_integers=False):
+    if pd.isna(value):
+        return "NA"
+    numeric_value = float(value)
+    if numeric_value.is_integer() and (
+        all_values_are_integers or numeric_value > 1
+    ):
+        return str(int(numeric_value))
+    return _format_beta_value(numeric_value)
+
+
 def _beta_linkage(matrix, axis):
     values = matrix.to_numpy(dtype=float)
     if axis == 1:
@@ -2703,12 +2714,20 @@ def de_heatmap(
             )
 
     if show_values:
+        finite_values = original_values.to_numpy(dtype=float)
+        finite_values = finite_values[np.isfinite(finite_values)]
+        all_values_are_integers = bool(len(finite_values)) and np.all(
+            finite_values == np.floor(finite_values)
+        )
         for row_index, row in enumerate(original_values.to_numpy(dtype=float)):
             for column_index, value in enumerate(row):
                 grid.ax_heatmap.text(
                     column_index + 0.5,
                     row_index + 0.5,
-                    _format_beta_value(value),
+                    _format_de_heatmap_value(
+                        value,
+                        all_values_are_integers=all_values_are_integers,
+                    ),
                     ha="center",
                     va="center",
                     fontsize=7,

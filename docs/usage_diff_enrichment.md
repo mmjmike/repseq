@@ -384,7 +384,10 @@ mapping. Every non-missing `enriched_in` value must occur in
 `log_values=True` follows the same rule as `rsplot.beta_metric`: zeros are
 replaced by one tenth of the smallest positive plotted count before applying
 log10. Cell labels, when `show_values=True`, always display the original count
-values. The default heatmap colors are the R `pheatmap` blue-to-red palette.
+values. Integer-valued counts are written in full without a trailing `.0` or
+scientific notation, so a count such as `456789` remains `456789`. Genuine
+decimal values retain compact decimal formatting. The default heatmap colors
+are the R `pheatmap` blue-to-red palette.
 
 ```py
 fig = rsplot.de_heatmap(

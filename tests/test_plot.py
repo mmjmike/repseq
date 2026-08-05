@@ -1359,7 +1359,7 @@ def test_beta_metric_rejects_more_than_three_annotation_groups():
 def _de_heatmap_inputs(sample_order=None):
     sample_order = sample_order or ["a1", "b1", "a2", "b2"]
     sample_values = {
-        "a1": [5, 0],
+        "a1": [456789, 0],
         "a2": [4, 0],
         "b1": [0, 6],
         "b2": [0, 7],
@@ -1427,10 +1427,10 @@ def test_de_heatmap_groups_interleaved_samples_and_matches_annotation_colors():
     )
     assert {text.get_text() for text in heatmap.texts} >= {
         "0",
-        "4.0",
-        "5.0",
-        "6.0",
-        "7.0",
+        "4",
+        "6",
+        "7",
+        "456789",
     }
     assert any(ax.get_ylabel() == "log10(Count)" for ax in fig.axes)
     assert [text.get_text() for text in fig.legends[0].get_texts()] == ["A", "B"]
@@ -1456,6 +1456,12 @@ def test_de_heatmap_preserves_samples_when_groups_are_already_contiguous():
         "a1",
         "a2",
     ]
+
+
+def test_de_heatmap_integer_formatter_preserves_real_decimals():
+    assert rsplot._format_de_heatmap_value(456789.0) == "456789"
+    assert rsplot._format_de_heatmap_value(2.0) == "2"
+    assert rsplot._format_de_heatmap_value(0.25) == "0.25"
 
 
 def test_de_heatmap_requires_enriched_groups_in_metadata():
