@@ -942,44 +942,77 @@ def _assemble_statistics_output(
     pass_mask,
     simplify,
 ):
-    statistics_by_position = {
-        int(position): group.drop(columns="_row_position")
-        for position, group in statistics.groupby("_row_position", sort=False)
-    }
-    rows = []
-    for row_position in range(len(count_table)):
-        base_row = count_table.iloc[[row_position]].copy()
-        row_statistics = statistics_by_position.get(row_position)
-        if row_statistics is None or not pass_mask[row_position]:
-            for column in STATISTICS_COLUMNS:
-                base_row[column] = None
-            rows.append(base_row)
-            continue
-        if simplify:
-            row_statistics = row_statistics.iloc[[0]]
-        repeated = pd.concat([base_row] * len(row_statistics), axis=0)
-        for column in STATISTICS_COLUMNS:
-            repeated[column] = row_statistics[column].to_numpy()
-        rows.append(repeated)
-    result = pd.concat(rows, axis=0) if rows else count_table.copy()
+    base_columns = [
+        column
+        for column in count_table.columns
+        if column not in STATISTICS_COLUMNS
+    ]
+    base_table = count_table[base_columns].copy()
+    row_position_column = "__repseq_row_position__"
+    while row_position_column in base_table.columns:
+        row_position_column = "_" + row_position_column
+    comparison_order_column = "__repseq_comparison_order__"
+    while comparison_order_column in base_table.columns:
+        comparison_order_column = "_" + comparison_order_column
+
+    base_table[row_position_column] = np.arange(len(base_table), dtype=int)
+    pass_mask = np.asarray(pass_mask, dtype=bool)
+    passing_table = base_table.loc[pass_mask]
+    failing_table = base_table.loc[~pass_mask].copy()
+
+    statistics_for_merge = statistics[
+        ["_row_position", *STATISTICS_COLUMNS]
+    ].copy()
+    statistics_for_merge[comparison_order_column] = np.arange(
+        len(statistics_for_merge),
+        dtype=int,
+    )
+    statistics_for_merge = statistics_for_merge.rename(
+        columns={"_row_position": row_position_column}
+    )
+    passing_result = passing_table.merge(
+        statistics_for_merge,
+        how="left",
+        on=row_position_column,
+        sort=False,
+        validate="one_to_one" if simplify else "one_to_many",
+    )
+
     for column in STATISTICS_COLUMNS:
-        if column not in result.columns:
-            result[column] = None
-    original_numeric_columns = list(
-        count_table.select_dtypes(include="number").columns
+        failing_table[column] = None
+    failing_table[comparison_order_column] = -1
+
+    result = pd.concat(
+        [passing_result, failing_table],
+        axis=0,
+        ignore_index=True,
+        sort=False,
     )
-    statistics_values = result[STATISTICS_COLUMNS].copy()
-    result = result.drop(columns=STATISTICS_COLUMNS)
+    result = result.sort_values(
+        [row_position_column, comparison_order_column],
+        kind="stable",
+    )
+    row_positions = result[row_position_column].to_numpy(dtype=int)
+    result = result.drop(
+        columns=[row_position_column, comparison_order_column]
+    )
+    result.index = count_table.index.take(row_positions)
+
+    original_numeric_columns = [
+        column
+        for column in count_table.select_dtypes(include="number").columns
+        if column in base_columns
+    ]
     insert_position = (
-        result.columns.get_loc(original_numeric_columns[0])
+        base_columns.index(original_numeric_columns[0])
         if original_numeric_columns
-        else len(result.columns)
+        else len(base_columns)
     )
-    for offset, column in enumerate(STATISTICS_COLUMNS):
-        result.insert(
-            insert_position + offset,
-            column,
-            statistics_values[column].to_numpy(),
-        )
+    ordered_columns = [
+        *base_columns[:insert_position],
+        *STATISTICS_COLUMNS,
+        *base_columns[insert_position:],
+    ]
+    result = result[ordered_columns]
     result.attrs = count_table.attrs.copy()
     return result

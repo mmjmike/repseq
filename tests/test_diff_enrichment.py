@@ -337,6 +337,34 @@ def test_calc_statistics_multigroup_expands_passed_features_and_parallelizes(mon
     assert result.loc[result["feature"].eq("filtered"), "method"].isna().all()
 
 
+def test_calc_statistics_expanded_output_preserves_original_index_order():
+    count_table, metadata = _three_group_inputs()
+    count_table.index = pd.Index([10, 10, 30], name="source_row")
+    count_table.attrs["source"] = "custom-index-table"
+
+    result = rsde.calc_statistics(
+        count_table,
+        metadata,
+        method="fisher",
+        simplify=False,
+        cpu=1,
+        verbose=False,
+    )
+
+    assert result.index.tolist() == [10, 10, 10, 10, 10, 10, 30]
+    assert result.index.name == "source_row"
+    assert result["feature"].tolist() == [
+        "enriched_a",
+        "enriched_a",
+        "enriched_a",
+        "enriched_b",
+        "enriched_b",
+        "enriched_b",
+        "filtered",
+    ]
+    assert result.attrs == {"source": "custom-index-table"}
+
+
 def test_calc_statistics_reports_default_feature_column_duplicates():
     count_table = _statistics_count_table().copy()
     count_table.index = [10, 11, 12]
