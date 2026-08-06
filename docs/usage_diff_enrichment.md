@@ -19,10 +19,13 @@ from repseq import plot as rsplot
 1. A wide count table with one row per feature and numeric sample columns.
 2. A sample metadata table containing `sample_id` and `group` columns.
 
-The sample IDs in the metadata must exactly match numeric count-table column
-names. Numeric sample columns that are not listed in the metadata are reported
-and ignored. Each group must contain at least two represented samples, and at
-least two groups are required.
+Numeric count-table sample columns are matched to metadata by `sample_id`.
+`samples_metadata` may contain additional samples that are absent from the
+count table; they are reported and ignored. Numeric table columns that are not
+listed in the metadata are also reported and ignored. Group detection and the
+minimum group-size checks use only samples represented in both inputs. Each
+represented group must contain at least two samples, and at least two groups
+are required.
 
 Example metadata:
 

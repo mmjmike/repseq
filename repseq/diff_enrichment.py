@@ -434,20 +434,16 @@ def _prepare_statistics_setup(
         column for column in numeric_columns if column != feature_column
     ]
     metadata_sample_ids = samples_metadata["sample_id"].tolist()
-    missing_sample_columns = [
+    metadata_only_samples = [
         sample_id
         for sample_id in metadata_sample_ids
         if sample_id not in count_table.columns
     ]
-    if missing_sample_columns:
-        raise ValueError(
-            "The following samples_metadata sample_id values are absent from "
-            f"count_table columns: {missing_sample_columns}"
-        )
     non_numeric_samples = [
         sample_id
         for sample_id in metadata_sample_ids
-        if sample_id not in numeric_sample_columns
+        if sample_id in count_table.columns
+        and sample_id not in numeric_sample_columns
     ]
     if non_numeric_samples:
         raise ValueError(
@@ -511,6 +507,7 @@ def _prepare_statistics_setup(
         "numeric_columns": numeric_columns,
         "sample_columns": sample_columns,
         "ignored_sample_columns": ignored_sample_columns,
+        "metadata_only_samples": metadata_only_samples,
         "groups": groups,
         "group_samples": group_samples,
         "group_sample_indices": group_sample_indices,
@@ -536,6 +533,14 @@ def _print_statistics_setup(setup):
         )
     else:
         print("All numeric sample columns are represented in samples_metadata.")
+    if setup["metadata_only_samples"]:
+        print(
+            "samples_metadata entries absent from count_table will be ignored "
+            f"({len(setup['metadata_only_samples'])}): "
+            f"{setup['metadata_only_samples']}"
+        )
+    else:
+        print("All samples_metadata sample IDs are represented in count_table.")
     if setup["prefilter_used"]:
         print(
             "Prefilter applied: "

@@ -398,11 +398,11 @@ def test_calc_statistics_accepts_explicit_unique_feature_column():
         (
             pd.DataFrame(
                 {
-                    "sample_id": ["a1", "a2", "missing", "b2"],
-                    "group": ["A", "A", "B", "B"],
+                    "sample_id": ["a1", "a2", "b1", "b2", "annotation"],
+                    "group": ["A", "A", "B", "B", "annotation_group"],
                 }
             ),
-            "absent from count_table",
+            "non-numeric samples",
         ),
         (
             pd.DataFrame(
@@ -431,6 +431,33 @@ def test_calc_statistics_validates_metadata(metadata, message):
             metadata,
             verbose=False,
         )
+
+
+def test_calc_statistics_ignores_metadata_samples_absent_from_count_table(capsys):
+    metadata = pd.concat(
+        [
+            _two_group_metadata(),
+            pd.DataFrame(
+                {
+                    "sample_id": ["extra1", "extra2"],
+                    "group": ["ExtraGroup", "ExtraGroup"],
+                }
+            ),
+        ],
+        ignore_index=True,
+    )
+
+    result = rsde.calc_statistics(
+        _statistics_count_table(),
+        metadata,
+        cpu=1,
+    )
+
+    assert result.loc[:1, "method"].tolist() == ["mann_whitney"] * 2
+    output = capsys.readouterr().out
+    assert "samples_metadata entries absent from count_table will be ignored" in output
+    assert "['extra1', 'extra2']" in output
+    assert "Groups detected: 2" in output
 
 
 @pytest.mark.parametrize(
