@@ -2750,6 +2750,142 @@ def de_heatmap(
     return _close_and_return(grid.fig)
 
 
+def _adjust_de_volcano_log2fc(values):
+    adjusted = pd.Series(values, copy=True, dtype=float)
+    finite = adjusted[np.isfinite(adjusted)]
+    repeated_high_values = finite.value_counts()
+    repeated_high_values = repeated_high_values[
+        (repeated_high_values.index > 10) & (repeated_high_values > 1)
+    ]
+    for repeated_value in repeated_high_values.index:
+        values_below = finite[finite < repeated_value]
+        if values_below.empty:
+            continue
+        max_non_repeated_value = float(values_below.max())
+        replacement = max(max_non_repeated_value + 2, float(repeated_value))
+        adjusted.loc[adjusted.eq(repeated_value)] = replacement
+    return adjusted
+
+
+def _prepare_de_volcano_data(statistics_table, p_column):
+    if not isinstance(statistics_table, pd.DataFrame):
+        raise TypeError("statistics_table must be a pandas DataFrame")
+    if p_column not in {"p_adj", "p_val"}:
+        raise ValueError("p_column must be either 'p_adj' or 'p_val'")
+    required_columns = {
+        "log2FC",
+        "mean_group_count",
+        "enriched_in",
+        p_column,
+    }
+    missing_columns = required_columns.difference(statistics_table.columns)
+    if missing_columns:
+        raise ValueError(
+            "statistics_table is missing required volcano columns: "
+            f"{sorted(missing_columns)}"
+        )
+
+    plotted = statistics_table[
+        ["log2FC", p_column, "mean_group_count", "enriched_in"]
+    ].dropna().copy()
+    if plotted.empty:
+        raise ValueError("No rows with complete volcano-plot values are available")
+    for column in ["log2FC", p_column, "mean_group_count"]:
+        converted = pd.to_numeric(plotted[column], errors="coerce")
+        if converted.isna().any():
+            raise ValueError(f"statistics_table[{column!r}] must be numeric")
+        plotted[column] = converted.astype(float)
+    if ((plotted[p_column] < 0) | (plotted[p_column] > 1)).any():
+        raise ValueError(f"statistics_table[{p_column!r}] values must be in [0, 1]")
+    if (plotted["mean_group_count"] < 0).any():
+        raise ValueError("statistics_table['mean_group_count'] must be non-negative")
+
+    plotted["_plot_log2FC"] = _adjust_de_volcano_log2fc(
+        plotted["log2FC"]
+    ).to_numpy()
+    p_values = plotted[p_column].to_numpy(dtype=float)
+    positive_p_values = p_values[p_values > 0]
+    p_floor = (
+        float(np.min(positive_p_values)) / 10
+        if len(positive_p_values)
+        else np.finfo(float).tiny
+    )
+    plotted["_negative_log10_p"] = -np.log10(
+        np.where(p_values == 0, p_floor, p_values)
+    )
+    return plotted
+
+
+def de_volcano(
+    statistics_table,
+    p_column="p_adj",
+    group_palette=None,
+    size_range=(20, 300),
+    alpha=0.7,
+    height=6,
+    aspect=1.3,
+):
+    """Plot differential-enrichment effect sizes against p-values.
+
+    Parameters
+    ----------
+    statistics_table : pandas.DataFrame
+        A table returned by ``diff_enrichment.calc_statistics``.
+    p_column : {"p_adj", "p_val"}, default "p_adj"
+        P-value column used for the vertical axis.
+    group_palette : palette name, sequence, or dict, optional
+        Colors assigned to ``enriched_in`` groups.
+    size_range : pair of float, default (20, 300)
+        Minimum and maximum scatter-point areas. Point size is proportional to
+        ``mean_group_count``.
+    alpha : float, default 0.7
+        Point opacity.
+    height, aspect : float
+        Figure height and width multiplier.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Closed volcano-plot figure.
+    """
+    plotted = _prepare_de_volcano_data(statistics_table, p_column)
+    group_order = _category_order(plotted["enriched_in"])
+    color_map = _palette_mapping(group_order, palette=group_palette)
+    point_colors = [color_map[group] for group in plotted["enriched_in"]]
+    point_sizes = _scaled_dot_sizes(plotted["mean_group_count"], size_range)
+
+    fig, ax = plt.subplots(figsize=(height * aspect, height))
+    ax.scatter(
+        plotted["_plot_log2FC"],
+        plotted["_negative_log10_p"],
+        s=point_sizes,
+        c=point_colors,
+        alpha=float(alpha),
+        edgecolors="black",
+        linewidths=0.5,
+    )
+    ax.axvline(0, color="#888888", linestyle="--", linewidth=0.8, zorder=0)
+    ax.set_title("Differential enrichment volcano plot")
+    ax.set_xlabel("log2FC")
+    ax.set_ylabel(f"-log10({p_column})")
+    ax.grid(color="#eeeeee", linewidth=0.6)
+    ax.set_axisbelow(True)
+
+    handles = [
+        Patch(facecolor=color_map[group], edgecolor="black", label=str(group))
+        for group in group_order
+    ]
+    if handles:
+        ax.legend(
+            handles=handles,
+            title="Enriched in",
+            frameon=False,
+            loc="best",
+        )
+    fig.tight_layout()
+    return _close_and_return(fig)
+
+
 def beta_metric(
     beta_data,
     metric=None,

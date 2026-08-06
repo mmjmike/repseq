@@ -405,6 +405,53 @@ fig = rsplot.de_heatmap(
 )
 ```
 
+## Differential-enrichment volcano plot
+
+`rsplot.de_volcano` plots effect size against statistical significance. The
+default vertical axis uses adjusted p-values, point color represents
+`enriched_in`, and point area is proportional to `mean_group_count`.
+
+```py
+fig = rsplot.de_volcano(
+    result,
+    p_column="p_adj",
+    size_range=(20, 300),
+)
+```
+
+Rows with missing `log2FC`, selected p-value, `mean_group_count`, or
+`enriched_in` values are silently omitted. Use raw p-values with:
+
+```py
+fig = rsplot.de_volcano(
+    result,
+    p_column="p_val",
+)
+```
+
+The y-axis is `-log10(p_adj)` or `-log10(p_val)`. Zero p-values are replaced by
+one tenth of the smallest positive plotted p-value before transformation, so
+they remain finite on the plot.
+
+Repeated identical `log2FC` values greater than `10` are adjusted for plotting.
+For a repeated value `X`, the largest plotted value below `X` is found and all
+copies of `X` are replaced by `max(max_non_X + 2, X)`. This changes only the
+displayed x-coordinate; the input dataframe is not modified.
+
+Group colors and point-size limits can be customized:
+
+```py
+fig = rsplot.de_volcano(
+    result,
+    group_palette={
+        "Pep1": "#1f77b4",
+        "Control": "#ff7f0e",
+    },
+    size_range=(30, 500),
+    alpha=0.8,
+)
+```
+
 ## API reference
 
 ### `prefilter`

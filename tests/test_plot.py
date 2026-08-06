@@ -1472,6 +1472,66 @@ def test_de_heatmap_requires_enriched_groups_in_metadata():
         rsplot.de_heatmap(statistics_table, metadata)
 
 
+def _de_volcano_table():
+    return pd.DataFrame(
+        {
+            "log2FC": [12, 12, 11, 5, np.nan],
+            "p_adj": [0.01, 0.02, 0.03, 0.04, 0.05],
+            "p_val": [0.1, 0.2, 0.3, 0.4, 0.5],
+            "mean_group_count": [10, 20, 5, 40, 50],
+            "enriched_in": ["A", "A", "B", "B", "A"],
+        }
+    )
+
+
+def test_de_volcano_uses_adjusted_p_values_sizes_colors_and_drops_na():
+    fig = rsplot.de_volcano(_de_volcano_table())
+    ax = fig.axes[0]
+    points = ax.collections[0]
+    offsets = np.asarray(points.get_offsets())
+
+    np.testing.assert_allclose(offsets[:, 0], [13, 13, 11, 5])
+    np.testing.assert_allclose(
+        offsets[:, 1],
+        -np.log10([0.01, 0.02, 0.03, 0.04]),
+    )
+    assert len(offsets) == 4
+    assert points.get_sizes()[3] == points.get_sizes().max()
+    np.testing.assert_allclose(
+        points.get_facecolors()[0],
+        points.get_facecolors()[1],
+    )
+    np.testing.assert_allclose(
+        points.get_facecolors()[2],
+        points.get_facecolors()[3],
+    )
+    assert not np.allclose(
+        points.get_facecolors()[0],
+        points.get_facecolors()[2],
+    )
+    assert ax.get_xlabel() == "log2FC"
+    assert ax.get_ylabel() == "-log10(p_adj)"
+    assert [text.get_text() for text in ax.get_legend().get_texts()] == ["A", "B"]
+
+
+def test_de_volcano_can_plot_raw_p_values():
+    fig = rsplot.de_volcano(_de_volcano_table(), p_column="p_val")
+    ax = fig.axes[0]
+    offsets = np.asarray(ax.collections[0].get_offsets())
+
+    np.testing.assert_allclose(
+        offsets[:, 1],
+        -np.log10([0.1, 0.2, 0.3, 0.4]),
+    )
+    assert ax.get_ylabel() == "-log10(p_val)"
+
+
+def test_de_volcano_repeated_high_log2fc_adjustment_uses_maximum_below_value():
+    adjusted = rsplot._adjust_de_volcano_log2fc([12, 12, 11, 4])
+
+    assert adjusted.tolist() == [13, 13, 11, 4]
+
+
 def test_beta_table_dots_uses_lower_triangle_and_upper_f2_values():
     fig = rsplot.beta_table(
         {"full_table": _beta_full_table_same_set()},
