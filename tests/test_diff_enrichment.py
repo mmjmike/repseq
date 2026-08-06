@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -574,3 +575,137 @@ def test_simplify_keeps_lowest_p_value_per_feature_position():
     result = rsde.simplify(statistics)
 
     assert result["enriched_in"].tolist() == ["B", "A"]
+
+
+def _paired_chain_inputs():
+    count_table1 = pd.DataFrame(
+        {
+            "feature1": ["a1", "a2", "a_filtered"],
+            "prefilter_pass": [True, True, False],
+            "enriched_in": ["group1", "group2", "group1"],
+            "mean_group_count": [5.0, 4.0, 100.0],
+            "tra_s1": [10, 0, 100],
+            "tra_s2": [0, 5, 100],
+            "tra_s3": [0, 5, 100],
+        }
+    )
+    count_table2 = pd.DataFrame(
+        {
+            "feature2": ["b1", "b2", "b_filtered"],
+            "prefilter_pass": [True, True, False],
+            "enriched_in": ["group1", "group2", "group1"],
+            "mean_group_count": [4.0, 3.0, 100.0],
+            "trb_s1": [8, 0, 100],
+            "trb_s2": [0, 4, 100],
+            "trb_s3": [0, 4, 100],
+        }
+    )
+    metadata = pd.DataFrame(
+        {
+            "sample_id": [
+                "tra_s1",
+                "trb_s1",
+                "tra_s2",
+                "trb_s2",
+                "tra_s3",
+                "trb_s3",
+                "unused_sample",
+            ],
+            "sample": ["s1", "s1", "s2", "s2", "s3", "s3", "unused"],
+        }
+    )
+    return count_table1, count_table2, metadata
+
+
+def test_pair_chains_jsd_normalizes_rows_and_excludes_prefiltered_features():
+    count_table1, count_table2, metadata = _paired_chain_inputs()
+
+    result = rsde.pair_chains(count_table1, count_table2, metadata)
+
+    assert result.index.tolist() == ["b1", "b2"]
+    assert result.columns.tolist() == ["a1", "a2"]
+    assert result.index.name == "feature2"
+    assert result.columns.name == "feature1"
+    assert result.loc["b1", "a1"] == pytest.approx(0)
+    assert result.loc["b2", "a2"] == pytest.approx(0)
+    assert result.loc["b1", "a2"] == pytest.approx(np.log(2))
+    assert result.loc["b2", "a1"] == pytest.approx(np.log(2))
+    assert result.attrs["method"] == "jsd"
+    assert result.attrs["paired_samples"].to_dict("records") == [
+        {"sample": "s1", "sample_id1": "tra_s1", "sample_id2": "trb_s1"},
+        {"sample": "s2", "sample_id1": "tra_s2", "sample_id2": "trb_s2"},
+        {"sample": "s3", "sample_id1": "tra_s3", "sample_id2": "trb_s3"},
+    ]
+
+
+def test_pair_chains_pearson_returns_correlation_matrix():
+    count_table1, count_table2, metadata = _paired_chain_inputs()
+
+    result = rsde.pair_chains(
+        count_table1,
+        count_table2,
+        metadata,
+        method="pearson",
+    )
+
+    assert result.loc["b1", "a1"] == pytest.approx(1)
+    assert result.loc["b2", "a2"] == pytest.approx(1)
+    assert result.loc["b1", "a2"] == pytest.approx(-1)
+    assert result.loc["b2", "a1"] == pytest.approx(-1)
+
+
+def test_pair_chains_filters_requested_ids_and_adds_best_opposite_partners():
+    count_table1, count_table2, metadata = _paired_chain_inputs()
+
+    result = rsde.pair_chains(
+        count_table1,
+        count_table2,
+        metadata,
+        filter_ids1=["a1"],
+        filter_ids2=["b2"],
+    )
+
+    assert result.columns.tolist() == ["a1", "a2"]
+    assert result.index.tolist() == ["b2", "b1"]
+
+
+def test_pair_chains_single_filter_returns_requested_ids_and_best_partners():
+    count_table1, count_table2, metadata = _paired_chain_inputs()
+
+    result1 = rsde.pair_chains(
+        count_table1,
+        count_table2,
+        metadata,
+        filter_ids1=["a1"],
+    )
+    result2 = rsde.pair_chains(
+        count_table1,
+        count_table2,
+        metadata,
+        filter_ids2=["b2"],
+    )
+
+    assert result1.columns.tolist() == ["a1"]
+    assert result1.index.tolist() == ["b1"]
+    assert result2.columns.tolist() == ["a2"]
+    assert result2.index.tolist() == ["b2"]
+
+
+def test_pair_chains_rejects_unpaired_count_table_samples():
+    count_table1, count_table2, metadata = _paired_chain_inputs()
+    count_table2 = count_table2.drop(columns="trb_s3")
+
+    with pytest.raises(ValueError, match="must have a paired sample_id"):
+        rsde.pair_chains(count_table1, count_table2, metadata)
+
+
+def test_pair_chains_rejects_filter_ids_removed_by_prefilter():
+    count_table1, count_table2, metadata = _paired_chain_inputs()
+
+    with pytest.raises(ValueError, match="absent after prefiltering"):
+        rsde.pair_chains(
+            count_table1,
+            count_table2,
+            metadata,
+            filter_ids1=["a_filtered"],
+        )

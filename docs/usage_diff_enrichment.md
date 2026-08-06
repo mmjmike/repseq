@@ -405,6 +405,125 @@ fig = rsplot.de_heatmap(
 )
 ```
 
+## Pairing features between chains
+
+`rsde.pair_chains` compares feature abundance patterns between two
+chain-specific `calc_statistics` tables. For example, it can rank candidate
+TRA/TRB feature pairs across matched biological samples.
+
+The pairing metadata requires:
+
+- `sample_id`: the chain-specific count-table column name;
+- `sample`: the shared biological sample identifier used to pair the chains.
+
+Each represented biological sample must have exactly one sample ID in each
+count table.
+
+| sample_id | sample |
+|:----------|:-------|
+| donor1_TRA | donor1 |
+| donor1_TRB | donor1 |
+| donor2_TRA | donor2 |
+| donor2_TRB | donor2 |
+| donor3_TRA | donor3 |
+| donor3_TRB | donor3 |
+
+```py
+paired_metadata = pd.DataFrame(
+    {
+        "sample_id": [
+            "donor1_TRA",
+            "donor1_TRB",
+            "donor2_TRA",
+            "donor2_TRB",
+            "donor3_TRA",
+            "donor3_TRB",
+        ],
+        "sample": [
+            "donor1",
+            "donor1",
+            "donor2",
+            "donor2",
+            "donor3",
+            "donor3",
+        ],
+    }
+)
+```
+
+Calculate Jensen–Shannon divergence with:
+
+```py
+pairing_matrix = rsde.pair_chains(
+    tra_statistics,
+    trb_statistics,
+    paired_metadata,
+    method="jsd",
+)
+```
+
+Rows from each table are normalized to sum to one across paired samples before
+scoring. For JSD, smaller values indicate more similar abundance patterns and
+`0` indicates identical normalized patterns.
+
+Pearson correlation is also available:
+
+```py
+pairing_matrix = rsde.pair_chains(
+    tra_statistics,
+    trb_statistics,
+    paired_metadata,
+    method="pearson",
+)
+```
+
+For Pearson scores, larger values indicate better agreement. Features with
+constant normalized profiles receive `NaN` correlations.
+
+The matrix columns are features from the first count table and rows are
+features from the second count table:
+
+```text
+                         count_table1 features
+                       TRA_1    TRA_2    TRA_3
+count_table2  TRB_1     0.00     0.54     0.31
+features      TRB_2     0.48     0.02     0.60
+              TRB_3     0.25     0.41     0.01
+```
+
+When `prefilter_pass` is present, only `True` rows are eligible. Without filter
+lists, all eligible features are returned. Filter lists retain requested IDs
+and add their best-scoring partners from the opposite chain:
+
+```py
+selected_pairs = rsde.pair_chains(
+    tra_statistics,
+    trb_statistics,
+    paired_metadata,
+    method="jsd",
+    filter_ids1=["TRA_feature_1", "TRA_feature_2"],
+    filter_ids2=["TRB_feature_5"],
+)
+```
+
+In this example, the result includes both requested TRA features, the requested
+TRB feature, the best TRB partner for each requested TRA feature, and the best
+TRA partner for the requested TRB feature. JSD selects the minimum score;
+Pearson selects the maximum score.
+
+By default, the first column of each table is used as its feature ID. If both
+tables use the same feature-column name, pass one value. Different names can be
+provided as a two-item tuple:
+
+```py
+pairing_matrix = rsde.pair_chains(
+    tra_statistics,
+    trb_statistics,
+    paired_metadata,
+    feature_column=("tra_feature", "trb_feature"),
+)
+```
+
 ## Differential-enrichment volcano plot
 
 `rsplot.de_volcano` plots effect size against statistical significance. The

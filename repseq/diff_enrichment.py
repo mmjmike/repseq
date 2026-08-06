@@ -30,6 +30,17 @@ SUPPORTED_METHODS = {
     "negative_binomial",
     "permutation",
 }
+PAIR_CHAIN_METHOD_ALIASES = {
+    "pearson": "pearson",
+    "pearson_correlation": "pearson",
+    "correlation": "pearson",
+    "jsd": "jsd",
+    "jensen_shannon": "jsd",
+    "jensen-shannon": "jsd",
+    "jensen_shannon_divergence": "jsd",
+    "jenson_shannon": "jsd",
+    "jenson-shannon": "jsd",
+}
 
 
 def prefilter(
@@ -368,6 +379,385 @@ def simplify_statistics(statistics):
 def simplify(statistics):
     """Return the lowest-p-value group result for each tested feature row."""
     return simplify_statistics(statistics)
+
+
+def pair_chains(
+    count_table1,
+    count_table2,
+    samples_metadata,
+    method="jsd",
+    feature_column=None,
+    filter_ids1=None,
+    filter_ids2=None,
+):
+    """Score feature pairs from two chains across paired biological samples.
+
+    Parameters
+    ----------
+    count_table1, count_table2 : pandas.DataFrame
+        Chain-specific tables returned by :func:`calc_statistics`.
+    samples_metadata : pandas.DataFrame
+        Metadata containing unique ``sample_id`` values and a ``sample`` value
+        that pairs one sample ID from each chain.
+    method : {"jsd", "pearson"}, default "jsd"
+        Jensen–Shannon divergence or Pearson correlation across paired samples.
+    feature_column : hashable or pair of hashable, optional
+        Feature identifier column. A single value is used for both tables; a
+        two-item tuple/list specifies table-specific columns. By default, each
+        table's first column is used.
+    filter_ids1, filter_ids2 : sequence, optional
+        Requested feature IDs for either chain. Requested IDs are retained and
+        the best-scoring partners required by IDs on the opposite axis are
+        added. Without filters, all eligible features are returned.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Score matrix with table-2 features on rows and table-1 features on
+        columns.
+    """
+    method = _normalize_pair_chain_method(method)
+    feature_column1, feature_column2 = _pair_chain_feature_columns(
+        count_table1,
+        count_table2,
+        feature_column,
+    )
+    paired_samples = _prepare_paired_chain_samples(
+        count_table1,
+        count_table2,
+        samples_metadata,
+        feature_column1,
+        feature_column2,
+    )
+    features1, values1 = _prepare_pair_chain_features(
+        count_table1,
+        feature_column1,
+        paired_samples["sample_id1"],
+        "count_table1",
+    )
+    features2, values2 = _prepare_pair_chain_features(
+        count_table2,
+        feature_column2,
+        paired_samples["sample_id2"],
+        "count_table2",
+    )
+
+    normalized1 = _normalize_pair_chain_rows(values1)
+    normalized2 = _normalize_pair_chain_rows(values2)
+    if method == "pearson":
+        scores = _pairwise_pearson_scores(normalized1, normalized2)
+    else:
+        scores = _pairwise_jsd_scores(normalized1, normalized2)
+    score_matrix = pd.DataFrame(
+        scores,
+        index=pd.Index(features2, name=feature_column2),
+        columns=pd.Index(features1, name=feature_column1),
+    )
+    score_matrix = _filter_pair_chain_matrix(
+        score_matrix,
+        filter_ids1=filter_ids1,
+        filter_ids2=filter_ids2,
+        method=method,
+    )
+    score_matrix.attrs["method"] = method
+    score_matrix.attrs["paired_samples"] = paired_samples.copy()
+    return score_matrix
+
+
+def _normalize_pair_chain_method(method):
+    normalized = str(method).strip().casefold().replace(" ", "_")
+    selected = PAIR_CHAIN_METHOD_ALIASES.get(normalized)
+    if selected is None:
+        raise ValueError("method must be one of: jsd, pearson")
+    return selected
+
+
+def _pair_chain_feature_columns(count_table1, count_table2, feature_column):
+    for name, table in (
+        ("count_table1", count_table1),
+        ("count_table2", count_table2),
+    ):
+        if not isinstance(table, pd.DataFrame):
+            raise TypeError(f"{name} must be a pandas DataFrame")
+        if table.shape[1] == 0:
+            raise ValueError(f"{name} must contain at least one column")
+    if feature_column is None:
+        columns = (count_table1.columns[0], count_table2.columns[0])
+    elif isinstance(feature_column, (list, tuple)):
+        if len(feature_column) != 2:
+            raise ValueError("feature_column must contain exactly two column names")
+        columns = tuple(feature_column)
+    else:
+        columns = (feature_column, feature_column)
+    if columns[0] not in count_table1.columns:
+        raise ValueError(f"feature_column {columns[0]!r} is not in count_table1")
+    if columns[1] not in count_table2.columns:
+        raise ValueError(f"feature_column {columns[1]!r} is not in count_table2")
+    return columns
+
+
+def _prepare_paired_chain_samples(
+    count_table1,
+    count_table2,
+    samples_metadata,
+    feature_column1,
+    feature_column2,
+):
+    if not isinstance(samples_metadata, pd.DataFrame):
+        raise TypeError("samples_metadata must be a pandas DataFrame")
+    missing_columns = {"sample_id", "sample"}.difference(samples_metadata.columns)
+    if missing_columns:
+        raise ValueError(
+            "samples_metadata must contain columns 'sample_id' and 'sample'; "
+            f"missing: {sorted(missing_columns)}"
+        )
+    if samples_metadata[["sample_id", "sample"]].isna().any().any():
+        raise ValueError(
+            "samples_metadata columns 'sample_id' and 'sample' must not contain "
+            "missing values"
+        )
+    duplicated_ids = samples_metadata["sample_id"].duplicated(keep=False)
+    if duplicated_ids.any():
+        duplicates = samples_metadata.loc[duplicated_ids, "sample_id"].tolist()
+        raise ValueError(
+            "samples_metadata['sample_id'] values must be unique; duplicated "
+            f"values: {duplicates}"
+        )
+
+    metadata_ids = set(samples_metadata["sample_id"])
+    numeric1 = set(count_table1.select_dtypes(include="number").columns)
+    numeric2 = set(count_table2.select_dtypes(include="number").columns)
+    sample_ids1 = [
+        column
+        for column in count_table1.columns
+        if column in metadata_ids and column in numeric1 and column != feature_column1
+    ]
+    sample_ids2 = [
+        column
+        for column in count_table2.columns
+        if column in metadata_ids and column in numeric2 and column != feature_column2
+    ]
+    non_numeric1 = [
+        column
+        for column in count_table1.columns
+        if column in metadata_ids and column not in numeric1
+    ]
+    non_numeric2 = [
+        column
+        for column in count_table2.columns
+        if column in metadata_ids and column not in numeric2
+    ]
+    if non_numeric1 or non_numeric2:
+        raise ValueError(
+            "Paired sample columns must be numeric; non-numeric columns: "
+            f"count_table1={non_numeric1}, count_table2={non_numeric2}"
+        )
+    if not sample_ids1 or not sample_ids2:
+        raise ValueError("Both count tables must contain metadata-matched sample columns")
+    overlapping_ids = sorted(set(sample_ids1).intersection(sample_ids2), key=str)
+    if overlapping_ids:
+        raise ValueError(
+            "The two count tables must use different chain-specific sample_id "
+            f"values; shared IDs: {overlapping_ids}"
+        )
+
+    metadata = samples_metadata.set_index("sample_id")
+    metadata1 = metadata.loc[sample_ids1, ["sample"]].reset_index()
+    metadata2 = metadata.loc[sample_ids2, ["sample"]].reset_index()
+    duplicated_samples1 = metadata1["sample"].duplicated(keep=False)
+    duplicated_samples2 = metadata2["sample"].duplicated(keep=False)
+    if duplicated_samples1.any() or duplicated_samples2.any():
+        raise ValueError(
+            "Each biological sample must have exactly one represented sample_id "
+            "per count table"
+        )
+
+    samples1 = set(metadata1["sample"])
+    samples2 = set(metadata2["sample"])
+    if samples1 != samples2:
+        raise ValueError(
+            "Every represented sample in one count table must have a paired "
+            "sample_id in the other table. Missing from count_table2: "
+            f"{sorted(samples1 - samples2, key=str)}; missing from count_table1: "
+            f"{sorted(samples2 - samples1, key=str)}"
+        )
+    sample_id2_by_sample = metadata2.set_index("sample")["sample_id"]
+    return pd.DataFrame(
+        {
+            "sample": metadata1["sample"].tolist(),
+            "sample_id1": metadata1["sample_id"].tolist(),
+            "sample_id2": [
+                sample_id2_by_sample[sample]
+                for sample in metadata1["sample"]
+            ],
+        }
+    )
+
+
+def _prepare_pair_chain_features(
+    count_table,
+    feature_column,
+    sample_columns,
+    table_name,
+):
+    if PREFILTER_COLUMN in count_table.columns:
+        valid_prefilter = count_table[PREFILTER_COLUMN].isin([True, False])
+        if not valid_prefilter.all():
+            raise ValueError(
+                f"{table_name}[{PREFILTER_COLUMN!r}] must contain only True or False"
+            )
+        eligible = count_table.loc[count_table[PREFILTER_COLUMN].eq(True)].copy()
+    else:
+        eligible = count_table.copy()
+    if eligible.empty:
+        raise ValueError(f"{table_name} contains no eligible features")
+    duplicated = eligible[feature_column].duplicated(keep=False)
+    if duplicated.any():
+        duplicate_value = eligible.loc[duplicated, feature_column].iloc[0]
+        raise ValueError(
+            f"{table_name} feature column {feature_column!r} contains duplicate "
+            f"eligible value {duplicate_value!r}"
+        )
+    values = eligible[list(sample_columns)].to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError(f"{table_name} paired sample counts must be finite")
+    if (values < 0).any():
+        raise ValueError(f"{table_name} paired sample counts must be non-negative")
+    return eligible[feature_column].tolist(), values
+
+
+def _normalize_pair_chain_rows(values):
+    values = np.asarray(values, dtype=float)
+    totals = values.sum(axis=1, keepdims=True)
+    return np.divide(
+        values,
+        totals,
+        out=np.zeros_like(values, dtype=float),
+        where=totals != 0,
+    )
+
+
+def _pairwise_pearson_scores(values1, values2):
+    centered1 = values1 - values1.mean(axis=1, keepdims=True)
+    centered2 = values2 - values2.mean(axis=1, keepdims=True)
+    denominator = np.outer(
+        np.linalg.norm(centered2, axis=1),
+        np.linalg.norm(centered1, axis=1),
+    )
+    return np.divide(
+        centered2 @ centered1.T,
+        denominator,
+        out=np.full((len(values2), len(values1)), np.nan),
+        where=denominator != 0,
+    )
+
+
+def _pairwise_jsd_scores(values1, values2):
+    scores = np.empty((len(values2), len(values1)), dtype=float)
+    for row_index, values in enumerate(values2):
+        midpoint = 0.5 * (values1 + values)
+        first_terms = np.zeros_like(values1)
+        second_terms = np.zeros_like(values1)
+        np.log(
+            np.divide(
+                values1,
+                midpoint,
+                out=np.ones_like(values1),
+                where=midpoint != 0,
+            ),
+            out=first_terms,
+            where=values1 != 0,
+        )
+        np.log(
+            np.divide(
+                values,
+                midpoint,
+                out=np.ones_like(values1),
+                where=midpoint != 0,
+            ),
+            out=second_terms,
+            where=values != 0,
+        )
+        scores[row_index] = 0.5 * (
+            np.sum(values1 * first_terms, axis=1)
+            + np.sum(values * second_terms, axis=1)
+        )
+    return scores
+
+
+def _normalize_filter_ids(filter_ids, eligible_ids, name):
+    if filter_ids is None:
+        return None
+    if isinstance(filter_ids, (str, bytes)):
+        requested = [filter_ids]
+    else:
+        requested = list(filter_ids)
+    if not requested:
+        raise ValueError(f"{name} must not be empty")
+    requested = list(dict.fromkeys(requested))
+    eligible = set(eligible_ids)
+    missing = [feature_id for feature_id in requested if feature_id not in eligible]
+    if missing:
+        raise ValueError(
+            f"{name} contains IDs absent after prefiltering: {missing}"
+        )
+    return requested
+
+
+def _best_pair_id(values, candidates, method):
+    finite = np.isfinite(values)
+    if not finite.any():
+        return candidates[0]
+    valid_positions = np.flatnonzero(finite)
+    valid_values = values[finite]
+    selected = (
+        valid_positions[np.argmin(valid_values)]
+        if method == "jsd"
+        else valid_positions[np.argmax(valid_values)]
+    )
+    return candidates[int(selected)]
+
+
+def _filter_pair_chain_matrix(
+    score_matrix,
+    filter_ids1,
+    filter_ids2,
+    method,
+):
+    selected1 = _normalize_filter_ids(
+        filter_ids1,
+        list(score_matrix.columns),
+        "filter_ids1",
+    )
+    selected2 = _normalize_filter_ids(
+        filter_ids2,
+        list(score_matrix.index),
+        "filter_ids2",
+    )
+    if selected1 is None and selected2 is None:
+        return score_matrix
+    selected1 = [] if selected1 is None else selected1
+    selected2 = [] if selected2 is None else selected2
+    requested1 = list(selected1)
+    requested2 = list(selected2)
+
+    for feature_id1 in requested1:
+        best_id2 = _best_pair_id(
+            score_matrix[feature_id1].to_numpy(dtype=float),
+            list(score_matrix.index),
+            method,
+        )
+        if best_id2 not in selected2:
+            selected2.append(best_id2)
+    for feature_id2 in requested2:
+        best_id1 = _best_pair_id(
+            score_matrix.loc[feature_id2].to_numpy(dtype=float),
+            list(score_matrix.columns),
+            method,
+        )
+        if best_id1 not in selected1:
+            selected1.append(best_id1)
+    return score_matrix.loc[selected2, selected1]
 
 
 def _prepare_statistics_setup(
