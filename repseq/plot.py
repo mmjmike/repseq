@@ -2762,7 +2762,7 @@ def _adjust_de_volcano_log2fc(values):
         if values_below.empty:
             continue
         max_non_repeated_value = float(values_below.max())
-        replacement = max(max_non_repeated_value + 2, float(repeated_value))
+        replacement = min(max_non_repeated_value + 2, float(repeated_value))
         adjusted.loc[adjusted.eq(repeated_value)] = replacement
     return adjusted
 

@@ -1475,7 +1475,7 @@ def test_de_heatmap_requires_enriched_groups_in_metadata():
 def _de_volcano_table():
     return pd.DataFrame(
         {
-            "log2FC": [12, 12, 11, 5, np.nan],
+            "log2FC": [100, 100, 11, 5, np.nan],
             "p_adj": [0.01, 0.02, 0.03, 0.04, 0.05],
             "p_val": [0.1, 0.2, 0.3, 0.4, 0.5],
             "mean_group_count": [10, 20, 5, 40, 50],
@@ -1527,7 +1527,7 @@ def test_de_volcano_can_plot_raw_p_values():
 
 
 def test_de_volcano_repeated_high_log2fc_adjustment_uses_maximum_below_value():
-    adjusted = rsplot._adjust_de_volcano_log2fc([12, 12, 11, 4])
+    adjusted = rsplot._adjust_de_volcano_log2fc([100, 100, 11, 4])
 
     assert adjusted.tolist() == [13, 13, 11, 4]
 

@@ -435,7 +435,7 @@ they remain finite on the plot.
 
 Repeated identical `log2FC` values greater than `10` are adjusted for plotting.
 For a repeated value `X`, the largest plotted value below `X` is found and all
-copies of `X` are replaced by `max(max_non_X + 2, X)`. This changes only the
+copies of `X` are replaced by `min(max_non_X + 2, X)`. This changes only the
 displayed x-coordinate; the input dataframe is not modified.
 
 Group colors and point-size limits can be customized:
