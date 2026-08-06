@@ -2821,6 +2821,7 @@ def de_volcano(
     p_column="p_adj",
     group_palette=None,
     size_range=(20, 300),
+    log_sizes=True,
     alpha=0.7,
     height=6,
     aspect=1.3,
@@ -2836,8 +2837,10 @@ def de_volcano(
     group_palette : palette name, sequence, or dict, optional
         Colors assigned to ``enriched_in`` groups.
     size_range : pair of float, default (20, 300)
-        Minimum and maximum scatter-point areas. Point size is proportional to
-        ``mean_group_count``.
+        Minimum and maximum scatter-point areas.
+    log_sizes : bool, default True
+        Scale point sizes by ``log1p(mean_group_count)``. If false, use raw
+        ``mean_group_count`` values.
     alpha : float, default 0.7
         Point opacity.
     height, aspect : float
@@ -2852,7 +2855,10 @@ def de_volcano(
     group_order = _category_order(plotted["enriched_in"])
     color_map = _palette_mapping(group_order, palette=group_palette)
     point_colors = [color_map[group] for group in plotted["enriched_in"]]
-    point_sizes = _scaled_dot_sizes(plotted["mean_group_count"], size_range)
+    size_values = plotted["mean_group_count"].to_numpy(dtype=float)
+    if log_sizes:
+        size_values = np.log1p(size_values)
+    point_sizes = _scaled_dot_sizes(size_values, size_range)
 
     fig, ax = plt.subplots(figsize=(height * aspect, height))
     ax.scatter(

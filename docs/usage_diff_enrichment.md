@@ -409,13 +409,16 @@ fig = rsplot.de_heatmap(
 
 `rsplot.de_volcano` plots effect size against statistical significance. The
 default vertical axis uses adjusted p-values, point color represents
-`enriched_in`, and point area is proportional to `mean_group_count`.
+`enriched_in`, and point area is proportional to
+`log1p(mean_group_count)` by default. The `log1p` transformation keeps zero
+counts valid while reducing domination by very abundant features.
 
 ```py
 fig = rsplot.de_volcano(
     result,
     p_column="p_adj",
     size_range=(20, 300),
+    log_sizes=True,
 )
 ```
 
@@ -449,6 +452,15 @@ fig = rsplot.de_volcano(
     },
     size_range=(30, 500),
     alpha=0.8,
+)
+```
+
+Use raw `mean_group_count` values for point sizing when needed:
+
+```py
+fig = rsplot.de_volcano(
+    result,
+    log_sizes=False,
 )
 ```
 

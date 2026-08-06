@@ -1496,6 +1496,10 @@ def test_de_volcano_uses_adjusted_p_values_sizes_colors_and_drops_na():
         -np.log10([0.01, 0.02, 0.03, 0.04]),
     )
     assert len(offsets) == 4
+    np.testing.assert_allclose(
+        points.get_sizes(),
+        rsplot._scaled_dot_sizes(np.log1p([10, 20, 5, 40]), (20, 300)),
+    )
     assert points.get_sizes()[3] == points.get_sizes().max()
     np.testing.assert_allclose(
         points.get_facecolors()[0],
@@ -1524,6 +1528,16 @@ def test_de_volcano_can_plot_raw_p_values():
         -np.log10([0.1, 0.2, 0.3, 0.4]),
     )
     assert ax.get_ylabel() == "-log10(p_val)"
+
+
+def test_de_volcano_can_size_points_by_raw_mean_group_count():
+    fig = rsplot.de_volcano(_de_volcano_table(), log_sizes=False)
+    points = fig.axes[0].collections[0]
+
+    np.testing.assert_allclose(
+        points.get_sizes(),
+        rsplot._scaled_dot_sizes([10, 20, 5, 40], (20, 300)),
+    )
 
 
 def test_de_volcano_repeated_high_log2fc_adjustment_uses_maximum_below_value():
