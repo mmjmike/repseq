@@ -13,6 +13,7 @@ from .common_functions import run_parallel_calculation
 
 
 PREFILTER_COLUMN = "prefilter_pass"
+POSTFILTER_COLUMN = "postfilter_pass"
 STATISTICS_COLUMNS = [
     "enriched_in",
     "method",
@@ -134,6 +135,128 @@ def _validate_prefilter_arguments(
     ):
         if not isinstance(value, Real) or isinstance(value, bool) or value < 0:
             raise ValueError(f"{name} must be a non-negative number")
+
+
+def postfilter(
+    statistics_table,
+    max_p_adj=1,
+    max_p_val=1,
+    min_group_mean=2,
+    min_logfc=1,
+    groups=None,
+):
+    """Mark differential-enrichment rows that pass result thresholds.
+
+    All thresholds are inclusive. Rows pass when ``p_adj <= max_p_adj``,
+    ``p_val <= max_p_val``, ``mean_group_count >= min_group_mean``, and
+    ``log2FC >= min_logfc``. When ``groups`` is provided, ``enriched_in`` must
+    also match one of the requested groups.
+
+    Parameters
+    ----------
+    statistics_table : pandas.DataFrame
+        A table returned by :func:`calc_statistics`.
+    max_p_adj, max_p_val : real number, default 1
+        Inclusive maximum adjusted and raw p-values.
+    min_group_mean : real number, default 2
+        Inclusive minimum ``mean_group_count``.
+    min_logfc : real number, default 1
+        Inclusive minimum ``log2FC``.
+    groups : str or sequence of str, optional
+        Allowed ``enriched_in`` groups. ``None`` disables group filtering.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A copy of ``statistics_table`` with boolean ``postfilter_pass`` added
+        immediately before the first numeric column.
+    """
+    selected_groups = _validate_postfilter_arguments(
+        statistics_table,
+        max_p_adj=max_p_adj,
+        max_p_val=max_p_val,
+        min_group_mean=min_group_mean,
+        min_logfc=min_logfc,
+        groups=groups,
+    )
+    postfilter_pass = (
+        statistics_table["p_adj"].le(max_p_adj)
+        & statistics_table["p_val"].le(max_p_val)
+        & statistics_table["mean_group_count"].ge(min_group_mean)
+        & statistics_table["log2FC"].ge(min_logfc)
+    )
+    if selected_groups is not None:
+        postfilter_pass &= statistics_table["enriched_in"].isin(selected_groups)
+    postfilter_pass = postfilter_pass.fillna(False).astype(bool)
+
+    result = statistics_table.copy()
+    numeric_columns = list(result.select_dtypes(include="number").columns)
+    insert_position = (
+        result.columns.get_loc(numeric_columns[0])
+        if numeric_columns
+        else len(result.columns)
+    )
+    result.insert(insert_position, POSTFILTER_COLUMN, postfilter_pass)
+    result.attrs = statistics_table.attrs.copy()
+    return result
+
+
+def _validate_postfilter_arguments(
+    statistics_table,
+    max_p_adj,
+    max_p_val,
+    min_group_mean,
+    min_logfc,
+    groups,
+):
+    if not isinstance(statistics_table, pd.DataFrame):
+        raise TypeError("statistics_table must be a pandas DataFrame")
+    if POSTFILTER_COLUMN in statistics_table.columns:
+        raise ValueError(
+            "statistics_table already contains the reserved column "
+            f"{POSTFILTER_COLUMN!r}"
+        )
+    required_columns = {
+        "p_adj",
+        "p_val",
+        "mean_group_count",
+        "log2FC",
+        "enriched_in",
+    }
+    missing_columns = required_columns.difference(statistics_table.columns)
+    if missing_columns:
+        raise ValueError(
+            "statistics_table is missing required postfilter columns: "
+            f"{sorted(missing_columns)}"
+        )
+    for name, value in (("max_p_adj", max_p_adj), ("max_p_val", max_p_val)):
+        if (
+            not isinstance(value, Real)
+            or isinstance(value, bool)
+            or value < 0
+            or value > 1
+        ):
+            raise ValueError(f"{name} must be a number in [0, 1]")
+    if (
+        not isinstance(min_group_mean, Real)
+        or isinstance(min_group_mean, bool)
+        or min_group_mean < 0
+    ):
+        raise ValueError("min_group_mean must be a non-negative number")
+    if not isinstance(min_logfc, Real) or isinstance(min_logfc, bool):
+        raise ValueError("min_logfc must be a number")
+    if groups is None:
+        return None
+    if isinstance(groups, str):
+        return [groups]
+    if not isinstance(groups, (list, tuple, set, pd.Index, np.ndarray)):
+        raise TypeError("groups must be None, a string, or a sequence of strings")
+    selected_groups = list(groups)
+    if not selected_groups:
+        raise ValueError("groups must not be empty")
+    if any(not isinstance(group, str) for group in selected_groups):
+        raise TypeError("groups must contain only strings")
+    return list(dict.fromkeys(selected_groups))
 
 
 def calc_statistics(

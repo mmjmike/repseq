@@ -106,6 +106,93 @@ def test_prefilter_rejects_existing_status_column():
         rsde.prefilter(count_table, verbose=False)
 
 
+def _postfilter_table():
+    table = pd.DataFrame(
+        {
+            "feature": ["exact", "low_mean", "low_logfc", "high_p", "missing"],
+            "prefilter_pass": [True, True, True, True, False],
+            "enriched_in": ["A", "A", "B", "B", None],
+            "method": ["mann_whitney"] * 4 + [None],
+            "mean_group_count": [2, 1.99, 3, 3, np.nan],
+            "log2FC": [1, 2, 0.99, 2, np.nan],
+            "p_val": [1, 0.01, 0.01, 1, np.nan],
+            "p_adj": [1, 0.01, 0.01, 1, np.nan],
+            "sample1": [2, 3, 4, 5, 0],
+        }
+    )
+    table.attrs["source"] = "statistics"
+    return table
+
+
+def test_postfilter_uses_inclusive_thresholds_and_preserves_table():
+    statistics_table = _postfilter_table()
+
+    result = rsde.postfilter(
+        statistics_table,
+        max_p_adj=1,
+        max_p_val=1,
+        min_group_mean=2,
+        min_logfc=1,
+    )
+
+    assert result["postfilter_pass"].tolist() == [True, False, False, True, False]
+    assert list(result.columns) == [
+        "feature",
+        "prefilter_pass",
+        "enriched_in",
+        "method",
+        "postfilter_pass",
+        "mean_group_count",
+        "log2FC",
+        "p_val",
+        "p_adj",
+        "sample1",
+    ]
+    pd.testing.assert_frame_equal(
+        result.drop(columns="postfilter_pass"),
+        statistics_table,
+    )
+    assert result.attrs == {"source": "statistics"}
+
+
+@pytest.mark.parametrize(
+    ("groups", "expected"),
+    [
+        (None, [True, False, False, True, False]),
+        ("A", [True, False, False, False, False]),
+        (["B"], [False, False, False, True, False]),
+        (["A", "B"], [True, False, False, True, False]),
+    ],
+)
+def test_postfilter_optionally_filters_enriched_groups(groups, expected):
+    result = rsde.postfilter(_postfilter_table(), groups=groups)
+
+    assert result["postfilter_pass"].tolist() == expected
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "error_type", "message"),
+    [
+        ({"max_p_adj": 1.1}, ValueError, "max_p_adj"),
+        ({"max_p_val": -0.1}, ValueError, "max_p_val"),
+        ({"min_group_mean": -1}, ValueError, "min_group_mean"),
+        ({"min_logfc": "one"}, ValueError, "min_logfc"),
+        ({"groups": []}, ValueError, "groups must not be empty"),
+        ({"groups": ["A", 2]}, TypeError, "only strings"),
+    ],
+)
+def test_postfilter_rejects_invalid_arguments(kwargs, error_type, message):
+    with pytest.raises(error_type, match=message):
+        rsde.postfilter(_postfilter_table(), **kwargs)
+
+
+def test_postfilter_rejects_existing_status_column():
+    statistics_table = _postfilter_table().assign(postfilter_pass=True)
+
+    with pytest.raises(ValueError, match="already contains"):
+        rsde.postfilter(statistics_table)
+
+
 def _two_group_metadata():
     return pd.DataFrame(
         {

@@ -323,6 +323,55 @@ candidates = result[
 ].copy()
 ```
 
+## Postfiltering statistical results
+
+`rsde.postfilter` adds a boolean `postfilter_pass` column without removing any
+rows. It applies inclusive statistical and effect-size thresholds:
+
+```py
+result = rsde.postfilter(
+    result,
+    max_p_adj=1,
+    max_p_val=1,
+    min_group_mean=2,
+    min_logfc=1,
+)
+```
+
+A row passes when all of the following are true:
+
+- `p_adj <= max_p_adj`;
+- `p_val <= max_p_val`;
+- `mean_group_count >= min_group_mean`;
+- `log2FC >= min_logfc`.
+
+Values exactly equal to a threshold pass. Rows with missing statistical values
+receive `postfilter_pass=False`.
+
+By default, `enriched_in` is not filtered. Select one group with a string or
+several groups with a list:
+
+```py
+pep1_result = rsde.postfilter(
+    result,
+    max_p_adj=0.05,
+    min_group_mean=5,
+    min_logfc=2,
+    groups="Pep1",
+)
+
+selected_groups = rsde.postfilter(
+    result,
+    groups=["Pep1", "Pep2"],
+)
+```
+
+Retrieve the passing rows with:
+
+```py
+postfiltered_result = result[result["postfilter_pass"]].copy()
+```
+
 ## Simplified and expanded results
 
 `simplify=True` is the default. For analyses with more than two groups, it
@@ -595,6 +644,13 @@ fig = rsplot.de_volcano(
 ### `calc_statistics`
 
 ::: repseq.diff_enrichment.calc_statistics
+    options:
+      show_root_heading: true
+      show_source: false
+
+### `postfilter`
+
+::: repseq.diff_enrichment.postfilter
     options:
       show_root_heading: true
       show_source: false
