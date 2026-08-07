@@ -183,11 +183,60 @@ def test_postfilter_optionally_filters_enriched_groups(groups, expected):
         ({"min_logfc": "one"}, ValueError, "min_logfc"),
         ({"groups": []}, ValueError, "groups must not be empty"),
         ({"groups": ["A", 2]}, TypeError, "only strings"),
+        ({"groups_exclude": []}, ValueError, "groups_exclude must not be empty"),
+        ({"groups_exclude": ["A", 2]}, TypeError, "only strings"),
     ],
 )
 def test_postfilter_rejects_invalid_arguments(kwargs, error_type, message):
     with pytest.raises(error_type, match=message):
         rsde.postfilter(_postfilter_table(), verbose=False, **kwargs)
+
+
+@pytest.mark.parametrize(
+    ("groups_exclude", "expected"),
+    [
+        (None, [True, False, False, True, False]),
+        ("A", [False, False, False, True, False]),
+        (["B"], [True, False, False, False, False]),
+        (["A", "B"], [False, False, False, False, False]),
+    ],
+)
+def test_postfilter_optionally_excludes_enriched_groups(groups_exclude, expected):
+    result = rsde.postfilter(
+        _postfilter_table(),
+        groups_exclude=groups_exclude,
+        sort=False,
+        verbose=False,
+    )
+
+    assert result["postfilter_pass"].tolist() == expected
+
+
+def test_postfilter_groups_override_groups_exclude(capsys):
+    result = rsde.postfilter(
+        _postfilter_table(),
+        groups="A",
+        groups_exclude=["A", "not_present"],
+        sort=False,
+    )
+
+    assert result["postfilter_pass"].tolist() == [True, False, False, False, False]
+    output = capsys.readouterr().out
+    assert "groups_exclude: skipped because groups overrides groups_exclude" in output
+    assert "not_present" not in output
+
+
+def test_postfilter_silently_ignores_unmatched_groups_exclude(capsys):
+    result = rsde.postfilter(
+        _postfilter_table(),
+        groups_exclude=["not_present"],
+        sort=False,
+    )
+
+    assert result["postfilter_pass"].tolist() == [True, False, False, True, False]
+    output = capsys.readouterr().out
+    assert "groups_exclude" not in output
+    assert "not_present" not in output
 
 
 def test_postfilter_rejects_existing_status_column():

@@ -404,7 +404,17 @@ selected_groups = rsde.postfilter(
     result,
     groups=["Pep1", "Pep2"],
 )
+
+without_controls = rsde.postfilter(
+    result,
+    groups_exclude=["Control"],
+)
 ```
+
+`groups_exclude` accepts the same string or sequence forms as `groups`, but
+removes matching `enriched_in` groups instead. Values absent from `enriched_in`
+are silently ignored. If both options are provided, `groups` takes precedence
+and verbose output reports that `groups_exclude` was skipped.
 
 Retrieve the passing rows with:
 

@@ -154,6 +154,7 @@ def postfilter(
     groups=None,
     verbose=True,
     sort=DEFAULT_SORT_COLUMNS,
+    groups_exclude=None,
 ):
     """Mark differential-enrichment rows that pass result thresholds.
 
@@ -176,6 +177,8 @@ def postfilter(
         Inclusive minimum ``log2FC``.
     groups : str or sequence of str, optional
         Allowed ``enriched_in`` groups. ``None`` disables group filtering.
+    groups_exclude : str or sequence of str, optional
+        Excluded ``enriched_in`` groups. Ignored when ``groups`` is specified.
     verbose : bool, default True
         Print comparisons and the number of passing features.
     sort : sequence, str, bool, or None, default DEFAULT_SORT_COLUMNS
@@ -190,13 +193,14 @@ def postfilter(
         A copy of ``statistics_table`` with boolean ``postfilter_pass`` added
         immediately before the original count-table columns.
     """
-    selected_groups = _validate_postfilter_arguments(
+    selected_groups, excluded_groups = _validate_postfilter_arguments(
         statistics_table,
         max_p_adj=max_p_adj,
         max_p_val=max_p_val,
         min_group_mean=min_group_mean,
         min_logfc=min_logfc,
         groups=groups,
+        groups_exclude=groups_exclude,
     )
     postfilter_pass = (
         statistics_table["mean_group_count"].ge(min_group_mean)
@@ -206,8 +210,17 @@ def postfilter(
         postfilter_pass &= statistics_table["p_adj"].lt(max_p_adj)
     if max_p_val is not None:
         postfilter_pass &= statistics_table["p_val"].lt(max_p_val)
+    matched_excluded_groups = [
+        group
+        for group in excluded_groups or []
+        if statistics_table["enriched_in"].isin([group]).any()
+    ]
     if selected_groups is not None:
         postfilter_pass &= statistics_table["enriched_in"].isin(selected_groups)
+    elif matched_excluded_groups:
+        postfilter_pass &= ~statistics_table["enriched_in"].isin(
+            matched_excluded_groups
+        )
     prefilter_pass = None
     if PREFILTER_COLUMN in statistics_table.columns:
         valid_prefilter = statistics_table[PREFILTER_COLUMN].isin([True, False])
@@ -241,6 +254,17 @@ def postfilter(
             "Enriched-in groups: "
             + ("any" if selected_groups is None else f"enriched_in in {selected_groups}")
         )
+        if matched_excluded_groups:
+            if selected_groups is not None:
+                print(
+                    "groups_exclude: skipped because groups overrides "
+                    "groups_exclude"
+                )
+            else:
+                print(
+                    "Excluded enriched-in groups: enriched_in not in "
+                    f"{matched_excluded_groups}"
+                )
         passed = int(postfilter_pass.sum())
         if prefilter_pass is None:
             print(f"Features passed postfilter: {passed} of {len(statistics_table)}")
@@ -264,6 +288,7 @@ def _validate_postfilter_arguments(
     min_group_mean,
     min_logfc,
     groups,
+    groups_exclude,
 ):
     if not isinstance(statistics_table, pd.DataFrame):
         raise TypeError("statistics_table must be a pandas DataFrame")
@@ -303,18 +328,27 @@ def _validate_postfilter_arguments(
         raise ValueError("min_group_mean must be a non-negative number")
     if not isinstance(min_logfc, Real) or isinstance(min_logfc, bool):
         raise ValueError("min_logfc must be a number")
+    return (
+        _normalize_postfilter_groups(groups, "groups"),
+        _normalize_postfilter_groups(groups_exclude, "groups_exclude"),
+    )
+
+
+def _normalize_postfilter_groups(groups, name):
     if groups is None:
         return None
     if isinstance(groups, str):
         return [groups]
     if not isinstance(groups, (list, tuple, set, pd.Index, np.ndarray)):
-        raise TypeError("groups must be None, a string, or a sequence of strings")
-    selected_groups = list(groups)
-    if not selected_groups:
-        raise ValueError("groups must not be empty")
-    if any(not isinstance(group, str) for group in selected_groups):
-        raise TypeError("groups must contain only strings")
-    return list(dict.fromkeys(selected_groups))
+        raise TypeError(
+            f"{name} must be None, a string, or a sequence of strings"
+        )
+    normalized_groups = list(groups)
+    if not normalized_groups:
+        raise ValueError(f"{name} must not be empty")
+    if any(not isinstance(group, str) for group in normalized_groups):
+        raise TypeError(f"{name} must contain only strings")
+    return list(dict.fromkeys(normalized_groups))
 
 
 def calc_statistics(
