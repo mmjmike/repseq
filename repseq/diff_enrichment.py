@@ -401,6 +401,8 @@ def calc_statistics(
         The input table with ``enriched_in``, ``method``,
         ``mean_group_count``, ``log2FC``, ``p_val``, and ``p_adj`` inserted
         before its numeric columns.
+        If ``samples_metadata["group"]`` is categorical, ``enriched_in``
+        uses the same categorical dtype.
     """
     setup = _prepare_statistics_setup(
         count_table,
@@ -548,6 +550,9 @@ def calc_statistics(
         pass_mask=pass_mask,
         simplify=simplify,
     )
+    group_dtype = samples_metadata["group"].dtype
+    if isinstance(group_dtype, pd.CategoricalDtype):
+        result["enriched_in"] = result["enriched_in"].astype(group_dtype)
     result = _sort_output_table(result, sort)
     if verbose:
         print("Differential enrichment analysis finished successfully!")

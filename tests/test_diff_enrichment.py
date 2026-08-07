@@ -434,6 +434,28 @@ def test_calc_statistics_applies_default_and_custom_sorting():
     assert unsorted["feature"].tolist() == ["f2", "f1", "f3"]
 
 
+@pytest.mark.parametrize("ordered", [False, True])
+def test_calc_statistics_preserves_categorical_group_dtype(ordered):
+    samples_metadata = _two_group_metadata()
+    samples_metadata["group"] = pd.Categorical(
+        samples_metadata["group"],
+        categories=["B", "A", "unused"],
+        ordered=ordered,
+    )
+
+    result = rsde.calc_statistics(
+        _statistics_count_table(),
+        samples_metadata,
+        cpu=1,
+        verbose=False,
+    )
+
+    assert isinstance(result["enriched_in"].dtype, pd.CategoricalDtype)
+    assert result["enriched_in"].dtype.categories.tolist() == ["B", "A", "unused"]
+    assert result["enriched_in"].dtype.ordered is ordered
+    assert result["feature"].tolist() == ["f2", "f1", "f3"]
+
+
 def test_presence_threshold_changes_analysis_but_preserves_real_counts():
     count_table = pd.DataFrame(
         {
