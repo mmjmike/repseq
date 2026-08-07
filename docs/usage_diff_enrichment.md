@@ -91,7 +91,7 @@ count_table = rsde.prefilter(
     count_table,
     min_samples=3,
     min_count=2,
-    min_total_count=8,
+    min_total_count=10,
 )
 ```
 
@@ -430,6 +430,12 @@ fig = rsplot.de_heatmap(
     log_values=True,
 )
 ```
+
+If `postfilter_pass` is present, only its `True` rows are plotted. The same rule
+applies to `prefilter_pass`. When both columns are present, a feature must be
+`True` in both columns to appear in the heatmap. Filtering is applied before
+checking `enriched_in`, so excluded rows may contain missing statistical
+values.
 
 The function identifies count columns by matching numeric table columns to
 `samples_metadata["sample_id"]`. Statistical columns such as `log2FC`,

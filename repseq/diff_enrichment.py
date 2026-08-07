@@ -48,7 +48,7 @@ def prefilter(
     count_table,
     min_samples=3,
     min_count=2,
-    min_total_count=8,
+    min_total_count=10,
     verbose=True,
 ):
     """Mark features that pass count-based abundance thresholds.
@@ -68,7 +68,7 @@ def prefilter(
         ``min_count``.
     min_count : real number, default 2
         Minimum value for a numeric column to count toward ``min_samples``.
-    min_total_count : real number, default 8
+    min_total_count : real number, default 10
         Minimum sum across all numeric columns.
     verbose : bool, default True
         Print the thresholds and the number of passing features.

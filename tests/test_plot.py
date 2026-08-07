@@ -1556,6 +1556,49 @@ def test_de_heatmap_requires_enriched_groups_in_metadata():
         rsplot.de_heatmap(statistics_table, metadata)
 
 
+@pytest.mark.parametrize(
+    ("pass_column", "pass_values", "expected_feature"),
+    [
+        ("postfilter_pass", [True, False], "feature_a"),
+        ("prefilter_pass", [False, True], "feature_b"),
+    ],
+)
+def test_de_heatmap_uses_only_features_passing_available_filter_column(
+    pass_column,
+    pass_values,
+    expected_feature,
+):
+    statistics_table, metadata = _de_heatmap_inputs()
+    statistics_table[pass_column] = pass_values
+    statistics_table.loc[
+        statistics_table[pass_column].eq(False), "enriched_in"
+    ] = None
+
+    fig = rsplot.de_heatmap(statistics_table, metadata, show_values=False)
+    heatmap = next(
+        ax for ax in fig.axes if ax.get_title() == "Differential enrichment"
+    )
+
+    assert [tick.get_text() for tick in heatmap.get_yticklabels()] == [
+        expected_feature
+    ]
+
+
+def test_de_heatmap_combines_prefilter_and_postfilter_pass_columns():
+    statistics_table, metadata = _de_heatmap_inputs()
+    statistics_table["prefilter_pass"] = [True, True]
+    statistics_table["postfilter_pass"] = [True, False]
+
+    fig = rsplot.de_heatmap(statistics_table, metadata, show_values=False)
+    heatmap = next(
+        ax for ax in fig.axes if ax.get_title() == "Differential enrichment"
+    )
+
+    assert [tick.get_text() for tick in heatmap.get_yticklabels()] == [
+        "feature_a"
+    ]
+
+
 def _de_volcano_table():
     return pd.DataFrame(
         {

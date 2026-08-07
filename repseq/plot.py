@@ -2549,7 +2549,9 @@ def de_heatmap(
     ----------
     statistics_table : pandas.DataFrame
         A user-filtered table returned by ``diff_enrichment.calc_statistics``.
-        It must contain ``enriched_in`` and numeric sample count columns.
+        It must contain ``enriched_in`` and numeric sample count columns. If
+        ``postfilter_pass`` or ``prefilter_pass`` is present, only ``True``
+        rows are plotted.
     samples_metadata : pandas.DataFrame
         Sample metadata containing unique ``sample_id`` and ``group`` columns.
     feature_column : hashable, optional
@@ -2588,7 +2590,22 @@ def de_heatmap(
         )
     if "enriched_in" not in statistics_table.columns:
         raise ValueError("statistics_table must contain an 'enriched_in' column")
-    if statistics_table["enriched_in"].isna().any():
+    plotted_table = statistics_table
+    for pass_column in ["postfilter_pass", "prefilter_pass"]:
+        if pass_column not in plotted_table.columns:
+            continue
+        valid_pass_values = plotted_table[pass_column].isin([True, False])
+        if not valid_pass_values.all():
+            raise ValueError(
+                f"statistics_table[{pass_column!r}] must contain only True or False"
+            )
+        plotted_table = plotted_table.loc[plotted_table[pass_column].eq(True)]
+    if plotted_table.empty:
+        raise ValueError(
+            "No features remain after applying prefilter_pass and "
+            "postfilter_pass"
+        )
+    if plotted_table["enriched_in"].isna().any():
         raise ValueError(
             "statistics_table['enriched_in'] contains missing values; filter "
             "out rows without differential-enrichment statistics before plotting"
@@ -2606,16 +2623,16 @@ def de_heatmap(
         )
 
     feature_column = (
-        statistics_table.columns[0]
+        plotted_table.columns[0]
         if feature_column is None
         else feature_column
     )
-    if feature_column not in statistics_table.columns:
+    if feature_column not in plotted_table.columns:
         raise ValueError(f"feature_column {feature_column!r} is not in statistics_table")
 
     metadata = samples_metadata.set_index("sample_id")
     metadata_groups = set(metadata["group"])
-    enriched_groups = list(pd.unique(statistics_table["enriched_in"]))
+    enriched_groups = list(pd.unique(plotted_table["enriched_in"]))
     missing_enriched_groups = [
         group for group in enriched_groups if group not in metadata_groups
     ]
@@ -2626,12 +2643,12 @@ def de_heatmap(
         )
 
     numeric_columns = list(
-        statistics_table.select_dtypes(include="number").columns
+        plotted_table.select_dtypes(include="number").columns
     )
     metadata_sample_ids = set(samples_metadata["sample_id"])
     sample_columns = [
         column
-        for column in statistics_table.columns
+        for column in plotted_table.columns
         if column in metadata_sample_ids and column in numeric_columns
     ]
     if not sample_columns:
@@ -2640,7 +2657,7 @@ def de_heatmap(
         )
     non_numeric_samples = [
         column
-        for column in statistics_table.columns
+        for column in plotted_table.columns
         if column in metadata_sample_ids and column not in numeric_columns
     ]
     if non_numeric_samples:
@@ -2657,12 +2674,12 @@ def de_heatmap(
         sample_groups,
         group_order,
     )
-    matrix = statistics_table[sample_order].apply(pd.to_numeric, errors="coerce")
-    invalid = statistics_table[sample_order].notna() & matrix.isna()
+    matrix = plotted_table[sample_order].apply(pd.to_numeric, errors="coerce")
+    invalid = plotted_table[sample_order].notna() & matrix.isna()
     if invalid.any().any():
         raise ValueError("Sample count columns must contain numeric values")
     matrix.index = pd.Index(
-        statistics_table[feature_column].astype(str),
+        plotted_table[feature_column].astype(str),
         name=str(feature_column),
     )
     original_values = matrix.astype(float)
@@ -2676,7 +2693,7 @@ def de_heatmap(
         {
             "Enriched in": [
                 color_map[group]
-                for group in statistics_table["enriched_in"]
+                for group in plotted_table["enriched_in"]
             ]
         },
         index=matrix.index,

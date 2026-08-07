@@ -32,7 +32,7 @@ def test_prefilter_marks_rows_and_inserts_status_before_numeric_columns():
         "sample2",
         "sample3",
     ]
-    assert result["prefilter_pass"].tolist() == [True, False, False, False]
+    assert result["prefilter_pass"].tolist() == [False, False, False, False]
     pd.testing.assert_frame_equal(
         result.drop(columns="prefilter_pass"),
         count_table,
@@ -47,7 +47,7 @@ def test_prefilter_uses_inclusive_thresholds_and_ignores_non_numeric_columns():
             "annotation": ["100", "100"],
             "sample1": [2, 7],
             "sample2": [2, 1],
-            "sample3": [4, 0],
+            "sample3": [6, 0],
         }
     )
 
