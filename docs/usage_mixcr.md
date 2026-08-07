@@ -176,6 +176,27 @@ Columns:
 | umi_in_clones           |Number of UMIs in a clonoset for a given chain|
 | umi_in_func_clones      |Number of UMIs in functional clonotypes|
 
+Plot the main processing metrics with `rsplot.processing`. By default it shows
+`reads_aligned_pc`, `reads_per_umi`, `clones_func`, and
+`umi_in_func_clones`:
+
+```py
+from repseq import plot as rsplot
+
+rsplot.processing(proc_table)
+rsplot.processing(
+    proc_table,
+    metadata=metadata,
+    group="experimental_group",
+    palette="Set2",
+)
+```
+
+Grouping, splitting, ordered metadata categories, and palettes behave as in
+the other `rsplot` statistics plots. The `extracted_chain` column is matched
+to the metadata `chain` column when both sample and chain identifiers are
+available.
+
 
 <br>
 

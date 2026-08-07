@@ -44,6 +44,13 @@ CONVERGENCE_PROPERTIES = [
     "convergence_vj",
 ]
 
+PROCESSING_PROPERTIES = [
+    "reads_aligned_pc",
+    "reads_per_umi",
+    "clones_func",
+    "umi_in_func_clones",
+]
+
 
 
 RAREFACTION_COLORS_20 = [
@@ -258,7 +265,10 @@ def _merge_stats_metadata(stats_df, metadata):
         raise ValueError("stats_df must contain a 'sample_id' column")
 
     if metadata is None:
-        return stats_df.copy(), set(stats_df.columns), ["sample_id"]
+        merge_keys = ["sample_id"]
+        if "chain" in stats_df.columns:
+            merge_keys.append("chain")
+        return stats_df.copy(), set(stats_df.columns), merge_keys
 
     if "sample_id" not in metadata.columns:
         raise ValueError("metadata must contain a 'sample_id' column")
@@ -3568,6 +3578,42 @@ def clonoset_stats(
     )
 
 
+def processing(
+    processing_table,
+    metadata=None,
+    properties=None,
+    group=None,
+    split=None,
+    palette=None,
+    height=3.2,
+    aspect=1.2,
+):
+    """Plot MiXCR processing statistics with optional sample metadata.
+
+    The input is the table returned by :func:`repseq.mixcr.get_processing_table`.
+    Its ``extracted_chain`` column is treated as ``chain`` for metadata matching
+    and sample labels.
+    """
+    plot_table = processing_table
+    if (
+        "extracted_chain" in processing_table.columns
+        and "chain" not in processing_table.columns
+    ):
+        plot_table = processing_table.rename(columns={"extracted_chain": "chain"})
+
+    return plot_stats(
+        plot_table,
+        metadata=metadata,
+        properties=properties or PROCESSING_PROPERTIES,
+        group=group,
+        split=split,
+        palette=palette,
+        height=height,
+        aspect=aspect,
+        zero_bottom=True,
+    )
+
+
 def cdr3aa_stats(
     stats_df,
     metadata=None,
@@ -3642,6 +3688,7 @@ __all__ = [
     "CDR3AA_STATS_PROPERTIES",
     "DIVERSITY_STATS_PROPERTIES",
     "CONVERGENCE_PROPERTIES",
+    "PROCESSING_PROPERTIES",
     "PHEATMAP_CMAP",
     "parse_gene_name",
     "plot_stats",
@@ -3654,6 +3701,7 @@ __all__ = [
     "beta_table",
     "rarefaction_curve",
     "clonoset_stats",
+    "processing",
     "cdr3aa_stats",
     "diversity_stats",
     "convergence",

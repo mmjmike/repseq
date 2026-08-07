@@ -243,6 +243,90 @@ def _clonoset_stats_df():
     )
 
 
+def _processing_table():
+    return pd.DataFrame(
+        [
+            {
+                "sample_id": "sample1",
+                "extracted_chain": "TRA",
+                "reads_aligned_pc": 91.0,
+                "reads_per_umi": 3.0,
+                "clones_func": 12,
+                "umi_in_func_clones": 40,
+            },
+            {
+                "sample_id": "sample1",
+                "extracted_chain": "TRB",
+                "reads_aligned_pc": 92.0,
+                "reads_per_umi": 4.0,
+                "clones_func": 18,
+                "umi_in_func_clones": 55,
+            },
+            {
+                "sample_id": "sample2",
+                "extracted_chain": "TRB",
+                "reads_aligned_pc": 88.0,
+                "reads_per_umi": 2.5,
+                "clones_func": 9,
+                "umi_in_func_clones": 30,
+            },
+        ]
+    )
+
+
+def test_processing_uses_default_properties_and_chain_sample_labels():
+    grid = rsplot.processing(_processing_table())
+
+    assert [ax.get_title() for ax in grid.axes.flat] == [
+        "Reads Aligned Pc",
+        "Reads Per Umi",
+        "Clones Func",
+        "Umi In Func Clones",
+    ]
+    expected_labels = ["sample1 (TRA)", "sample1 (TRB)", "sample2 (TRB)"]
+    visible_labels_by_axis = [
+        [tick.get_text() for tick in ax.get_xticklabels() if tick.get_text()]
+        for ax in grid.axes.flat
+        if ax.get_xticklabels()
+    ]
+    assert visible_labels_by_axis
+    assert all(labels == expected_labels for labels in visible_labels_by_axis)
+    assert all(ax.get_ylim()[0] == 0 for ax in grid.axes.flat)
+
+
+def test_processing_uses_standard_metadata_grouping_and_palette(monkeypatch):
+    captured = {}
+
+    def capture_plot_stats(stats_df, **kwargs):
+        captured["stats_df"] = stats_df
+        captured.update(kwargs)
+        return "grid"
+
+    monkeypatch.setattr(rsplot, "plot_stats", capture_plot_stats)
+    metadata = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "TRA", "condition": "control"},
+            {"sample_id": "sample1", "chain": "TRB", "condition": "treated"},
+            {"sample_id": "sample2", "chain": "TRB", "condition": "control"},
+        ]
+    )
+    palette = {"control": "#336699", "treated": "#cc5500"}
+
+    assert rsplot.processing(
+        _processing_table(),
+        metadata=metadata,
+        group="condition",
+        palette=palette,
+    ) == "grid"
+    assert "chain" in captured["stats_df"].columns
+    assert "extracted_chain" not in captured["stats_df"].columns
+    assert captured["properties"] == rsplot.PROCESSING_PROPERTIES
+    assert captured["metadata"] is metadata
+    assert captured["group"] == "condition"
+    assert captured["palette"] is palette
+    assert captured["zero_bottom"] is True
+
+
 def test_clonoset_stats_default_overlays_total_and_functional_bars():
     grid = rsplot.clonoset_stats(_clonoset_stats_df())
     axes = {ax.get_title(): ax for ax in grid.axes.flat}
