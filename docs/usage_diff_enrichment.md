@@ -151,6 +151,41 @@ At startup, the function reports:
 
 Set `verbose=False` to suppress this output and parallel progress reporting.
 
+## Sorting results
+
+Both `rsde.calc_statistics` and `rsde.postfilter` sort their output by
+default using:
+
+```py
+[
+    "prefilter_pass",
+    "postfilter_pass",
+    "enriched_in",
+    "mean_group_count",
+    "log2FC",
+    "p_adj",
+]
+```
+
+Filter columns place `True` first, `mean_group_count` and `log2FC` sort
+descending, and all other columns sort ascending. Categorical
+`enriched_in` values follow their category order; other values sort
+alphabetically. Columns absent from the output are silently ignored.
+
+Pass another column sequence to `sort`, or disable sorting with
+`sort=False`, `sort=None`, `sort=[]`, or a list containing only columns
+that are absent from the output. A single column name is also accepted:
+
+```py
+result = rsde.calc_statistics(
+    count_table,
+    samples_metadata,
+    sort=["p_adj", "feature"],
+)
+
+unsorted_result = rsde.postfilter(result, sort=False)
+```
+
 ## Two-group and multi-group analyses
 
 With exactly two groups, one two-sided comparison is calculated. The

@@ -133,6 +133,7 @@ def test_postfilter_uses_strict_p_values_and_inclusive_minimums():
         max_p_val=1,
         min_group_mean=2,
         min_logfc=1,
+        sort=False,
         verbose=False,
     )
 
@@ -166,7 +167,9 @@ def test_postfilter_uses_strict_p_values_and_inclusive_minimums():
     ],
 )
 def test_postfilter_optionally_filters_enriched_groups(groups, expected):
-    result = rsde.postfilter(_postfilter_table(), groups=groups, verbose=False)
+    result = rsde.postfilter(
+        _postfilter_table(), groups=groups, sort=False, verbose=False
+    )
 
     assert result["postfilter_pass"].tolist() == expected
 
@@ -217,13 +220,81 @@ def test_postfilter_verbose_reports_comparisons_and_prefilter_denominator(capsys
 def test_postfilter_verbose_reports_full_denominator_without_prefilter(capsys):
     statistics_table = _postfilter_table().drop(columns="prefilter_pass")
 
-    result = rsde.postfilter(statistics_table)
+    result = rsde.postfilter(statistics_table, sort=False)
 
     assert result["postfilter_pass"].tolist() == [True, False, False, True, True]
     output = capsys.readouterr().out
     assert "Adjusted p-value: any" in output
     assert "Raw p-value: any" in output
     assert "Features passed postfilter: 3 of 5" in output
+
+
+def test_postfilter_sorts_by_default_priorities():
+    result = rsde.postfilter(_postfilter_table(), verbose=False)
+
+    assert result["feature"].tolist() == [
+        "exact",
+        "high_p",
+        "low_mean",
+        "low_logfc",
+        "missing",
+    ]
+
+
+def test_postfilter_sorts_custom_and_categorical_columns():
+    statistics_table = _postfilter_table()
+    statistics_table.loc[statistics_table["feature"].eq("low_logfc"), "log2FC"] = 2
+    statistics_table["enriched_in"] = pd.Categorical(
+        statistics_table["enriched_in"],
+        categories=["B", "A"],
+        ordered=True,
+    )
+
+    categorical = rsde.postfilter(
+        statistics_table,
+        sort=["enriched_in"],
+        verbose=False,
+    )
+    arbitrary = rsde.postfilter(
+        statistics_table,
+        sort=["sample1"],
+        verbose=False,
+    )
+    directional = rsde.postfilter(
+        statistics_table,
+        sort=["mean_group_count", "log2FC", "p_adj"],
+        verbose=False,
+    )
+
+    assert categorical["feature"].tolist() == [
+        "low_logfc",
+        "high_p",
+        "exact",
+        "low_mean",
+        "missing",
+    ]
+    assert arbitrary["feature"].tolist() == [
+        "missing",
+        "exact",
+        "low_mean",
+        "low_logfc",
+        "high_p",
+    ]
+    assert directional["feature"].tolist() == [
+        "missing",
+        "low_logfc",
+        "high_p",
+        "exact",
+        "low_mean",
+    ]
+
+
+@pytest.mark.parametrize("sort", [False, None, [], ["not_a_column"]])
+def test_postfilter_skips_sorting_without_usable_columns(sort):
+    result = rsde.postfilter(_postfilter_table(), sort=sort, verbose=False)
+
+    assert result["feature"].tolist() == _postfilter_table()["feature"].tolist()
+    assert result.attrs == {"source": "statistics"}
 
 
 def _two_group_metadata():
@@ -332,6 +403,35 @@ def test_calc_statistics_without_prefilter_analyzes_all_features():
     )
 
     assert result["method"].notna().all()
+
+
+def test_calc_statistics_applies_default_and_custom_sorting():
+    count_table = _statistics_count_table().iloc[[1, 0, 2]]
+
+    default_sorted = rsde.calc_statistics(
+        count_table,
+        _two_group_metadata(),
+        cpu=1,
+        verbose=False,
+    )
+    custom_sorted = rsde.calc_statistics(
+        count_table,
+        _two_group_metadata(),
+        sort=["feature"],
+        cpu=1,
+        verbose=False,
+    )
+    unsorted = rsde.calc_statistics(
+        count_table,
+        _two_group_metadata(),
+        sort=["not_a_column"],
+        cpu=1,
+        verbose=False,
+    )
+
+    assert default_sorted["feature"].tolist() == ["f1", "f2", "f3"]
+    assert custom_sorted["feature"].tolist() == ["f1", "f2", "f3"]
+    assert unsorted["feature"].tolist() == ["f2", "f1", "f3"]
 
 
 def test_presence_threshold_changes_analysis_but_preserves_real_counts():
@@ -469,6 +569,7 @@ def test_calc_statistics_expanded_output_preserves_original_index_order():
         method="fisher",
         simplify=False,
         cpu=1,
+        sort=False,
         verbose=False,
     )
 

@@ -14,6 +14,14 @@ from .common_functions import run_parallel_calculation
 
 PREFILTER_COLUMN = "prefilter_pass"
 POSTFILTER_COLUMN = "postfilter_pass"
+DEFAULT_SORT_COLUMNS = [
+    PREFILTER_COLUMN,
+    POSTFILTER_COLUMN,
+    "enriched_in",
+    "mean_group_count",
+    "log2FC",
+    "p_adj",
+]
 STATISTICS_COLUMNS = [
     "enriched_in",
     "method",
@@ -145,6 +153,7 @@ def postfilter(
     min_logfc=1,
     groups=None,
     verbose=True,
+    sort=DEFAULT_SORT_COLUMNS,
 ):
     """Mark differential-enrichment rows that pass result thresholds.
 
@@ -169,6 +178,11 @@ def postfilter(
         Allowed ``enriched_in`` groups. ``None`` disables group filtering.
     verbose : bool, default True
         Print comparisons and the number of passing features.
+    sort : sequence, str, bool, or None, default DEFAULT_SORT_COLUMNS
+        Output columns used for stable sorting. Filter-status columns sort with
+        ``True`` first; ``mean_group_count`` and ``log2FC`` sort descending;
+        other columns use ascending order. Missing columns are ignored. Use
+        ``False``, ``None``, or an empty sequence to preserve row order.
 
     Returns
     -------
@@ -210,6 +224,7 @@ def postfilter(
     insert_position = result.columns.get_loc("p_adj") + 1
     result.insert(insert_position, POSTFILTER_COLUMN, postfilter_pass)
     result.attrs = statistics_table.attrs.copy()
+    result = _sort_output_table(result, sort)
     if verbose:
         print("Differential enrichment postfilter\n" + "-" * 50)
         print(
@@ -320,6 +335,7 @@ def calc_statistics(
     negative_binomial_alpha=1.0,
     cpu=None,
     verbose=True,
+    sort=DEFAULT_SORT_COLUMNS,
 ):
     """Calculate differential enrichment statistics for count-table features.
 
@@ -373,6 +389,11 @@ def calc_statistics(
         Worker count passed to ``run_parallel_calculation``.
     verbose : bool, default True
         Print analysis setup and parallel progress.
+    sort : sequence, str, bool, or None, default DEFAULT_SORT_COLUMNS
+        Output columns used for stable sorting. Filter-status columns sort with
+        ``True`` first; ``mean_group_count`` and ``log2FC`` sort descending;
+        other columns use ascending order. Missing columns are ignored. Use
+        ``False``, ``None``, or an empty sequence to preserve row order.
 
     Returns
     -------
@@ -527,8 +548,35 @@ def calc_statistics(
         pass_mask=pass_mask,
         simplify=simplify,
     )
+    result = _sort_output_table(result, sort)
     if verbose:
         print("Differential enrichment analysis finished successfully!")
+    return result
+
+
+def _sort_output_table(table, sort):
+    if sort is None or sort is False:
+        return table
+    requested_columns = [sort] if isinstance(sort, str) else list(sort)
+    sort_columns = list(
+        dict.fromkeys(
+            column for column in requested_columns if column in table.columns
+        )
+    )
+    if not sort_columns:
+        return table
+    descending_columns = {
+        PREFILTER_COLUMN,
+        POSTFILTER_COLUMN,
+        "mean_group_count",
+        "log2FC",
+    }
+    result = table.sort_values(
+        sort_columns,
+        ascending=[column not in descending_columns for column in sort_columns],
+        kind="stable",
+    )
+    result.attrs = table.attrs.copy()
     return result
 
 
