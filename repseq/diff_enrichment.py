@@ -139,37 +139,42 @@ def _validate_prefilter_arguments(
 
 def postfilter(
     statistics_table,
-    max_p_adj=1,
-    max_p_val=1,
+    max_p_adj=None,
+    max_p_val=None,
     min_group_mean=2,
     min_logfc=1,
     groups=None,
+    verbose=True,
 ):
     """Mark differential-enrichment rows that pass result thresholds.
 
-    All thresholds are inclusive. Rows pass when ``p_adj <= max_p_adj``,
-    ``p_val <= max_p_val``, ``mean_group_count >= min_group_mean``, and
-    ``log2FC >= min_logfc``. When ``groups`` is provided, ``enriched_in`` must
-    also match one of the requested groups.
+    P-value maxima use strict comparisons, while minimum thresholds are
+    inclusive. A ``None`` p-value maximum disables that filter. When
+    ``groups`` is provided, ``enriched_in`` must match one of the requested
+    groups. If ``prefilter_pass`` is present, only prefilter-passing rows can
+    pass the postfilter.
 
     Parameters
     ----------
     statistics_table : pandas.DataFrame
         A table returned by :func:`calc_statistics`.
-    max_p_adj, max_p_val : real number, default 1
-        Inclusive maximum adjusted and raw p-values.
+    max_p_adj, max_p_val : real number, optional
+        Strict maximum adjusted and raw p-values. ``None`` disables the
+        corresponding filter.
     min_group_mean : real number, default 2
         Inclusive minimum ``mean_group_count``.
     min_logfc : real number, default 1
         Inclusive minimum ``log2FC``.
     groups : str or sequence of str, optional
         Allowed ``enriched_in`` groups. ``None`` disables group filtering.
+    verbose : bool, default True
+        Print comparisons and the number of passing features.
 
     Returns
     -------
     pandas.DataFrame
         A copy of ``statistics_table`` with boolean ``postfilter_pass`` added
-        immediately before the first numeric column.
+        immediately before the original count-table columns.
     """
     selected_groups = _validate_postfilter_arguments(
         statistics_table,
@@ -180,24 +185,60 @@ def postfilter(
         groups=groups,
     )
     postfilter_pass = (
-        statistics_table["p_adj"].le(max_p_adj)
-        & statistics_table["p_val"].le(max_p_val)
-        & statistics_table["mean_group_count"].ge(min_group_mean)
+        statistics_table["mean_group_count"].ge(min_group_mean)
         & statistics_table["log2FC"].ge(min_logfc)
     )
+    if max_p_adj is not None:
+        postfilter_pass &= statistics_table["p_adj"].lt(max_p_adj)
+    if max_p_val is not None:
+        postfilter_pass &= statistics_table["p_val"].lt(max_p_val)
     if selected_groups is not None:
         postfilter_pass &= statistics_table["enriched_in"].isin(selected_groups)
+    prefilter_pass = None
+    if PREFILTER_COLUMN in statistics_table.columns:
+        valid_prefilter = statistics_table[PREFILTER_COLUMN].isin([True, False])
+        if not valid_prefilter.all():
+            raise ValueError(
+                f"statistics_table[{PREFILTER_COLUMN!r}] must contain only "
+                "True or False values"
+            )
+        prefilter_pass = statistics_table[PREFILTER_COLUMN].eq(True)
+        postfilter_pass &= prefilter_pass
     postfilter_pass = postfilter_pass.fillna(False).astype(bool)
 
     result = statistics_table.copy()
-    numeric_columns = list(result.select_dtypes(include="number").columns)
-    insert_position = (
-        result.columns.get_loc(numeric_columns[0])
-        if numeric_columns
-        else len(result.columns)
-    )
+    insert_position = result.columns.get_loc("p_adj") + 1
     result.insert(insert_position, POSTFILTER_COLUMN, postfilter_pass)
     result.attrs = statistics_table.attrs.copy()
+    if verbose:
+        print("Differential enrichment postfilter\n" + "-" * 50)
+        print(
+            "Adjusted p-value: "
+            + ("any" if max_p_adj is None else f"p_adj < {max_p_adj}")
+        )
+        print(
+            "Raw p-value: "
+            + ("any" if max_p_val is None else f"p_val < {max_p_val}")
+        )
+        print(f"Group mean count: mean_group_count >= {min_group_mean}")
+        print(f"Log2 fold change: log2FC >= {min_logfc}")
+        print(
+            "Enriched-in groups: "
+            + ("any" if selected_groups is None else f"enriched_in in {selected_groups}")
+        )
+        passed = int(postfilter_pass.sum())
+        if prefilter_pass is None:
+            print(f"Features passed postfilter: {passed} of {len(statistics_table)}")
+        else:
+            prefilter_passed = int(prefilter_pass.sum())
+            print(
+                f"Features passed prefilter: {prefilter_passed} of "
+                f"{len(statistics_table)}"
+            )
+            print(
+                f"Features passed postfilter: {passed} of {prefilter_passed} "
+                "prefilter-passing features"
+            )
     return result
 
 
@@ -230,6 +271,8 @@ def _validate_postfilter_arguments(
             f"{sorted(missing_columns)}"
         )
     for name, value in (("max_p_adj", max_p_adj), ("max_p_val", max_p_val)):
+        if value is None:
+            continue
         if (
             not isinstance(value, Real)
             or isinstance(value, bool)

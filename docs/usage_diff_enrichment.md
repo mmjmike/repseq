@@ -326,26 +326,31 @@ candidates = result[
 ## Postfiltering statistical results
 
 `rsde.postfilter` adds a boolean `postfilter_pass` column without removing any
-rows. It applies inclusive statistical and effect-size thresholds:
+rows. The column is placed after `p_adj`, immediately before the original
+count-table columns. P-value maxima are optional and use strict comparisons;
+minimum effect-size thresholds are inclusive:
 
 ```py
 result = rsde.postfilter(
     result,
-    max_p_adj=1,
-    max_p_val=1,
+    max_p_adj=None,
+    max_p_val=None,
     min_group_mean=2,
     min_logfc=1,
+    verbose=True,
 )
 ```
 
 A row passes when all of the following are true:
 
-- `p_adj <= max_p_adj`;
-- `p_val <= max_p_val`;
+- `p_adj < max_p_adj`, when `max_p_adj` is not `None`;
+- `p_val < max_p_val`, when `max_p_val` is not `None`;
 - `mean_group_count >= min_group_mean`;
 - `log2FC >= min_logfc`.
 
-Values exactly equal to a threshold pass. Rows with missing statistical values
+Values exactly equal to a p-value maximum fail, while values exactly equal to a
+minimum mean or log2FC threshold pass. `None` means that any value is accepted
+for that p-value column. Rows missing a value required by an active filter
 receive `postfilter_pass=False`.
 
 By default, `enriched_in` is not filtered. Select one group with a string or
@@ -371,6 +376,13 @@ Retrieve the passing rows with:
 ```py
 postfiltered_result = result[result["postfilter_pass"]].copy()
 ```
+
+With `verbose=True`, the function prints every active comparison explicitly,
+using `<` for p-values and `>=` for minimum thresholds. Disabled p-value and
+group filters are printed as `any`. If `prefilter_pass` is present, only its
+`True` rows can pass and the output reports both the prefilter count out of the
+whole table and the postfilter count out of prefilter-passing features. Without
+`prefilter_pass`, the postfilter count is reported out of the full table.
 
 ## Simplified and expanded results
 

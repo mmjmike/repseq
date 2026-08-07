@@ -111,12 +111,12 @@ def _postfilter_table():
         {
             "feature": ["exact", "low_mean", "low_logfc", "high_p", "missing"],
             "prefilter_pass": [True, True, True, True, False],
-            "enriched_in": ["A", "A", "B", "B", None],
-            "method": ["mann_whitney"] * 4 + [None],
-            "mean_group_count": [2, 1.99, 3, 3, np.nan],
-            "log2FC": [1, 2, 0.99, 2, np.nan],
-            "p_val": [1, 0.01, 0.01, 1, np.nan],
-            "p_adj": [1, 0.01, 0.01, 1, np.nan],
+            "enriched_in": ["A", "A", "B", "B", "A"],
+            "method": ["mann_whitney"] * 5,
+            "mean_group_count": [2, 1.99, 3, 3, 10],
+            "log2FC": [1, 2, 0.99, 2, 10],
+            "p_val": [1, 0.01, 0.01, 0.999, 0.001],
+            "p_adj": [1, 0.01, 0.01, 0.999, 0.001],
             "sample1": [2, 3, 4, 5, 0],
         }
     )
@@ -124,7 +124,7 @@ def _postfilter_table():
     return table
 
 
-def test_postfilter_uses_inclusive_thresholds_and_preserves_table():
+def test_postfilter_uses_strict_p_values_and_inclusive_minimums():
     statistics_table = _postfilter_table()
 
     result = rsde.postfilter(
@@ -133,19 +133,20 @@ def test_postfilter_uses_inclusive_thresholds_and_preserves_table():
         max_p_val=1,
         min_group_mean=2,
         min_logfc=1,
+        verbose=False,
     )
 
-    assert result["postfilter_pass"].tolist() == [True, False, False, True, False]
+    assert result["postfilter_pass"].tolist() == [False, False, False, True, False]
     assert list(result.columns) == [
         "feature",
         "prefilter_pass",
         "enriched_in",
         "method",
-        "postfilter_pass",
         "mean_group_count",
         "log2FC",
         "p_val",
         "p_adj",
+        "postfilter_pass",
         "sample1",
     ]
     pd.testing.assert_frame_equal(
@@ -165,7 +166,7 @@ def test_postfilter_uses_inclusive_thresholds_and_preserves_table():
     ],
 )
 def test_postfilter_optionally_filters_enriched_groups(groups, expected):
-    result = rsde.postfilter(_postfilter_table(), groups=groups)
+    result = rsde.postfilter(_postfilter_table(), groups=groups, verbose=False)
 
     assert result["postfilter_pass"].tolist() == expected
 
@@ -183,14 +184,46 @@ def test_postfilter_optionally_filters_enriched_groups(groups, expected):
 )
 def test_postfilter_rejects_invalid_arguments(kwargs, error_type, message):
     with pytest.raises(error_type, match=message):
-        rsde.postfilter(_postfilter_table(), **kwargs)
+        rsde.postfilter(_postfilter_table(), verbose=False, **kwargs)
 
 
 def test_postfilter_rejects_existing_status_column():
     statistics_table = _postfilter_table().assign(postfilter_pass=True)
 
     with pytest.raises(ValueError, match="already contains"):
-        rsde.postfilter(statistics_table)
+        rsde.postfilter(statistics_table, verbose=False)
+
+
+def test_postfilter_verbose_reports_comparisons_and_prefilter_denominator(capsys):
+    rsde.postfilter(
+        _postfilter_table(),
+        max_p_adj=0.05,
+        max_p_val=None,
+        min_group_mean=2,
+        min_logfc=1,
+        groups="A",
+    )
+
+    output = capsys.readouterr().out
+    assert "Adjusted p-value: p_adj < 0.05" in output
+    assert "Raw p-value: any" in output
+    assert "Group mean count: mean_group_count >= 2" in output
+    assert "Log2 fold change: log2FC >= 1" in output
+    assert "Enriched-in groups: enriched_in in ['A']" in output
+    assert "Features passed prefilter: 4 of 5" in output
+    assert "Features passed postfilter: 0 of 4 prefilter-passing features" in output
+
+
+def test_postfilter_verbose_reports_full_denominator_without_prefilter(capsys):
+    statistics_table = _postfilter_table().drop(columns="prefilter_pass")
+
+    result = rsde.postfilter(statistics_table)
+
+    assert result["postfilter_pass"].tolist() == [True, False, False, True, True]
+    output = capsys.readouterr().out
+    assert "Adjusted p-value: any" in output
+    assert "Raw p-value: any" in output
+    assert "Features passed postfilter: 3 of 5" in output
 
 
 def _two_group_metadata():
