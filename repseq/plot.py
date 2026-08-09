@@ -301,7 +301,8 @@ def _merge_stats_metadata(stats_df, metadata):
         if merged.empty:
             raise ValueError("metadata does not match any samples in stats_df")
 
-    return merged.drop(columns="_merge"), set(metadata.columns), merge_keys
+    merged = merged.drop(columns="_merge")
+    return merged, set(merged.columns), merge_keys
 
 
 def _validate_metadata_columns(columns, available_columns, label):

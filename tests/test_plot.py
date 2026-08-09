@@ -372,6 +372,26 @@ def test_processing_merges_unique_sample_metadata_by_sample_id():
     assert tick_labels == ["control", "treated"]
 
 
+def test_processing_combines_metadata_group_with_table_split():
+    metadata = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "Primers": "primer_a"},
+            {"sample_id": "sample2", "Primers": "primer_b"},
+        ]
+    )
+
+    grid = rsplot.processing(
+        _processing_table(),
+        metadata=metadata,
+        properties=["clones_func"],
+        group="Primers",
+        split="extracted_chain",
+        aspect=1.5,
+    )
+
+    assert [ax.get_title() for ax in grid.axes.flat] == ["TRA", "TRB"]
+
+
 def test_stats_wrappers_accept_custom_property_columns():
     custom_stats = _stats_df().assign(custom_score=[2.5, 4.5])
     custom_processing = _processing_table().assign(custom_score=[2.5, 3.5, 4.5])
