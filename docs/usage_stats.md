@@ -450,9 +450,10 @@ from repseq import plot as rsplot
 
 Each plotting function takes a statistics table and, optionally, a metadata
 table. Metadata must contain `sample_id`; if both tables contain `chain`, the
-merge uses `sample_id` + `chain`. Grouping and split columns are taken from the
-metadata table. If metadata contains fewer samples than the statistics table, a
-warning is shown and only the matched subset is plotted.
+merge uses `sample_id` + `chain`. Grouping and split columns can come from the
+metadata table or directly from the statistics table when metadata has already
+been merged by the user. If metadata contains fewer samples than the statistics
+table, a warning is shown and only the matched subset is plotted.
 
 ```py
 rsplot.diversity_stats(
@@ -495,7 +496,8 @@ rsplot.cdr3aa_stats(
 ```
 
 Default property panels are provided for CDR3 amino-acid properties, diversity
-statistics, and convergence. You can override them with `properties`.
+statistics, convergence, processing, and clonoset statistics. You can add any
+numeric column to a statistics table and select it with `properties`.
 
 ```py
 rsplot.convergence(convergence, metadata=metadata, group="experimental_group")

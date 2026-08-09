@@ -93,6 +93,33 @@ def test_plot_stats_checks_group_columns_are_in_metadata():
         )
 
 
+def test_plot_stats_uses_group_and_split_columns_from_stats_table():
+    stats_df = _stats_df().assign(
+        condition=["treated", "control"],
+        batch=["b1", "b2"],
+    )
+
+    grouped = rsplot.diversity_stats(
+        stats_df,
+        properties=["diversity"],
+        group="condition",
+    )
+    tick_labels = [
+        tick.get_text() for tick in grouped.axes.flat[0].get_xticklabels()
+    ]
+    assert tick_labels == ["treated", "control"]
+
+    split = rsplot.diversity_stats(
+        stats_df,
+        properties=["diversity"],
+        split=["condition", "batch"],
+    )
+    assert [ax.get_title() for ax in split.axes.flat] == [
+        "treated | b1",
+        "control | b2",
+    ]
+
+
 def test_plot_stats_preserves_ordered_group_categories():
     metadata = pd.DataFrame(
         [
@@ -294,7 +321,7 @@ def test_processing_uses_default_properties_and_chain_sample_labels():
     assert all(ax.get_ylim()[0] == 0 for ax in grid.axes.flat)
 
 
-def test_processing_uses_standard_metadata_grouping_and_palette(monkeypatch):
+def test_processing_keeps_extracted_chain_separate_from_metadata_chain(monkeypatch):
     captured = {}
 
     def capture_plot_stats(stats_df, **kwargs):
@@ -305,9 +332,8 @@ def test_processing_uses_standard_metadata_grouping_and_palette(monkeypatch):
     monkeypatch.setattr(rsplot, "plot_stats", capture_plot_stats)
     metadata = pd.DataFrame(
         [
-            {"sample_id": "sample1", "chain": "TRA", "condition": "control"},
-            {"sample_id": "sample1", "chain": "TRB", "condition": "treated"},
-            {"sample_id": "sample2", "chain": "TRB", "condition": "control"},
+            {"sample_id": "sample1", "chain": "TCR", "condition": "control"},
+            {"sample_id": "sample2", "chain": "BCR", "condition": "treated"},
         ]
     )
     palette = {"control": "#336699", "treated": "#cc5500"}
@@ -318,13 +344,51 @@ def test_processing_uses_standard_metadata_grouping_and_palette(monkeypatch):
         group="condition",
         palette=palette,
     ) == "grid"
-    assert "chain" in captured["stats_df"].columns
-    assert "extracted_chain" not in captured["stats_df"].columns
+    assert "extracted_chain" in captured["stats_df"].columns
+    assert "chain" not in captured["stats_df"].columns
     assert captured["properties"] == rsplot.PROCESSING_PROPERTIES
     assert captured["metadata"] is metadata
     assert captured["group"] == "condition"
     assert captured["palette"] is palette
     assert captured["zero_bottom"] is True
+
+
+def test_processing_merges_unique_sample_metadata_by_sample_id():
+    metadata = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "TCR", "condition": "control"},
+            {"sample_id": "sample2", "chain": "BCR", "condition": "treated"},
+        ]
+    )
+
+    grid = rsplot.processing(
+        _processing_table(),
+        metadata=metadata,
+        properties=["clones_func"],
+        group="condition",
+    )
+
+    tick_labels = [tick.get_text() for tick in grid.axes.flat[0].get_xticklabels()]
+    assert tick_labels == ["control", "treated"]
+
+
+def test_stats_wrappers_accept_custom_property_columns():
+    custom_stats = _stats_df().assign(custom_score=[2.5, 4.5])
+    custom_processing = _processing_table().assign(custom_score=[2.5, 3.5, 4.5])
+    custom_clonosets = _clonoset_stats_df().assign(custom_score=[2.5, 4.5])
+
+    plot_calls = [
+        (rsplot.processing, custom_processing),
+        (rsplot.cdr3aa_stats, custom_stats),
+        (rsplot.diversity_stats, custom_stats),
+        (rsplot.convergence, custom_stats),
+        (rsplot.clonoset_stats, custom_clonosets),
+    ]
+
+    for plot_function, stats_table in plot_calls:
+        grid = plot_function(stats_table, properties=["custom_score"])
+        assert grid.axes.flat[0].get_title() == "Custom Score"
+        plt.close(grid.fig)
 
 
 def test_clonoset_stats_default_overlays_total_and_functional_bars():
@@ -408,6 +472,17 @@ def test_clonoset_stats_custom_properties_use_standard_plot(monkeypatch):
     )
     assert captured["properties"] == ["reads_func"]
     assert captured["group"] is None
+
+
+def test_clonoset_stats_default_uses_split_from_stats_table():
+    stats_df = _clonoset_stats_df().assign(tissue=["blood", "tumor"])
+
+    grid = rsplot.clonoset_stats(stats_df, split="tissue")
+
+    assert [ax.get_title() for ax in grid.axes[0]] == [
+        "Reads | blood",
+        "Reads | tumor",
+    ]
 
 
 def test_clonoset_stats_default_supports_two_ordered_splits():

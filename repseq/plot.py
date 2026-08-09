@@ -304,16 +304,30 @@ def _merge_stats_metadata(stats_df, metadata):
     return merged.drop(columns="_merge"), set(metadata.columns), merge_keys
 
 
-def _validate_metadata_columns(columns, metadata_columns, label):
-    missing = [column for column in columns if column not in metadata_columns]
+def _validate_metadata_columns(columns, available_columns, label):
+    missing = [column for column in columns if column not in available_columns]
     if missing:
-        raise ValueError(f"{label} column(s) must be present in metadata: {missing}")
+        raise ValueError(
+            f"{label} column(s) must be present in metadata or stats_df: {missing}"
+        )
 
 
 def _make_sample_labels(data):
-    use_chain = "chain" in data.columns and data["sample_id"].duplicated(keep=False).any()
+    chain_column = next(
+        (column for column in ["extracted_chain", "chain"] if column in data.columns),
+        None,
+    )
+    use_chain = (
+        chain_column is not None
+        and data["sample_id"].duplicated(keep=False).any()
+    )
     if use_chain:
-        labels = data["sample_id"].astype(str) + " (" + data["chain"].astype(str) + ")"
+        labels = (
+            data["sample_id"].astype(str)
+            + " ("
+            + data[chain_column].astype(str)
+            + ")"
+        )
     else:
         labels = data["sample_id"].astype(str)
     order = list(pd.unique(labels))
@@ -327,8 +341,6 @@ def _prepare_plot_data(stats_df, metadata, properties, group, split):
         group_columns = []
 
     data, metadata_columns, merge_keys = _merge_stats_metadata(stats_df, metadata)
-    if metadata is None and (group_columns or split_columns):
-        raise ValueError("metadata is required when group or split columns are used")
     _validate_metadata_columns(group_columns, metadata_columns, "group")
     _validate_metadata_columns(split_columns, metadata_columns, "split")
 
@@ -336,7 +348,12 @@ def _prepare_plot_data(stats_df, metadata, properties, group, split):
     if missing_properties:
         raise ValueError(f"stats_df does not contain property column(s): {missing_properties}")
 
-    id_columns = list(dict.fromkeys(merge_keys + group_columns + split_columns))
+    label_columns = [
+        column for column in ["extracted_chain", "chain"] if column in data.columns
+    ]
+    id_columns = list(
+        dict.fromkeys(merge_keys + label_columns + group_columns + split_columns)
+    )
     plot_data = data[id_columns + list(properties)].copy()
     plot_data["_sample_label"] = _make_sample_labels(plot_data)
 
@@ -511,23 +528,25 @@ def plot_stats(
     stats_df : pandas.DataFrame
         Statistics table. It must contain ``sample_id`` and the selected
         property columns. If both ``stats_df`` and ``metadata`` contain
-        ``chain``, the merge uses both ``sample_id`` and ``chain``.
+        ``chain``, the merge uses both ``sample_id`` and ``chain``. Grouping
+        and splitting columns may also be included directly in this table.
     metadata : pandas.DataFrame, optional
         Sample metadata with one row per ``sample_id`` or ``sample_id`` +
-        ``chain`` key. Grouping and splitting columns must come from this
-        table. If metadata covers only part of ``stats_df``, a warning is
-        emitted and only matched samples are plotted.
+        ``chain`` key. If metadata covers only part of ``stats_df``, a warning
+        is emitted and only matched samples are plotted.
     properties : str or sequence of str
         Numeric columns to plot. Multiple properties are shown as separate
         panels.
     group : str or sequence of str, optional
-        Metadata column(s) used to group samples. No group draws one bar per
-        sample. One group draws boxplots with jittered points by that group.
-        Two groups use the first column on the x-axis and the second column as
-        color.
+        Column(s) used to group samples. They may come from ``metadata`` or,
+        when metadata is omitted, directly from ``stats_df``. No group draws
+        one bar per sample. One group draws boxplots with jittered points by
+        that group. Two groups use the first column on the x-axis and the
+        second column as color.
     split : str or sequence of str, optional
-        One or two metadata columns used to split plots into panels. Two split
-        columns are combined into an interaction panel.
+        One or two columns used to split plots into panels. They may come from
+        ``metadata`` or, when metadata is omitted, directly from ``stats_df``.
+        Two split columns are combined into an interaction panel.
     palette : optional
         Any seaborn/matplotlib-compatible palette specification.
     height, aspect : float
@@ -626,8 +645,6 @@ def _format_clonoset_bar_value(value):
 def _prepare_default_clonoset_plot_data(stats_df, metadata, split):
     split_columns = _as_list(split, "split", max_len=2)
     data, metadata_columns, merge_keys = _merge_stats_metadata(stats_df, metadata)
-    if metadata is None and split_columns:
-        raise ValueError("metadata is required when split columns are used")
     _validate_metadata_columns(split_columns, metadata_columns, "split")
 
     descriptors = [
@@ -3608,20 +3625,13 @@ def processing(
     """Plot MiXCR processing statistics with optional sample metadata.
 
     The input is the table returned by :func:`repseq.mixcr.get_processing_table`.
-    Its ``extracted_chain`` column is treated as ``chain`` for metadata matching
-    and sample labels.
+    Its ``extracted_chain`` column is kept separate from a metadata ``chain``
+    column and is used to distinguish extracted chains in sample labels.
     """
-    plot_table = processing_table
-    if (
-        "extracted_chain" in processing_table.columns
-        and "chain" not in processing_table.columns
-    ):
-        plot_table = processing_table.rename(columns={"extracted_chain": "chain"})
-
     return plot_stats(
-        plot_table,
+        processing_table,
         metadata=metadata,
-        properties=properties or PROCESSING_PROPERTIES,
+        properties=PROCESSING_PROPERTIES if properties is None else properties,
         group=group,
         split=split,
         palette=palette,
@@ -3645,7 +3655,7 @@ def cdr3aa_stats(
     return plot_stats(
         stats_df,
         metadata=metadata,
-        properties=properties or CDR3AA_STATS_PROPERTIES,
+        properties=CDR3AA_STATS_PROPERTIES if properties is None else properties,
         group=group,
         split=split,
         palette=palette,
@@ -3668,7 +3678,7 @@ def diversity_stats(
     return plot_stats(
         stats_df,
         metadata=metadata,
-        properties=properties or DIVERSITY_STATS_PROPERTIES,
+        properties=DIVERSITY_STATS_PROPERTIES if properties is None else properties,
         group=group,
         split=split,
         palette=palette,
@@ -3692,7 +3702,7 @@ def convergence(
     return plot_stats(
         stats_df,
         metadata=metadata,
-        properties=properties or CONVERGENCE_PROPERTIES,
+        properties=CONVERGENCE_PROPERTIES if properties is None else properties,
         group=group,
         split=split,
         palette=palette,

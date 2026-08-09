@@ -193,9 +193,11 @@ rsplot.processing(
 ```
 
 Grouping, splitting, ordered metadata categories, and palettes behave as in
-the other `rsplot` statistics plots. The `extracted_chain` column is matched
-to the metadata `chain` column when both sample and chain identifiers are
-available.
+the other `rsplot` statistics plots. The processing table's `extracted_chain`
+column remains separate from a metadata `chain` column. Processing metadata is
+matched by the unique `sample_id`, while `extracted_chain` distinguishes rows
+and sample labels. Grouping and splitting columns may also be included directly
+in `proc_table` when metadata has already been merged.
 
 
 <br>
