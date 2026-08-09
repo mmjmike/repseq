@@ -738,7 +738,8 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local",
     )
 
 
-def get_processing_table(folder, show_offtarget=False, offtarget_chain_threshold=0.01):
+def get_processing_table(folder, show_offtarget=False, offtarget_chain_threshold=0.01,
+                         small=False):
     """
     Searches for clonosets in the the folder, extracts their sample_id's and shows main
     processing stats in a table format. By default does not show "off-target" clonosets - 
@@ -753,6 +754,7 @@ def get_processing_table(folder, show_offtarget=False, offtarget_chain_threshold
             processing stats
         show_offtarget (bool): add offtarget chains to the stats
         offtarget_chain_threshold (float): threshold for off-target chains
+        small (bool): return only the main processing stats columns
     
     Returns:
         df (pd.DataFrame): dataframe, containing `sample_id`, `extracted_chain` and 
@@ -763,7 +765,12 @@ def get_processing_table(folder, show_offtarget=False, offtarget_chain_threshold
     if isinstance(folder, list):
         tables = []
         for f in folder:
-            table = get_processing_table(f, show_offtarget=show_offtarget)
+            table = get_processing_table(
+                f,
+                show_offtarget=show_offtarget,
+                offtarget_chain_threshold=offtarget_chain_threshold,
+                small=small,
+            )
             tables.append(table)
         return pd.concat(tables).sort_values(by="sample_id").reset_index(drop=True)
     
@@ -842,6 +849,12 @@ def get_processing_table(folder, show_offtarget=False, offtarget_chain_threshold
                                                "reads_per_umi", "clones_total", "reads_in_clones_total", "clones", "reads_in_clones", "clones_func", "reads_in_func_clones", "umi_in_clones", "umi_in_func_clones"])
     if not show_offtarget:
         result_df = result_df.loc[result_df.reads_in_clones/result_df.reads_in_clones_total > offtarget_chain_threshold]
+    if small:
+        result_df = result_df[[
+            "sample_id", "extracted_chain", "reads_total", "reads_with_umi_pc",
+            "reads_aligned_pc", "reads_overlapped_aln_pc", "reads_per_umi",
+            "overseq_threshold", "clones_func", "umi_in_func_clones",
+        ]]
     return result_df.sort_values(by="sample_id").reset_index(drop=True)
 
 

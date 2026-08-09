@@ -11,6 +11,40 @@ from matplotlib.figure import Figure
 from repseq import mixcr
 
 
+SMALL_PROCESSING_TABLE_COLUMNS = [
+    "sample_id",
+    "extracted_chain",
+    "reads_total",
+    "reads_with_umi_pc",
+    "reads_aligned_pc",
+    "reads_overlapped_aln_pc",
+    "reads_per_umi",
+    "overseq_threshold",
+    "clones_func",
+    "umi_in_func_clones",
+]
+
+
+def test_get_processing_table_small_returns_selected_columns(tmp_path):
+    table = mixcr.get_processing_table(str(tmp_path), small=True)
+
+    assert table.columns.tolist() == SMALL_PROCESSING_TABLE_COLUMNS
+
+
+def test_get_processing_table_small_applies_to_folder_lists(tmp_path):
+    first_folder = tmp_path / "first"
+    second_folder = tmp_path / "second"
+    first_folder.mkdir()
+    second_folder.mkdir()
+
+    table = mixcr.get_processing_table(
+        [str(first_folder), str(second_folder)],
+        small=True,
+    )
+
+    assert table.columns.tolist() == SMALL_PROCESSING_TABLE_COLUMNS
+
+
 def test_mixcr4_analyze_batch_preserves_custom_tag_pattern(tmp_path):
     tag_pattern = r"^N{0:2}tggtatcaacgcagagt(SMPL:N{5})(UMI:N{14})N{1}gctN{16}(R1:*)\^N{20}(R2:*)"
     sample_df = pd.DataFrame(
