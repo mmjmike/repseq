@@ -2830,9 +2830,13 @@ def _prepare_de_volcano_data(statistics_table, p_column):
             f"{sorted(missing_columns)}"
         )
 
-    plotted = statistics_table[
-        ["log2FC", p_column, "mean_group_count", "enriched_in"]
-    ].dropna().copy()
+    plot_columns = ["log2FC", p_column, "mean_group_count", "enriched_in"]
+    for pass_column in ["prefilter_pass", "postfilter_pass"]:
+        if pass_column in statistics_table:
+            plot_columns.append(pass_column)
+    plotted = statistics_table[plot_columns].dropna(
+        subset=["log2FC", p_column, "mean_group_count", "enriched_in"]
+    ).copy()
     if plotted.empty:
         raise ValueError("No rows with complete volcano-plot values are available")
     for column in ["log2FC", p_column, "mean_group_count"]:
@@ -2897,24 +2901,42 @@ def de_volcano(
         Closed volcano-plot figure.
     """
     plotted = _prepare_de_volcano_data(statistics_table, p_column)
-    group_order = _category_order(plotted["enriched_in"])
+    filtered_out = pd.Series(False, index=plotted.index)
+    if {"prefilter_pass", "postfilter_pass"}.issubset(plotted.columns):
+        filtered_out = plotted["prefilter_pass"].eq(True) & plotted[
+            "postfilter_pass"
+        ].eq(False)
+    retained = plotted.loc[~filtered_out]
+    group_order = _category_order(retained["enriched_in"])
     color_map = _palette_mapping(group_order, palette=group_palette)
-    point_colors = [color_map[group] for group in plotted["enriched_in"]]
     size_values = plotted["mean_group_count"].to_numpy(dtype=float)
     if log_sizes:
         size_values = np.log1p(size_values)
     point_sizes = _scaled_dot_sizes(size_values, size_range)
 
     fig, ax = plt.subplots(figsize=(height * aspect, height))
-    ax.scatter(
-        plotted["_plot_log2FC"],
-        plotted["_negative_log10_p"],
-        s=point_sizes,
-        c=point_colors,
-        alpha=float(alpha),
-        edgecolors="black",
-        linewidths=0.5,
-    )
+    if filtered_out.any():
+        ax.scatter(
+            plotted.loc[filtered_out, "_plot_log2FC"],
+            plotted.loc[filtered_out, "_negative_log10_p"],
+            s=float(np.min(point_sizes)),
+            c="#999999",
+            alpha=0.3,
+            edgecolors="none",
+            linewidths=0,
+            zorder=1,
+        )
+    if not retained.empty:
+        ax.scatter(
+            retained["_plot_log2FC"],
+            retained["_negative_log10_p"],
+            s=point_sizes[~filtered_out.to_numpy()],
+            c=[color_map[group] for group in retained["enriched_in"]],
+            alpha=float(alpha),
+            edgecolors="black",
+            linewidths=0.5,
+            zorder=2,
+        )
     ax.axvline(0, color="#888888", linestyle="--", linewidth=0.8, zorder=0)
     ax.set_title("Differential enrichment volcano plot")
     ax.set_xlabel("log2FC")
@@ -2926,6 +2948,15 @@ def de_volcano(
         Patch(facecolor=color_map[group], edgecolor="black", label=str(group))
         for group in group_order
     ]
+    if filtered_out.any():
+        handles.append(
+            Patch(
+                facecolor="#999999",
+                edgecolor="none",
+                alpha=0.3,
+                label="filtered_out",
+            )
+        )
     if handles:
         ax.legend(
             handles=handles,

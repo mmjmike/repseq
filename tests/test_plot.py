@@ -1762,6 +1762,39 @@ def test_de_volcano_can_size_points_by_raw_mean_group_count():
     )
 
 
+def test_de_volcano_draws_postfiltered_points_in_background():
+    statistics_table = _de_volcano_table().iloc[:4].assign(
+        enriched_in=["A", "C", "B", "B"],
+        prefilter_pass=[True, True, False, True],
+        postfilter_pass=[True, False, False, False],
+    )
+
+    fig = rsplot.de_volcano(statistics_table)
+    ax = fig.axes[0]
+    filtered_points, retained_points = ax.collections
+
+    np.testing.assert_allclose(
+        np.asarray(filtered_points.get_offsets()),
+        [[13, -np.log10(0.02)], [5, -np.log10(0.04)]],
+    )
+    assert filtered_points.get_sizes().tolist() == [
+        rsplot._scaled_dot_sizes(np.log1p([10, 20, 5, 40]), (20, 300)).min()
+    ]
+    np.testing.assert_allclose(filtered_points.get_facecolors()[0, :3], [0.6] * 3)
+    assert filtered_points.get_alpha() == 0.3
+    assert filtered_points.get_edgecolors().size == 0
+    assert filtered_points.get_zorder() < retained_points.get_zorder()
+    np.testing.assert_allclose(
+        np.asarray(retained_points.get_offsets()),
+        [[13, -np.log10(0.01)], [11, -np.log10(0.03)]],
+    )
+    assert [text.get_text() for text in ax.get_legend().get_texts()] == [
+        "A",
+        "B",
+        "filtered_out",
+    ]
+
+
 def test_de_volcano_repeated_high_log2fc_adjustment_uses_maximum_below_value():
     adjusted = rsplot._adjust_de_volcano_log2fc([100, 100, 11, 4])
 
