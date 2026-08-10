@@ -48,7 +48,7 @@ def find_all_mixcr_clonosets(folders, chain=None, show_offtarget=True, offtarget
         clonosets_dfs.append(find_all_exported_clonosets_in_folder(folder, chain=chain, show_offtarget=show_offtarget, offtarget_threshold=offtarget_threshold))
     clonosets_df = pd.concat(clonosets_dfs)
     if "mix_id" in clonosets_df.columns:
-        clonosets_df = clonosets_df[["mix_id", "sample_id", "chain", "filename"]]
+        clonosets_df = clonosets_df[["sample_id", "mix_id", "chain", "filename"]]
     return clonosets_df
 
 
@@ -104,20 +104,20 @@ def find_all_exported_clonosets_in_folder(folder, chain=None, show_offtarget=Tru
                 
         if chain is None:
             if sample_chain in CHAIN_VARIANTS:
-                files.append([mix_id, sample_id, sample_chain, os.path.join(folder, f)])
+                files.append([sample_id, mix_id, sample_chain, os.path.join(folder, f)])
                 has_mix_id = has_mix_id or mix_id is not None
             else:
                 continue
         else:
             if sample_chain not in CHAIN_VARIANTS[chain.upper()]:
                 continue
-            files.append([mix_id, sample_id, sample_chain, os.path.join(folder, f)])
+            files.append([sample_id, mix_id, sample_chain, os.path.join(folder, f)])
             has_mix_id = has_mix_id or mix_id is not None
 
     if has_mix_id:
-        result_columns = ["mix_id"] + result_columns
+        result_columns = ["sample_id", "mix_id", "chain", "filename"]
     else:
-        files = [file[1:] for file in files]
+        files = [file[:1] + file[2:] for file in files]
         
     files_df = pd.DataFrame(files, columns=result_columns)
     if not show_offtarget:

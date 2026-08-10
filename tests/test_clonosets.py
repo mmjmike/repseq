@@ -43,7 +43,7 @@ def test_find_all_mixcr_clonosets_extracts_mix_id(tmp_path):
     assert result.loc["sample2", "mix_id"] is None
 
 
-def test_find_all_mixcr_clonosets_keeps_mix_id_first_across_folders(tmp_path):
+def test_find_all_mixcr_clonosets_keeps_sample_id_first_across_folders(tmp_path):
     plain_folder = tmp_path / "plain"
     mixed_folder = tmp_path / "mixed"
     plain_folder.mkdir()
@@ -55,7 +55,7 @@ def test_find_all_mixcr_clonosets_keeps_mix_id_first_across_folders(tmp_path):
         [str(plain_folder), str(mixed_folder)]
     )
 
-    assert list(result.columns) == ["mix_id", "sample_id", "chain", "filename"]
+    assert list(result.columns) == ["sample_id", "mix_id", "chain", "filename"]
 
 
 def test_find_all_exported_clonosets_warns_and_delegates(tmp_path):
