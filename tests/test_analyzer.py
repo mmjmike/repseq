@@ -214,3 +214,39 @@ def test_pairing_supports_sample_ids_reused_between_chains(monkeypatch):
 
     assert analyzer.pairing_matrix.shape == (1, 1)
     assert analyzer.samples_df["sample_id"].tolist() == ["a1", "a2", "a1", "a2"]
+
+
+def test_analyzer_has_only_correctly_spelled_prefiltered_property():
+    assert hasattr(rsde.Analyzer, "prefiltered")
+    assert not hasattr(rsde.Analyzer, "prefilered")
+
+
+def test_plot_volcano_prefers_postfiltered_and_can_force_statistics(monkeypatch):
+    from repseq import plot as rsplot
+
+    analyzer = rsde.Analyzer(samples_df=_single_chain_samples(), verbose=False)
+    statistics = pd.DataFrame({"feature": ["statistics"]})
+    postfiltered = pd.DataFrame({"feature": ["postfiltered"]})
+    analyzer._store("statistics_df", statistics, {}, "XCR")
+    analyzer._store("postfiltered", postfiltered, {}, "XCR")
+    plotted = []
+    monkeypatch.setattr(
+        rsplot,
+        "de_volcano",
+        lambda table, **kwargs: plotted.append((table, kwargs)) or table,
+    )
+
+    assert analyzer.plot_volcano(alpha=0.5).iloc[0, 0] == "postfiltered"
+    assert analyzer.plot_volcano(postfiltered=False).iloc[0, 0] == "statistics"
+    assert plotted[0][1] == {"alpha": 0.5}
+
+
+def test_plot_volcano_falls_back_to_statistics(monkeypatch):
+    from repseq import plot as rsplot
+
+    analyzer = rsde.Analyzer(samples_df=_single_chain_samples(), verbose=False)
+    statistics = pd.DataFrame({"feature": ["statistics"]})
+    analyzer._store("statistics_df", statistics, {}, "XCR")
+    monkeypatch.setattr(rsplot, "de_volcano", lambda table, **kwargs: table)
+
+    assert analyzer.plot_volcano().iloc[0, 0] == "statistics"

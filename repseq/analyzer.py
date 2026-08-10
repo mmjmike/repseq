@@ -546,10 +546,6 @@ class Analyzer:
         return self._get_result("count_table")
 
     @property
-    def prefilered(self):
-        return self._get_result("prefiltered")
-
-    @property
     def prefiltered(self):
         return self._get_result("prefiltered")
 
@@ -567,10 +563,18 @@ class Analyzer:
             print("Pairing matrix has not been calculated yet.")
         return self._pairing_matrix
 
-    def plot_volcano(self, chain=None, **kwargs):
+    def plot_volcano(self, chain=None, postfiltered=True, **kwargs):
         from .plot import de_volcano
 
-        table = self._get_result("statistics_df", chain=chain)
+        self._require_samples()
+        selected = chain or self._active_chain
+        if selected not in self._chains:
+            raise ValueError(f"Unknown chain {selected!r}; available chains: {self._chains}")
+        table = None
+        if postfiltered:
+            table = self._results[selected]["postfiltered"]
+        if table is None:
+            table = self._get_result("statistics_df", chain=selected)
         if table is None:
             return None
         return de_volcano(table, **kwargs)
