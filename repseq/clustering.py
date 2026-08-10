@@ -355,7 +355,7 @@ class Clusters(list):
     def set_pooled(self, pooled: bool):
         self.is_pooled = pooled
 
-    def read_from_clonosets_df(self, clonosets_df: 'pd.DataFrame', cl_filter=Filter()):
+    def read_from_clonosets_df(self, clonosets_df: 'pd.DataFrame', cl_filter=Filter(), verbose=True):
 
         self.clusters = []
 
@@ -375,7 +375,8 @@ class Clusters(list):
 
         self.clonotypes = pd.concat(clonotypes_dfs).reset_index(drop=True)
         self.set_pooled(False)
-        print(f"Pooled {len(self.clonotypes)} clonotypes from {len(clonosets_df)} samples")
+        if verbose:
+            print(f"Pooled {len(self.clonotypes)} clonotypes from {len(clonosets_df)} samples")
         return
 
 
@@ -417,7 +418,7 @@ class Clusters(list):
             return "None"
                 
 
-    def find_nodes_and_edges(self, mismatches, overlap_type):
+    def find_nodes_and_edges(self, mismatches, overlap_type, cpu=None, verbose=True):
         """
         Builds nodes from clonotypes and finds edges between similar sequences. 
         Parallel calculations are implemented.
@@ -483,7 +484,8 @@ class Clusters(list):
                 node.additional_properties["c"] = row["c"]
             nodes_by_len[len_cdr3aa].append(node)
             list_of_all_nodes.append(node)
-        print("Nodes list created: {} nodes".format(len(list_of_all_nodes)))
+        if verbose:
+            print("Nodes list created: {} nodes".format(len(list_of_all_nodes)))
         
         tasks = []
         for aa_len in nodes_by_len:
@@ -492,9 +494,16 @@ class Clusters(list):
             tasks.append(task)
         
         program_name = "Find neighbour clonotypes"
-        result_list = run_parallel_calculation(self.find_edges_in_nodes_set_mp, tasks, program_name)
+        result_list = run_parallel_calculation(
+            self.find_edges_in_nodes_set_mp,
+            tasks,
+            program_name,
+            verbose=verbose,
+            cpu=cpu,
+        )
         edges=[j for i in result_list for j in i]
-        print("found {} edges".format(len(edges)))
+        if verbose:
+            print("found {} edges".format(len(edges)))
         nodes_set = set(list_of_all_nodes)
         connected_nodes_set = set()
         for edge in edges:
@@ -518,7 +527,7 @@ class Clusters(list):
         return edges
 
 
-    def find_nodes_and_edges_tcrdist_no_gaps(self, radius=16):
+    def find_nodes_and_edges_tcrdist_no_gaps(self, radius=16, cpu=None, verbose=True):
         
         with open(os.path.join(os.path.dirname(__file__), 'tcrdist_ab_v_segments.json')) as f:
             TCRDIST_V_DIST = json.load(f)
@@ -608,7 +617,8 @@ class Clusters(list):
                 node.additional_properties["c"] = row["c"]
             nodes_by_len[len_cdr3aa].append(node)
             list_of_all_nodes.append(node)
-        print("Nodes list created: {} nodes".format(len(list_of_all_nodes)))
+        if verbose:
+            print("Nodes list created: {} nodes".format(len(list_of_all_nodes)))
 
         tasks = []
         for aa_len in nodes_by_len:
@@ -617,9 +627,16 @@ class Clusters(list):
             tasks.append(task)
         
         program_name = "Find neighbour clonotypes (TCRdist with no CDR3 gaps)"
-        result_list = run_parallel_calculation(self.find_nodes_and_edges_tcrdist_no_gaps_mp, tasks, program_name)
+        result_list = run_parallel_calculation(
+            self.find_nodes_and_edges_tcrdist_no_gaps_mp,
+            tasks,
+            program_name,
+            verbose=verbose,
+            cpu=cpu,
+        )
         edges=[j for i in result_list for j in i]
-        print("found {} edges".format(len(edges)))
+        if verbose:
+            print("found {} edges".format(len(edges)))
         nodes_set = set(list_of_all_nodes)
         connected_nodes_set = set()
         for edge in edges:
@@ -665,9 +682,11 @@ class Clusters(list):
 
 # !!! add igh check inside the function - only if there is a c column 
     def create_clusters(self,
-                        overlap_type='aaVJ', 
+                        overlap_type='aaVJ',
                         mismatches=1,
-                        tcrdist_radius=None):
+                        tcrdist_radius=None,
+                        cpu=None,
+                        verbose=True):
         """
         Creates clusters of clonotypes using either mismatch-based or distance-based methods.
 
@@ -703,14 +722,18 @@ class Clusters(list):
 
         if tcr_dist:
             self.tcrdist_radius = tcrdist_radius
-            nodes, edges = self.find_nodes_and_edges_tcrdist_no_gaps(radius=tcrdist_radius)
+            nodes, edges = self.find_nodes_and_edges_tcrdist_no_gaps(
+                radius=tcrdist_radius, cpu=cpu, verbose=verbose
+            )
         else:
-            nodes, edges = self.find_nodes_and_edges(mismatches, 
-                                                    overlap_type)
+            nodes, edges = self.find_nodes_and_edges(
+                mismatches, overlap_type, cpu=cpu, verbose=verbose
+            )
         
         main_graph = Cluster()
         main_graph.add_nodes_from(nodes)
-        print("-----------------------------\nNexworkX graph created")
+        if verbose:
+            print("-----------------------------\nNexworkX graph created")
 
         program_name = "Adding edges..."
         edges_done = 0
@@ -728,7 +751,8 @@ class Clusters(list):
         cluster_num = len(self.filter_one_node_clusters(inplace=False))
         singletons = total_clusters - cluster_num
         
-        print(f"Found {cluster_num} clusters (2 or more nodes) and {singletons} single nodes. Total: {total_clusters}")
+        if verbose:
+            print(f"Found {cluster_num} clusters (2 or more nodes) and {singletons} single nodes. Total: {total_clusters}")
         
         self.clusters.sort(key=lambda x: (-len(x), x.calc_cluster_consensus(seq_type="prot", weigh_by=None)))
         self.write_cluster_no_to_nodes()

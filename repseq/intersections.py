@@ -260,7 +260,7 @@ def similarity(
 
 
 def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, strict_presence=False,
-                by_freq=False, custom_clonotypes_df=None):
+                by_freq=False, custom_clonotypes_df=None, cpu=None, verbose=True):
     """
     Creates a table that shows how many times each unique clonotype appears across different clonosets. It processes a given dataset of clonotypes (clonosets_df) 
     and generates a frequency/count table based on a specified overlap type.
@@ -288,6 +288,8 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
             `overlap_type`: `cdr3aa` or `cdr3nt` for sequence-based overlap types, `v` when V is used,
             and `j` when J is used. `VJlen` requires `cdr3aa`, `v`, and `j`; CDR3 length is derived
             from `cdr3aa`.
+        cpu (int, optional): number of worker processes used for feature counting.
+        verbose (bool): print setup and progress messages.
     
     Returns:
         df (pd.DataFrame): dataframe containing a pipe-delimited `clonotype` column, its component columns,
@@ -295,8 +297,9 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
     """
 
     
-    print("Creating clonotypes count table\n"+"-"*50)
-    print(f"Overlap type: {overlap_type}")
+    if verbose:
+        print("Creating clonotypes count table\n"+"-"*50)
+        print(f"Overlap type: {overlap_type}")
     effective_mismatches = mismatches if overlap_type_uses_sequence(overlap_type) else 0
     custom_clonotypes = None
     if custom_clonotypes_df is not None:
@@ -314,7 +317,14 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
         task = [unique_clonotypes, sample_id, clonoset_dicts[sample_id], effective_mismatches, strict_presence]
         tasks.append(task)
     
-    results = run_parallel_calculation(count_table_mp, tasks, "Counting features", object_name="clonosets")
+    results = run_parallel_calculation(
+        count_table_mp,
+        tasks,
+        "Counting features",
+        object_name="clonosets",
+        verbose=verbose,
+        cpu=cpu,
+    )
     result_dict = dict()
     for result in results:
         result_dict.update(result)

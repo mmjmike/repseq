@@ -1659,3 +1659,6 @@ def _assemble_statistics_output(
     result = result[ordered_columns]
     result.attrs = count_table.attrs.copy()
     return result
+
+
+from .analyzer import Analyzer

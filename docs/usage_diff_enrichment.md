@@ -12,6 +12,46 @@ from repseq import intersections
 from repseq import plot as rsplot
 ```
 
+## Stateful analysis with `Analyzer`
+
+`Analyzer` manages the complete count-table, prefilter, statistics, postfilter,
+and optional chain-pairing workflow while caching each completed step.
+
+```python
+analyzer = rsde.Analyzer(
+    samples_df=samples_df,
+    method="mann_whitney",
+    min_samples=3,
+)
+analyzer.run()
+
+statistics = analyzer.statistics_df
+filtered = analyzer.postfiltered
+```
+
+Parameters can also be supplied as a dictionary or updated later. Updating a
+parameter clears only results downstream of the affected step.
+
+```python
+analyzer.update_parameters({"min_count": 3, "max_p_adj": 0.05})
+analyzer.run()
+```
+
+For paired chains, select a branch explicitly or define chain-specific
+overrides with a suffix. A callable result table retrieves another branch
+without changing the active chain.
+
+```python
+analyzer.update_parameters({"overlap_type_TRA": "aaVJ"})
+analyzer.select_chain("TRB")
+trb_statistics = analyzer.statistics_df
+tra_statistics = analyzer.statistics_df("TRA")
+```
+
+Supported paired-chain combinations are `TRA`–`TRB`, `TRG`–`TRD`, and
+`IGH`–`IGKL`. The analyzer normalizes supported `TRAD`, `IGK`, and `IGL`
+aliases when their paired chain identifies the intended branch.
+
 ## Input data
 
 `rsde.calc_statistics` requires two dataframes:
