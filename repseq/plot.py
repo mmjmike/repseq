@@ -2795,6 +2795,116 @@ def de_heatmap(
     return _close_and_return(grid.fig)
 
 
+def _pairing_negative_log10_values(matrix):
+    values = matrix.astype(float)
+    finite = values.to_numpy(dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if (finite < 0).any():
+        raise ValueError("-log10 pairing values cannot contain negatives")
+    positive = finite[finite > 0]
+    floor = (
+        float(np.min(positive)) / 10
+        if len(positive)
+        else np.finfo(float).tiny
+    )
+    return -np.log10(values.mask(values == 0, floor))
+
+
+def de_pairing(
+    pairing_matrix,
+    log_minus=False,
+    hclust=False,
+    show_values=True,
+    cmap=PHEATMAP_CMAP,
+    height=8,
+    aspect=1.0,
+):
+    """Plot a chain-pairing score matrix as a heatmap.
+
+    Parameters
+    ----------
+    pairing_matrix : pandas.DataFrame
+        Numeric score matrix returned by ``diff_enrichment.pair_chains``.
+    log_minus : bool, default False
+        Color cells by ``-log10(value)``. Zeros are replaced by one tenth of
+        the smallest positive score before transformation. Original scores
+        remain displayed in cells.
+    hclust : bool, default False
+        Hierarchically cluster rows and columns.
+    show_values : bool, default True
+        Display compact original values, including ``NA``, in heatmap cells.
+    cmap : matplotlib colormap, optional
+        Heatmap colormap. Defaults to the R ``pheatmap`` palette.
+    height, aspect : float
+        Figure height and width multiplier.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        A closed pairing heatmap figure.
+    """
+    if not isinstance(pairing_matrix, pd.DataFrame):
+        raise TypeError("pairing_matrix must be a pandas DataFrame")
+    if pairing_matrix.empty:
+        raise ValueError("pairing_matrix must not be empty")
+    original_values = pairing_matrix.apply(pd.to_numeric, errors="coerce")
+    invalid = pairing_matrix.notna() & original_values.isna()
+    if invalid.any().any():
+        raise ValueError("pairing_matrix must contain only numeric values")
+    color_values = original_values.copy()
+    if log_minus:
+        color_values = _pairing_negative_log10_values(color_values)
+
+    row_linkage = _beta_linkage(color_values, axis=0) if hclust else None
+    column_linkage = _beta_linkage(color_values, axis=1) if hclust else None
+    method = pairing_matrix.attrs.get("method")
+    method_label = str(method).upper() if method else "Pairing score"
+    colorbar_label = f"-log10({method_label})" if log_minus else method_label
+    grid = sns.clustermap(
+        color_values,
+        cmap=cmap,
+        mask=color_values.isna(),
+        row_cluster=row_linkage is not None,
+        col_cluster=column_linkage is not None,
+        row_linkage=row_linkage,
+        col_linkage=column_linkage,
+        figsize=(height * aspect, height),
+        cbar_kws={"label": colorbar_label},
+        xticklabels=True,
+        yticklabels=True,
+    )
+    grid.ax_heatmap.set_title("Chain pairing")
+    grid.ax_heatmap.set_xlabel(pairing_matrix.columns.name or "Chain 1 feature")
+    grid.ax_heatmap.set_ylabel(pairing_matrix.index.name or "Chain 2 feature")
+    grid.ax_heatmap.tick_params(axis="x", labelrotation=90)
+
+    if show_values:
+        row_order = (
+            grid.dendrogram_row.reordered_ind
+            if grid.dendrogram_row is not None
+            else list(range(len(pairing_matrix.index)))
+        )
+        column_order = (
+            grid.dendrogram_col.reordered_ind
+            if grid.dendrogram_col is not None
+            else list(range(len(pairing_matrix.columns)))
+        )
+        displayed = original_values.iloc[row_order, column_order]
+        for row_index, row in enumerate(displayed.to_numpy(dtype=float)):
+            for column_index, value in enumerate(row):
+                grid.ax_heatmap.text(
+                    column_index + 0.5,
+                    row_index + 0.5,
+                    _format_beta_value(value),
+                    ha="center",
+                    va="center",
+                    fontsize=7,
+                    color="black",
+                )
+
+    return _close_and_return(grid.fig)
+
+
 def _adjust_de_volcano_log2fc(values):
     adjusted = pd.Series(values, copy=True, dtype=float)
     finite = adjusted[np.isfinite(adjusted)]
@@ -3941,6 +4051,7 @@ __all__ = [
     "vj_usage",
     "vjlen_usage",
     "beta_metric",
+    "de_pairing",
     "beta_table",
     "rarefaction_curve",
     "clonotypes_coverage",

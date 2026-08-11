@@ -1535,6 +1535,49 @@ def test_beta_metric_rejects_more_than_three_annotation_groups():
         )
 
 
+def _pairing_matrix():
+    matrix = pd.DataFrame(
+        [[0.0, 0.01], [0.1, np.nan]],
+        index=pd.Index(["chain2_a", "chain2_b"], name="chain2_feature"),
+        columns=pd.Index(["chain1_a", "chain1_b"], name="chain1_feature"),
+    )
+    matrix.attrs["method"] = "jsd"
+    return matrix
+
+
+def test_de_pairing_uses_negative_log10_colors_and_original_cell_values():
+    fig = rsplot.de_pairing(_pairing_matrix(), log_minus=True)
+    heatmap = next(ax for ax in fig.axes if ax.get_title() == "Chain pairing")
+    plotted = np.ma.filled(
+        np.ma.asarray(heatmap.collections[0].get_array(), dtype=float),
+        np.nan,
+    )
+
+    np.testing.assert_allclose(
+        plotted,
+        [[3.0, 2.0], [1.0, np.nan]],
+        equal_nan=True,
+    )
+    assert {text.get_text() for text in heatmap.texts} == {
+        "0",
+        "0.01",
+        "0.1",
+        "NA",
+    }
+    assert heatmap.collections[0].cmap.name == "pheatmap_default"
+    assert heatmap.get_xlabel() == "chain1_feature"
+    assert heatmap.get_ylabel() == "chain2_feature"
+    assert any(ax.get_ylabel() == "-log10(JSD)" for ax in fig.axes)
+
+
+def test_de_pairing_rejects_negative_log_transformed_values():
+    matrix = _pairing_matrix()
+    matrix.iloc[0, 0] = -0.1
+
+    with pytest.raises(ValueError, match="cannot contain negatives"):
+        rsplot.de_pairing(matrix, log_minus=True)
+
+
 def _de_heatmap_inputs(sample_order=None):
     sample_order = sample_order or ["a1", "b1", "a2", "b2"]
     sample_values = {

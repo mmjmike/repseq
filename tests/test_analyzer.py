@@ -250,3 +250,38 @@ def test_plot_volcano_falls_back_to_statistics(monkeypatch):
     monkeypatch.setattr(rsplot, "de_volcano", lambda table, **kwargs: table)
 
     assert analyzer.plot_volcano().iloc[0, 0] == "statistics"
+
+
+@pytest.mark.parametrize(
+    ("method", "expected_log_minus"),
+    [("jsd", True), ("pearson", False)],
+)
+def test_plot_pairing_selects_log_transform_from_method(
+    monkeypatch, method, expected_log_minus
+):
+    from repseq import plot as rsplot
+
+    analyzer = rsde.Analyzer(samples_df=_single_chain_samples(), verbose=False)
+    analyzer._pairing_matrix = pd.DataFrame([[0.1]])
+    analyzer._pairing_matrix.attrs["method"] = method
+    calls = []
+    monkeypatch.setattr(
+        rsplot,
+        "de_pairing",
+        lambda matrix, **kwargs: calls.append((matrix, kwargs)) or matrix,
+    )
+
+    result = analyzer.plot_pairing(show_values=False)
+
+    assert result is analyzer._pairing_matrix
+    assert calls[0][1] == {
+        "show_values": False,
+        "log_minus": expected_log_minus,
+    }
+
+
+def test_plot_pairing_reports_missing_matrix(capsys):
+    analyzer = rsde.Analyzer(samples_df=_single_chain_samples(), verbose=False)
+
+    assert analyzer.plot_pairing() is None
+    assert "Pairing matrix has not been calculated yet" in capsys.readouterr().out

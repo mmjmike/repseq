@@ -588,6 +588,18 @@ class Analyzer:
             return None
         return de_heatmap(table, self._branch_samples(selected), **kwargs)
 
+    def plot_pairing(self, **kwargs):
+        from .plot import de_pairing
+
+        if self._pairing_matrix is None:
+            print("Pairing matrix has not been calculated yet.")
+            return None
+        method = self._pairing_matrix.attrs.get(
+            "method", self._parameters["pairing_method"]
+        )
+        kwargs["log_minus"] = str(method).casefold() == "jsd"
+        return de_pairing(self._pairing_matrix, **kwargs)
+
     def __repr__(self):
         if self._samples_df is None:
             return "Analyzer(samples_df not read; no analysis results)"

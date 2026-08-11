@@ -52,6 +52,13 @@ Supported paired-chain combinations are `TRA`–`TRB`, `TRG`–`TRD`, and
 `IGH`–`IGKL`. The analyzer normalizes supported `TRAD`, `IGK`, and `IGL`
 aliases when their paired chain identifies the intended branch.
 
+Pairing scores can be shown as a heatmap. The analyzer uses `-log10` colors
+for JSD scores and untransformed colors for other pairing methods.
+
+```python
+pairing_figure = analyzer.plot_pairing()
+```
+
 ## Input data
 
 `rsde.calc_statistics` requires two dataframes:
