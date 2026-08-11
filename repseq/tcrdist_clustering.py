@@ -15,7 +15,8 @@ REPSEQ_PATH = os.path.join(os.path.expanduser("~"), "soft", "repseq")
 
 def build_tcr_dist_clusters_slurm(clonoset_filename, radius, output_prefix,
                                   chain="beta", species="human", group_colname="group",
-                                  cpus=1, time_estimate=4, memory=100, append_command=None, cdr3_gap_penalty=None):
+                                  cpus=1, time_estimate=4, memory=100, append_command=None,
+                                  cdr3_gap_penalty=None, constraint=None):
     # print(os.path.abspath(a_module.__file__))
     
     script_path = os.path.join(REPSEQ_PATH, "repseq", "tcrdist_clusters_slurm.py")
@@ -29,7 +30,15 @@ def build_tcr_dist_clusters_slurm(clonoset_filename, radius, output_prefix,
     jobname = f"TCRdist_clusters_{jn}"
 
     print(f"Running slurm command: {command}")
-    run_slurm_command_from_jupyter(command, jobname, cpus, time_estimate, memory, log_filename=log_filename)
+    run_slurm_command_from_jupyter(
+        command,
+        jobname,
+        cpus,
+        time_estimate,
+        memory,
+        log_filename=log_filename,
+        constraint=constraint,
+    )
 
 
 def build_tcr_dist_clusters(clonoset_filename, radius, output_prefix, chain="beta", species="human", cpus=1, group_colname="group", cdr3_gap_penalty=None):

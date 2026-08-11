@@ -26,6 +26,10 @@ JOB_TABLE_COLUMNS = [
     "command",
 ]
 
+DEFAULT_SAMPLE_BARCODE_TAG_PATTERN = (
+    r"^N{0:2}tggtatcaacgcagagt(SMPL:N{5})(UMI:N{14})N{1}gctN{16}(R1:*)\^N{20}(R2:*)"
+)
+
 
 def _validate_backend(backend):
     if backend not in ["local", "slurm"]:
@@ -49,12 +53,67 @@ def _strip_mixcr_template_placeholders(command_template):
     return [token for token in shlex.split(command_template) if token not in remove_list]
 
 
-def _mixcr_analyze_command(mixcr_path, memory, command_template_parts, r1, r2, output_prefix, tag_pattern=None):
+def _mixcr_analyze_command(mixcr_path, memory, command_template_parts, r1, r2,
+                           output_prefix, tag_pattern=None, extra_options=None):
     command_parts = [mixcr_path, f"-Xmx{memory}g", *command_template_parts]
     if tag_pattern is not None:
         command_parts.extend(["--tag-pattern", str(tag_pattern)])
+    if extra_options is not None:
+        command_parts.extend(extra_options)
     command_parts.extend([str(r1), str(r2), str(output_prefix)])
     return shlex.join(command_parts)
+
+
+def _sample_barcoded_groups(sample_df):
+    groups = {}
+    grouped_positions = set()
+
+    for _, group in sample_df.groupby(["R1", "R2"], sort=False, dropna=False):
+        if group["sample_id"].nunique(dropna=False) <= 1:
+            continue
+
+        if "mix_id" not in sample_df.columns:
+            raise ValueError("sample_df must contain a 'mix_id' column for sample-barcoded files")
+        if group["mix_id"].isna().any() or group["mix_id"].nunique(dropna=False) != 1:
+            raise ValueError("All rows with the same R1 and R2 files must have the same non-empty mix_id")
+        mix_id = group["mix_id"].iloc[0]
+        if isinstance(mix_id, str) and not mix_id.strip():
+            raise ValueError("mix_id must be non-empty for sample-barcoded files")
+
+        if "SMPL" not in sample_df.columns:
+            raise ValueError("sample_df must contain an 'SMPL' column for sample-barcoded files")
+        sample_barcodes = group["SMPL"].tolist()
+        if not all(isinstance(barcode, str) for barcode in sample_barcodes):
+            raise ValueError(f"All SMPL values for mix_id '{mix_id}' must be strings")
+        if len(set(sample_barcodes)) != len(sample_barcodes):
+            raise ValueError(f"SMPL values for mix_id '{mix_id}' must be distinct")
+        if len({len(barcode) for barcode in sample_barcodes}) != 1:
+            raise ValueError(f"All SMPL values for mix_id '{mix_id}' must have the same length")
+        if not all(re.fullmatch(r"[ATGC]+", barcode) for barcode in sample_barcodes):
+            raise ValueError(f"SMPL values for mix_id '{mix_id}' may contain only ATGC letters")
+
+        tag_patterns = []
+        if "miNNNPattern" in sample_df.columns:
+            for tag_pattern in group["miNNNPattern"]:
+                if pd.isna(tag_pattern) or (isinstance(tag_pattern, str) and not tag_pattern.strip()):
+                    continue
+                if not isinstance(tag_pattern, str):
+                    raise ValueError(f"miNNNPattern values for mix_id '{mix_id}' must be strings or empty")
+                tag_patterns.append(tag_pattern)
+        unique_tag_patterns = list(dict.fromkeys(tag_patterns))
+        if len(unique_tag_patterns) > 1:
+            raise ValueError(f"All non-empty miNNNPattern values for mix_id '{mix_id}' must be the same")
+        tag_pattern = unique_tag_patterns[0] if unique_tag_patterns else DEFAULT_SAMPLE_BARCODE_TAG_PATTERN
+
+        positions = group.index.tolist()
+        groups[positions[0]] = {
+            "rows": group,
+            "mix_id": mix_id,
+            "tag_pattern": tag_pattern,
+        }
+        grouped_positions.update(positions)
+
+    return groups, grouped_positions
 
 
 def _job_table(jobs, backend):
@@ -387,7 +446,7 @@ def _parse_slurm_job_id(stdout):
     return match.group(1) if match else ""
 
 
-def _submit_slurm_command(job, cpus, time_estimate, memory):
+def _submit_slurm_command(job, cpus, time_estimate, memory, constraint=None):
     command = job["command"]
     jobname = job["jobname"]
     cwd = job["cwd"]
@@ -410,6 +469,7 @@ def _submit_slurm_command(job, cpus, time_estimate, memory):
         memory,
         log_filename=log_filename,
         verbose=False,
+        constraint=constraint,
     )
     return _parse_slurm_job_id(stdout), stdout, stderr
 
@@ -422,7 +482,8 @@ def _save_result_table(table, table_filename):
 
 
 def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local",
-                    cpus=40, time_estimate=1.5, memory=32, save_result_table=True):
+                    cpus=40, time_estimate=1.5, memory=32, save_result_table=True,
+                    constraint=None):
     _validate_backend(backend)
     table = _job_table(jobs, backend)
     _write_batch_table(batch_filename, table, program_name=program_name)
@@ -441,6 +502,7 @@ def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local",
                 cpus,
                 time_estimate,
                 memory,
+                constraint=constraint,
             )
             status = "submitted" if job_id else "submit_failed"
             _update_job_status(
@@ -474,7 +536,8 @@ def _run_mixcr_jobs(jobs, program_name, batch_filename, backend="local",
 
 def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
                          mixcr_path="mixcr", memory=32, time_estimate=1.5,
-                         custom_tag_pattern_column=None, backend="local", cpus=40):
+                         custom_tag_pattern_column=None, backend="local", cpus=40,
+                         constraint=None):
     
     """
     Function for batch runs of MiXCR software.
@@ -484,7 +547,10 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
 
     Args:
         sample_df (pd.DataFrame): DataFrame, containing 'sample_id' column and 
-            'R1' and 'R2' columns, containing paths (recommended full paths) to raw read files
+            'R1' and 'R2' columns, containing paths (recommended full paths) to raw read files.
+            Rows sharing the same R1/R2 pair are processed as a sample-barcoded mix and
+            must also contain consistent 'mix_id' values and distinct ATGC-only 'SMPL' values.
+            A non-empty 'miNNNPattern' value overrides the default sample-barcode tag pattern.
         output_folder (str): path to output folder
         command_template (str): MiXCR command template 
             (default: 'mixcr analyze milab-human-rna-tcr-umi-multiplex -f r1 r2 output_prefix').
@@ -497,6 +563,7 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
             is the limit for SLURM task
         backend (str): `local` or `slurm`
         cpus (int): CPU request for SLURM jobs
+        constraint (str): Optional SLURM node constraint expression
 
     Returns:
         pd.DataFrame: submitted or completed job records
@@ -508,9 +575,19 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
     default_command_template = "mixcr analyze milab-human-rna-tcr-umi-multiplex -f r1 r2 output_prefix"
     if command_template is None:
         command_template = default_command_template
+
+    required_columns = {"sample_id", "R1", "R2"}
+    missing_columns = sorted(required_columns - set(sample_df.columns))
+    if missing_columns:
+        raise ValueError(f"sample_df is missing required columns: {', '.join(missing_columns)}")
+
+    sample_df = sample_df.reset_index(drop=True)
+    sample_barcoded_groups, sample_barcoded_positions = _sample_barcoded_groups(sample_df)
         
     # cut placeholders from command template
     command_template_parts = _strip_mixcr_template_placeholders(command_template)
+    if sample_barcoded_groups and "--tag-pattern" in command_template_parts:
+        raise ValueError("Please, remove '--tag-pattern' option from command_template for sample-barcoded files")
 
     # check input for custom tag pattern
     custom_tag_pattern = False
@@ -532,8 +609,41 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
     batch_filename = os.path.join(output_folder, "mixcr_analyze_batch.log")
     jobs = []
     
-    # main cycle by samples
+    # main cycle by samples and sample-barcoded mixes
     for i,r in sample_df.iterrows():
+        if i in sample_barcoded_groups:
+            sample_barcoded_group = sample_barcoded_groups[i]
+            mix_id = sample_barcoded_group["mix_id"]
+            barcode_table = sample_barcoded_group["rows"][["sample_id", "SMPL"]].rename(
+                columns={"sample_id": "Sample"}
+            )
+            barcode_table["TagPattern"] = ""
+            barcode_table = barcode_table[["Sample", "TagPattern", "SMPL"]]
+            barcode_table_filename = os.path.join(output_folder, f"{mix_id}_samples.tsv")
+            barcode_table.to_csv(barcode_table_filename, index=False, sep="\t")
+
+            jobname = f"mixcr_analyze_{mix_id}"
+            command = _mixcr_analyze_command(
+                mixcr_path,
+                memory,
+                command_template_parts,
+                r["R1"],
+                r["R2"],
+                mix_id,
+                tag_pattern=sample_barcoded_group["tag_pattern"],
+                extra_options=["--split-by-sample", "--sample-table", barcode_table_filename],
+            )
+            jobs.append({
+                "jobname": jobname,
+                "sample_id": mix_id,
+                "command": command,
+                "cwd": output_folder,
+                "log_filename": os.path.join(log_folder, f"{jobname}.log"),
+            })
+            continue
+        if i in sample_barcoded_positions:
+            continue
+
         sample_id = r["sample_id"]
         r1 = r["R1"]
         r2 = r["R2"]
@@ -570,11 +680,13 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
         cpus=cpus,
         time_estimate=time_estimate,
         memory=memory,
+        constraint=constraint,
     )
 
 
 def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=32,
-                           time_estimate=1.5, backend="local", cpus=40):
+                           time_estimate=1.5, backend="local", cpus=40,
+                           constraint=None):
     """
     Function for batch runs of the MiXCR software using the `mixcr analyze` command and the `Human 7GENES DNA Multiplex` MiXCR built-in preset.
     Incomplete rearrangements obtained by this kit are also included. For each incomplete rearrangement, unaligned reads from the previous 
@@ -591,6 +703,7 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
             is the limit for the SLURM task.
         backend (str): `local` or `slurm`.
         cpus (int): CPU request for SLURM jobs.
+        constraint (str): Optional SLURM node constraint expression.
 
     Returns:
         pd.DataFrame: submitted or completed job records.
@@ -659,11 +772,12 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
         cpus=cpus,
         time_estimate=time_estimate,
         memory=memory,
+        constraint=constraint,
     )
 
 
 def mixcr4_reports(folder, mixcr_path="mixcr", backend="local",
-                   cpus=40, time_estimate=1, memory=32):
+                   cpus=40, time_estimate=1, memory=32, constraint=None):
     
     """
     runs `mixcr exportQc` commands - `align`, `chainUsage` and `tags` in a given folder 
@@ -677,6 +791,7 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local",
         cpus (int): CPU request for SLURM jobs
         time_estimate (numeric): time estimate in hours for SLURM jobs
         memory (int): MiXCR memory in GB
+        constraint (str): Optional SLURM node constraint expression
     Returns:
         pd.DataFrame: submitted or completed job records
 
@@ -735,6 +850,7 @@ def mixcr4_reports(folder, mixcr_path="mixcr", backend="local",
         time_estimate=time_estimate,
         memory=memory,
         save_result_table=False,
+        constraint=constraint,
     )
 
 

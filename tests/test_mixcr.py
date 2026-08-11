@@ -5,6 +5,7 @@ import sys
 import types
 
 import pandas as pd
+import pytest
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
@@ -74,6 +75,155 @@ def test_mixcr4_analyze_batch_preserves_custom_tag_pattern(tmp_path):
     assert jobs.loc[0, "status"] == "finished"
     assert (tmp_path / "mixcr_analyze_batch.log").exists()
     assert (tmp_path / "logs" / "mixcr_analyze_batch_jobs.csv").exists()
+
+
+def test_mixcr4_analyze_batch_groups_sample_barcoded_files(tmp_path):
+    sample_df = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample_1",
+                "R1": "mix_R1.fastq.gz",
+                "R2": "mix_R2.fastq.gz",
+                "mix_id": "mix_1",
+                "SMPL": "AAAAA",
+                "miNNNPattern": "",
+            },
+            {
+                "sample_id": "sample_2",
+                "R1": "mix_R1.fastq.gz",
+                "R2": "mix_R2.fastq.gz",
+                "mix_id": "mix_1",
+                "SMPL": "CCCCC",
+                "miNNNPattern": None,
+            },
+            {
+                "sample_id": "sample_3",
+                "R1": "sample_3_R1.fastq.gz",
+                "R2": "sample_3_R2.fastq.gz",
+                "mix_id": "",
+                "SMPL": "",
+                "miNNNPattern": "",
+            },
+        ]
+    )
+
+    jobs = mixcr.mixcr4_analyze_batch(
+        sample_df,
+        str(tmp_path),
+        command_template="mixcr analyze test-preset -f r1 r2 output_prefix",
+        mixcr_path="echo",
+        memory=16,
+        backend="local",
+    )
+
+    assert jobs["jobname"].tolist() == ["mixcr_analyze_mix_1", "mixcr_analyze_sample_3"]
+    mix_command = shlex.split(jobs.loc[jobs["jobname"] == "mixcr_analyze_mix_1", "command"].iloc[0])
+    tag_pattern_index = mix_command.index("--tag-pattern") + 1
+    sample_table_index = mix_command.index("--sample-table") + 1
+    assert mix_command[tag_pattern_index] == mixcr.DEFAULT_SAMPLE_BARCODE_TAG_PATTERN
+    assert "--split-by-sample" in mix_command
+    assert mix_command[sample_table_index] == str(tmp_path / "mix_1_samples.tsv")
+    assert mix_command[-3:] == ["mix_R1.fastq.gz", "mix_R2.fastq.gz", "mix_1"]
+
+    barcode_table = pd.read_csv(tmp_path / "mix_1_samples.tsv", sep="	", keep_default_na=False)
+    assert barcode_table.to_dict("records") == [
+        {"Sample": "sample_1", "TagPattern": "", "SMPL": "AAAAA"},
+        {"Sample": "sample_2", "TagPattern": "", "SMPL": "CCCCC"},
+    ]
+
+
+def test_mixcr4_analyze_batch_uses_minnn_pattern_for_sample_barcoded_files(tmp_path):
+    tag_pattern = r"^(SMPL:N{6})(UMI:N{12})(R1:*)\^(R2:*)"
+    sample_df = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample_1",
+                "R1": "mix_R1.fastq.gz",
+                "R2": "mix_R2.fastq.gz",
+                "mix_id": "mix_1",
+                "SMPL": "AAAAAA",
+                "miNNNPattern": tag_pattern,
+            },
+            {
+                "sample_id": "sample_2",
+                "R1": "mix_R1.fastq.gz",
+                "R2": "mix_R2.fastq.gz",
+                "mix_id": "mix_1",
+                "SMPL": "CCCCCC",
+                "miNNNPattern": tag_pattern,
+            },
+        ]
+    )
+
+    jobs = mixcr.mixcr4_analyze_batch(
+        sample_df,
+        str(tmp_path),
+        mixcr_path="echo",
+        memory=16,
+        backend="local",
+    )
+
+    command_parts = shlex.split(jobs.loc[0, "command"])
+    assert command_parts[command_parts.index("--tag-pattern") + 1] == tag_pattern
+
+
+@pytest.mark.parametrize(
+    ("column", "values", "message"),
+    [
+        ("mix_id", None, "mix_id"),
+        ("mix_id", ["mix_1", "mix_2"], "same non-empty mix_id"),
+        ("SMPL", None, "SMPL"),
+        ("SMPL", ["AAAAA", "AAAAA"], "distinct"),
+        ("SMPL", ["AAAAA", "CCCC"], "same length"),
+        ("SMPL", ["AAAAA", "CCCNC"], "only ATGC"),
+        ("SMPL", [123, "CCCCC"], "must be strings"),
+        ("miNNNPattern", ["pattern_1", "pattern_2"], "must be the same"),
+    ],
+)
+def test_mixcr4_analyze_batch_validates_sample_barcoded_rows(tmp_path, column, values, message):
+    sample_df = pd.DataFrame(
+        {
+            "sample_id": ["sample_1", "sample_2"],
+            "R1": ["mix_R1.fastq.gz", "mix_R1.fastq.gz"],
+            "R2": ["mix_R2.fastq.gz", "mix_R2.fastq.gz"],
+            "mix_id": ["mix_1", "mix_1"],
+            "SMPL": ["AAAAA", "CCCCC"],
+            "miNNNPattern": ["", ""],
+        }
+    )
+    if values is None:
+        sample_df = sample_df.drop(columns=column)
+    else:
+        sample_df[column] = values
+
+    with pytest.raises(ValueError, match=message):
+        mixcr.mixcr4_analyze_batch(sample_df, str(tmp_path), mixcr_path="echo", memory=16)
+
+
+def test_mixcr4_analyze_batch_passes_constraint_to_slurm(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_submit(*args, **kwargs):
+        captured["constraint"] = kwargs["constraint"]
+        return b"Submitted batch job 42\n", b""
+
+    monkeypatch.setattr(mixcr, "run_slurm_command_from_jupyter", fake_submit)
+    sample_df = pd.DataFrame(
+        [{"sample_id": "sample_1", "R1": "R1.fastq.gz", "R2": "R2.fastq.gz"}]
+    )
+
+    jobs = mixcr.mixcr4_analyze_batch(
+        sample_df,
+        str(tmp_path),
+        mixcr_path="mixcr",
+        memory=16,
+        backend="slurm",
+        constraint="hpc",
+    )
+
+    assert captured["constraint"] == "hpc"
+    assert str(jobs.loc[0, "job_id"]) == "42"
+    assert jobs.loc[0, "status"] == "submitted"
 
 
 def test_mixcr_public_batch_functions_do_not_expose_max_workers():
