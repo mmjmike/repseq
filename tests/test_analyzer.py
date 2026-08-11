@@ -285,3 +285,82 @@ def test_plot_pairing_reports_missing_matrix(capsys):
 
     assert analyzer.plot_pairing() is None
     assert "Pairing matrix has not been calculated yet" in capsys.readouterr().out
+
+
+def test_run_verbose_highlights_chain_branches_and_prefilter_counts(
+    monkeypatch, capsys
+):
+    def fake_count_table(samples_df, **kwargs):
+        sample_ids = samples_df["sample_id"].tolist()
+        return pd.DataFrame(
+            {
+                "clonotype": ["passing", "filtered"],
+                **{
+                    sample_id: [3, 0]
+                    for sample_id in sample_ids
+                },
+            }
+        )
+
+    def fake_statistics(count_table, samples_metadata, **kwargs):
+        result = count_table.copy()
+        for name, value in reversed(
+            [
+                ("enriched_in", "A"),
+                ("method", "mann_whitney"),
+                ("mean_group_count", 3.0),
+                ("log2FC", 2.0),
+                ("p_val", 0.01),
+                ("p_adj", 0.02),
+            ]
+        ):
+            result.insert(1, name, value)
+        return result
+
+    monkeypatch.setattr(intersections, "count_table", fake_count_table)
+    monkeypatch.setattr(rsde, "calc_statistics", fake_statistics)
+    analyzer = rsde.Analyzer(
+        samples_df=_paired_samples(),
+        verbose=True,
+        min_samples=1,
+        min_total_count=1,
+        max_p_adj=0.05,
+    )
+
+    analyzer.run()
+
+    output = capsys.readouterr().out
+    assert "Found 2 chains: TRA, TRB" in output
+    assert "Biological samples: 2" in output
+    assert "Chain-specific samples: TRA=2, TRB=2" in output
+    assert "### PARALLEL CHAIN BRANCH 1/2: TRA (2 samples) ###" in output
+    assert "### PARALLEL CHAIN BRANCH 2/2: TRB (2 samples) ###" in output
+    assert "STEP: STATISTICS | CHAIN: TRA" in output
+    assert "-" * 72 in output
+    assert "Completed statistics for 1 prefiltered features." in output
+    assert "Completed postfilter: 1 of 1 prefiltered features passed." in output
+    assert "MERGING PARALLEL BRANCHES: CHAIN PAIRING" in output
+
+
+def test_analyzer_state_uses_prefilter_count_for_statistics_and_postfilter():
+    analyzer = rsde.Analyzer(samples_df=_single_chain_samples(), verbose=False)
+    prefiltered = pd.DataFrame(
+        {"feature": ["a", "b", "c"], "prefilter_pass": [True, True, False]}
+    )
+    statistics = prefiltered.assign(
+        enriched_in="A",
+        method="mann_whitney",
+        mean_group_count=3.0,
+        log2FC=2.0,
+        p_val=0.01,
+        p_adj=0.02,
+    )
+    postfiltered = statistics.assign(postfilter_pass=[True, False, False])
+    analyzer._store("prefiltered", prefiltered, {}, "XCR")
+    analyzer._store("statistics_df", statistics, {}, "XCR")
+    analyzer._store("postfiltered", postfiltered, {}, "XCR")
+
+    state = repr(analyzer)
+
+    assert "statistics (2 prefiltered features)" in state
+    assert "postfiltered (1 of 2 prefiltered features passed)" in state

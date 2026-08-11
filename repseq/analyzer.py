@@ -513,23 +513,99 @@ class Analyzer:
     def run(self):
         self._require_samples()
         original_chain = self._active_chain
+        verbose = self._parameters["verbose"]
+        if verbose:
+            sample_counts = {
+                chain: len(self._branch_samples(chain)) for chain in self._chains
+            }
+            print("\n" + "=" * 72)
+            print("DIFFERENTIAL ENRICHMENT ANALYSIS")
+            print("=" * 72)
+            chain_word = "chain" if len(self._chains) == 1 else "chains"
+            print(
+                f"Found {len(self._chains)} {chain_word}: "
+                + ", ".join(self._chains)
+            )
+            if len(self._chains) == 1:
+                print(f"Samples: {sample_counts[self._chains[0]]}")
+            else:
+                biological_samples = self._samples_df["sample"].nunique()
+                print(f"Biological samples: {biological_samples}")
+                print(
+                    "Chain-specific samples: "
+                    + ", ".join(
+                        f"{chain}={sample_counts[chain]}"
+                        for chain in self._chains
+                    )
+                )
         for chain in self._chains:
             self._active_chain = chain
+            if verbose:
+                if len(self._chains) == 2:
+                    branch_number = self._chains.index(chain) + 1
+                    print("\n" + "#" * 72)
+                    print(
+                        f"### PARALLEL CHAIN BRANCH {branch_number}/2: {chain} "
+                        f"({sample_counts[chain]} samples) ###"
+                    )
+                    print("#" * 72)
+                else:
+                    print("\n" + "#" * 72)
+                    print(
+                        f"### CHAIN: {chain} ({sample_counts[chain]} samples) ###"
+                    )
+                    print("#" * 72)
             for label, runner in (
                 ("count table", self.run_count_table),
                 ("prefilter", self.run_prefilter),
                 ("statistics", self.run_statistics),
                 ("postfilter", self.run_postfilter),
             ):
-                if self._parameters["verbose"]:
-                    print(f"Running {label} for chain {chain}.")
+                if verbose:
+                    print("\n" + "-" * 72)
+                    print(f"STEP: {label.upper()} | CHAIN: {chain}")
+                    print("-" * 72)
                 runner()
+                if verbose:
+                    self._print_run_stage_summary(label, chain)
         self._active_chain = original_chain
         if len(self._chains) == 2 and self._parameters["pair_chains"]:
-            if self._parameters["verbose"]:
-                print("Pairing chains.")
+            if verbose:
+                print("\n" + "=" * 72)
+                print("MERGING PARALLEL BRANCHES: CHAIN PAIRING")
+                print("=" * 72)
             self.pair_chains()
+        if verbose:
+            print("\n" + "=" * 72)
+            print("DIFFERENTIAL ENRICHMENT ANALYSIS COMPLETE")
+            print("=" * 72)
         return self
+
+    def _prefiltered_feature_count(self, chain):
+        table = self._results[chain]["prefiltered"]
+        if table is None or "prefilter_pass" not in table.columns:
+            return 0
+        return int(table["prefilter_pass"].sum())
+
+    def _print_run_stage_summary(self, label, chain):
+        if label == "count table":
+            table = self._results[chain]["count_table"]
+            print(f"Completed count table: {len(table)} features.")
+        elif label == "prefilter":
+            table = self._results[chain]["prefiltered"]
+            passed = self._prefiltered_feature_count(chain)
+            print(f"Completed prefilter: {passed} of {len(table)} features passed.")
+        elif label == "statistics":
+            passed = self._prefiltered_feature_count(chain)
+            print(f"Completed statistics for {passed} prefiltered features.")
+        elif label == "postfilter":
+            table = self._results[chain]["postfiltered"]
+            passed = int(table["postfilter_pass"].sum())
+            prefiltered = self._prefiltered_feature_count(chain)
+            print(
+                f"Completed postfilter: {passed} of {prefiltered} "
+                "prefiltered features passed."
+            )
 
     def _get_result(self, name, chain=None):
         self._require_samples()
@@ -618,8 +694,17 @@ class Analyzer:
                     detail = f" ({len(table)} rows)"
                     if stage == "prefiltered" and "prefilter_pass" in table:
                         detail = f" ({int(table['prefilter_pass'].sum())} of {len(table)} passed)"
+                    if stage == "statistics_df":
+                        detail = (
+                            f" ({self._prefiltered_feature_count(chain)} "
+                            "prefiltered features)"
+                        )
                     if stage == "postfiltered" and "postfilter_pass" in table:
-                        detail = f" ({int(table['postfilter_pass'].sum())} of {len(table)} passed)"
+                        detail = (
+                            f" ({int(table['postfilter_pass'].sum())} of "
+                            f"{self._prefiltered_feature_count(chain)} "
+                            "prefiltered features passed)"
+                        )
                     state.append(stage.replace("_df", "") + detail)
             lines.append(f"{chain}: " + (", ".join(state) if state else "no steps calculated"))
         if self._pairing_matrix is not None:
