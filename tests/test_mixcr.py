@@ -46,6 +46,64 @@ def test_get_processing_table_small_applies_to_folder_lists(tmp_path):
     assert table.columns.tolist() == SMALL_PROCESSING_TABLE_COLUMNS
 
 
+def test_get_processing_table_uses_mix_and_sample_ids_for_reports(
+    tmp_path, monkeypatch
+):
+    clonosets = pd.DataFrame(
+        [{
+            "sample_id": "sample1",
+            "mix_id": "mix1",
+            "chain": "TRA",
+            "filename": str(tmp_path / "mix1.sample1.clones_TRA.tsv"),
+        }]
+    )
+    report_calls = []
+
+    monkeypatch.setattr(
+        mixcr,
+        "find_all_exported_clonosets_in_folder",
+        lambda folder, chain=None: clonosets,
+    )
+
+    def read_report(sample_id, folder, report_type):
+        report_calls.append((sample_id, report_type))
+        if report_type == "refine":
+            raise FileNotFoundError
+        if report_type == "align":
+            return {
+                "totalReadsProcessed": 100,
+                "notAlignedReasons": {"NoBarcode": 0},
+                "aligned": 80,
+                "overlappedAligned": 40,
+            }
+        return {"clones": 2, "readsInClones": 10}
+
+    monkeypatch.setattr(mixcr, "read_json_report", read_report)
+    monkeypatch.setattr(
+        mixcr,
+        "read_clonoset",
+        lambda filename: pd.DataFrame({"readCount": [6, 4]}),
+    )
+    monkeypatch.setattr(mixcr, "filter_by_functionality", lambda clonoset: clonoset)
+
+    table = mixcr.get_processing_table(
+        str(tmp_path),
+        show_offtarget=True,
+        small=True,
+    )
+
+    assert table.columns.tolist() == [
+        "sample_id", "mix_id", *SMALL_PROCESSING_TABLE_COLUMNS[1:]
+    ]
+    assert table.loc[0, "sample_id"] == "sample1"
+    assert table.loc[0, "mix_id"] == "mix1"
+    assert report_calls == [
+        ("mix1", "align"),
+        ("mix1.sample1", "refine"),
+        ("mix1.sample1", "assemble"),
+    ]
+
+
 def test_mixcr4_analyze_batch_preserves_custom_tag_pattern(tmp_path):
     tag_pattern = r"^N{0:2}tggtatcaacgcagagt(SMPL:N{5})(UMI:N{14})N{1}gctN{16}(R1:*)\^N{20}(R2:*)"
     sample_df = pd.DataFrame(

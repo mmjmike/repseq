@@ -873,9 +873,11 @@ def get_processing_table(folder, show_offtarget=False, offtarget_chain_threshold
         small (bool): return only the main processing stats columns
     
     Returns:
-        df (pd.DataFrame): dataframe, containing `sample_id`, `extracted_chain` and 
-            different processing stats columns. There may be several rows with the same 
-            `sample_id`, with each found `extracted_chain`
+        df (pd.DataFrame): dataframe, containing `sample_id`, `extracted_chain` and
+            different processing stats columns. If clonoset filenames contain both
+            `mix_id` and `sample_id`, the dataframe also contains a `mix_id` column.
+            There may be several rows with the same `sample_id`, with each found
+            `extracted_chain`.
     """
 
     if isinstance(folder, list):
@@ -888,23 +890,37 @@ def get_processing_table(folder, show_offtarget=False, offtarget_chain_threshold
                 small=small,
             )
             tables.append(table)
-        return pd.concat(tables).sort_values(by="sample_id").reset_index(drop=True)
+        result_df = pd.concat(tables)
+        if "mix_id" in result_df.columns:
+            columns = ["sample_id", "mix_id"] + [
+                column for column in result_df.columns
+                if column not in {"sample_id", "mix_id"}
+            ]
+            result_df = result_df[columns]
+        return result_df.sort_values(by="sample_id").reset_index(drop=True)
     
     results = []
     clonosets = find_all_exported_clonosets_in_folder(folder, chain=None)
+    has_mix_id = "mix_id" in clonosets.columns
 
     for i, r in clonosets.iterrows():
         sample_id = r["sample_id"]
+        mix_id = r["mix_id"] if has_mix_id else None
+        report_sample_id = sample_id
+        align_report_id = sample_id
+        if pd.notna(mix_id):
+            report_sample_id = f"{mix_id}.{sample_id}"
+            align_report_id = mix_id
         chain = r["chain"]
-        align_report = read_json_report(sample_id, folder, "align")
+        align_report = read_json_report(align_report_id, folder, "align")
         
         try:
-            refine_report = read_json_report(sample_id, folder, "refine")
+            refine_report = read_json_report(report_sample_id, folder, "refine")
             umi = True
         except FileNotFoundError:
             umi = False
             
-        assemble_report = read_json_report(sample_id, folder, "assemble")
+        assemble_report = read_json_report(report_sample_id, folder, "assemble")
 
         # print(sample_id, chain)
         clonoset = read_clonoset(r.filename)
@@ -959,18 +975,27 @@ def get_processing_table(folder, show_offtarget=False, offtarget_chain_threshold
         if umi and overseq_threshold is None:
             reads_per_umi = round(Rclc/UMIcl, 2)
 
-        results.append([sample_id, chain, Rt, Ru_pc, Ra_pc, Roa_pc, UMIa, UMIc, overseq_threshold, Rf, UMIf, reads_per_umi, Ct, Rcl, Ctc, Rclc, Cfunc, Rfunc, UMIcl, UMIfunc])
-    result_df = pd.DataFrame(results, columns=["sample_id", "extracted_chain", "reads_total", "reads_with_umi_pc", "reads_aligned_pc", "reads_overlapped_aln_pc",
-                                               "total_umi", "umi_after_correction", "overseq_threshold", "reads_after_filter", "umi_after_filter",
-                                               "reads_per_umi", "clones_total", "reads_in_clones_total", "clones", "reads_in_clones", "clones_func", "reads_in_func_clones", "umi_in_clones", "umi_in_func_clones"])
+        result = [sample_id, chain, Rt, Ru_pc, Ra_pc, Roa_pc, UMIa, UMIc, overseq_threshold, Rf, UMIf, reads_per_umi, Ct, Rcl, Ctc, Rclc, Cfunc, Rfunc, UMIcl, UMIfunc]
+        if has_mix_id:
+            result.insert(1, mix_id)
+        results.append(result)
+    result_columns = ["sample_id", "extracted_chain", "reads_total", "reads_with_umi_pc", "reads_aligned_pc", "reads_overlapped_aln_pc",
+                      "total_umi", "umi_after_correction", "overseq_threshold", "reads_after_filter", "umi_after_filter",
+                      "reads_per_umi", "clones_total", "reads_in_clones_total", "clones", "reads_in_clones", "clones_func", "reads_in_func_clones", "umi_in_clones", "umi_in_func_clones"]
+    if has_mix_id:
+        result_columns.insert(1, "mix_id")
+    result_df = pd.DataFrame(results, columns=result_columns)
     if not show_offtarget:
         result_df = result_df.loc[result_df.reads_in_clones/result_df.reads_in_clones_total > offtarget_chain_threshold]
     if small:
-        result_df = result_df[[
+        small_columns = [
             "sample_id", "extracted_chain", "reads_total", "reads_with_umi_pc",
             "reads_aligned_pc", "reads_overlapped_aln_pc", "reads_per_umi",
             "overseq_threshold", "clones_func", "umi_in_func_clones",
-        ]]
+        ]
+        if has_mix_id:
+            small_columns.insert(1, "mix_id")
+        result_df = result_df[small_columns]
     return result_df.sort_values(by="sample_id").reset_index(drop=True)
 
 
