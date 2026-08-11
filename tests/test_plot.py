@@ -1890,3 +1890,72 @@ def test_rarefaction_curve_plots_chain_aware_sample_labels():
 def test_rarefaction_curve_validates_columns():
     with pytest.raises(ValueError, match="must contain columns"):
         rsplot.rarefaction_curve(pd.DataFrame({"sample_id": ["s1"]}))
+
+
+def _clonotypes_coverage_df():
+    rows = []
+    for sample_id, chain, values in [
+        ("sample1", "TRA", [3, 2, 1, 0, 0]),
+        ("sample2", "TRB", [1, 2, 3, 4, 0]),
+    ]:
+        for bin_label, value in zip(["3", "10", "32", "100", "316"], values):
+            rows.append({
+                "sample_id": sample_id,
+                "chain": chain,
+                "bin": bin_label,
+                "value": value,
+            })
+    return pd.DataFrame(rows)
+
+
+def test_clonotypes_coverage_plots_numeric_bins_at_equal_spacing():
+    grid = rsplot.clonotypes_coverage(_clonotypes_coverage_df())
+    ax = grid.axes.flat[0]
+
+    assert [tick.get_text() for tick in ax.get_xticklabels()] == [
+        "3", "10", "32", "100", "316"
+    ]
+    np.testing.assert_allclose(ax.get_xticks(), [0, 1, 2, 3, 4])
+    assert {text.get_text() for text in grid.legend.texts} == {"sample1", "sample2"}
+
+
+def test_clonotypes_coverage_supports_two_metadata_splits_and_rejects_group():
+    metadata = pd.DataFrame([
+        {"sample_id": "sample1", "chain": "TRA", "tissue": "blood", "sex": "F"},
+        {"sample_id": "sample2", "chain": "TRB", "tissue": "tumor", "sex": "M"},
+    ])
+
+    grid = rsplot.clonotypes_coverage(
+        _clonotypes_coverage_df(), metadata=metadata, split=["tissue", "sex"]
+    )
+    assert [ax.get_title() for ax in grid.axes.flat] == ["blood | F", "tumor | M"]
+
+    with pytest.raises(ValueError, match="group is not supported"):
+        rsplot.clonotypes_coverage(
+            _clonotypes_coverage_df(), metadata=metadata, group="tissue"
+        )
+
+
+def test_clonotypes_coverage_separate_trims_panel_specific_high_zero_bins():
+    coverage = _clonotypes_coverage_df()
+    grid = rsplot.clonotypes_coverage(coverage, separate=True)
+    axes = {ax.get_title(): ax for ax in grid.axes.flat}
+
+    assert [tick.get_text() for tick in axes["sample1"].get_xticklabels()] == [
+        "3", "10", "32", "100"
+    ]
+    assert [tick.get_text() for tick in axes["sample2"].get_xticklabels()] == [
+        "3", "10", "32", "100"
+    ]
+    assert all(
+        to_rgba(patch.get_facecolor()) == to_rgba("#CCCCCC")
+        for ax in axes.values()
+        for patch in ax.patches
+    )
+
+    untrimmed = rsplot.clonotypes_coverage(
+        coverage, separate=True, trim_high_zero_bins=False
+    )
+    assert [tick.get_text() for tick in untrimmed.axes.flat[0].get_xticklabels()] == [
+        "3", "10", "32", "100", "316"
+    ]

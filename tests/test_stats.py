@@ -557,3 +557,49 @@ def test_calc_rarefaction_points_prefilters_and_retains_duplicate_sample_chains(
 def test_calc_rarefaction_points_rejects_invalid_iterations():
     with pytest.raises(ValueError, match="positive integer"):
         stats.calc_rarefaction_points(pd.DataFrame(), iterations=0)
+
+
+def test_clonotypes_coverage_uses_half_order_bins_and_fills_zeros(tmp_path):
+    first_file = tmp_path / "first.tsv"
+    second_file = tmp_path / "second.tsv"
+    base = {"freq": 0.1, "cdr3nt": "AAA", "cdr3aa": "CASS", "v": "V1", "d": ".", "j": "J1"}
+    _write_clonoset(
+        first_file,
+        [dict(base, count=count) for count in [1, 2, 3, 4, 9, 10, 31, 32, 100]],
+    )
+    _write_clonoset(second_file, [dict(base, count=4)])
+    samples = pd.DataFrame([
+        {"sample_id": "first", "chain": "TRB", "filename": str(first_file)},
+        {"sample_id": "second", "chain": "TRB", "filename": str(second_file)},
+    ])
+
+    result = stats.clonotypes_coverage(samples, cpu=1, verbose=False)
+
+    assert list(result.columns) == ["sample_id", "chain", "bin", "value"]
+    assert result["bin"].drop_duplicates().tolist() == ["3", "10", "32", "100", "316"]
+    first = result[result["sample_id"] == "first"].set_index("bin")["value"]
+    assert first.to_dict() == {"3": 3.0, "10": 2.0, "32": 2.0, "100": 1.0, "316": 1.0}
+    second = result[result["sample_id"] == "second"].set_index("bin")["value"]
+    assert second.to_dict() == {"3": 0.0, "10": 1.0, "32": 0.0, "100": 0.0, "316": 0.0}
+
+
+def test_clonotypes_coverage_by_counts_sums_count_values(tmp_path):
+    filename = tmp_path / "sample.tsv"
+    base = {"freq": 0.25, "cdr3nt": "AAA", "cdr3aa": "CASS", "v": "V1", "d": ".", "j": "J1"}
+    _write_clonoset(filename, [dict(base, count=count) for count in [1, 2, 4, 10]])
+    samples = pd.DataFrame([{"sample_id": "sample", "filename": str(filename)}])
+
+    result = stats.clonotypes_coverage(
+        samples, by_counts=True, cpu=1, verbose=False
+    ).set_index("bin")["value"]
+
+    assert result.to_dict() == {"3": 3.0, "10": 4.0, "32": 10.0}
+
+
+def test_clonotypes_coverage_cl_rejects_negative_counts():
+    clonoset = pd.DataFrame({"count": [-1]})
+    with pytest.raises(ValueError, match="Negative clonotype counts"):
+        stats.clonotypes_coverage_cl(
+            clonoset,
+            colnames={"count_column": "count"},
+        )

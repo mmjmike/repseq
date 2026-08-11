@@ -3593,6 +3593,190 @@ def rarefaction_curve(
     fig.tight_layout()
     return _close_and_return(fig)
 
+
+def _coverage_bin_positions(data):
+    bin_numbers = sorted(pd.unique(data["_bin_number"]))
+    positions = {bin_number: position for position, bin_number in enumerate(bin_numbers)}
+    labels = {
+        bin_number: str(data.loc[data["_bin_number"] == bin_number, "bin"].iloc[0])
+        for bin_number in bin_numbers
+    }
+    return positions, [labels[bin_number] for bin_number in bin_numbers]
+
+
+def _coverage_sample_labels(data):
+    labels = data["sample_id"].astype(str)
+    if "chain" not in data.columns:
+        return labels
+    chain_counts = data[["sample_id", "chain"]].drop_duplicates().groupby(
+        "sample_id"
+    ).size()
+    use_chain = data["sample_id"].map(chain_counts).gt(1)
+    labels = labels.copy()
+    labels.loc[use_chain] = (
+        data.loc[use_chain, "sample_id"].astype(str)
+        + " ("
+        + data.loc[use_chain, "chain"].astype(str)
+        + ")"
+    )
+    return labels
+
+
+def _draw_clonotypes_coverage_lines(data, marker="o", **kwargs):
+    ax = kwargs.get("ax", plt.gca())
+    positions, labels = _coverage_bin_positions(data)
+    plotted = data.assign(
+        _bin_position=data["_bin_number"].map(positions)
+    ).sort_values("_bin_position")
+    sns.lineplot(
+        data=plotted,
+        x="_bin_position",
+        y="value",
+        estimator=None,
+        marker=marker,
+        sort=True,
+        color=kwargs.get("color"),
+        ax=ax,
+    )
+    ax.set_xticks(range(len(labels)), labels)
+
+
+def _draw_clonotypes_coverage_bars(data, trim_high_zero_bins=True, **kwargs):
+    ax = kwargs.get("ax", plt.gca())
+    plotted = data.copy()
+    if trim_high_zero_bins:
+        nonzero_bins = plotted.loc[plotted["value"] != 0, "_bin_number"]
+        highest_nonzero = nonzero_bins.max() if not nonzero_bins.empty else -np.inf
+        plotted = plotted.loc[
+            ~(
+                (plotted["_bin_number"] > 100)
+                & (plotted["_bin_number"] > highest_nonzero)
+            )
+        ]
+    positions, labels = _coverage_bin_positions(plotted)
+    plotted = plotted.assign(_bin_position=plotted["_bin_number"].map(positions))
+    ax.bar(plotted["_bin_position"], plotted["value"], color="#CCCCCC")
+    ax.set_xticks(range(len(labels)), labels)
+
+
+def clonotypes_coverage(
+    coverage_df,
+    metadata=None,
+    group=None,
+    split=None,
+    separate=False,
+    trim_high_zero_bins=True,
+    palette=None,
+    height=3.2,
+    aspect=1.3,
+    marker="o",
+):
+    """Plot half-order clonotype-count histograms.
+
+    With ``separate=False``, samples are drawn as lines on the same panel and
+    may be split into facets by at most two metadata columns. Grouping is not
+    supported for this plot type. With ``separate=True``, metadata, ``group``,
+    and ``split`` are ignored and each sample is drawn as a grey barplot in a
+    separate facet.
+
+    Args:
+        coverage_df (pd.DataFrame): Output of
+            :func:`repseq.stats.clonotypes_coverage` with ``sample_id``,
+            ``bin``, and ``value`` columns.
+        metadata (pd.DataFrame, optional): Sample metadata used only for
+            splitting combined line plots.
+        group (optional): Unsupported for combined plots and ignored for
+            separate plots.
+        split (str or sequence of str, optional): One or two facet columns.
+        separate (bool): Draw one barplot facet per sample.
+        trim_high_zero_bins (bool): In separate plots, remove zero-valued bins
+            above both 100 and the highest non-zero bin in that panel.
+        palette: Seaborn palette for sample lines.
+        height, aspect (float): Facet dimensions.
+        marker (str): Marker used for combined line plots.
+
+    Returns:
+        seaborn.FacetGrid: The created plot grid.
+    """
+    required = {"sample_id", "bin", "value"}
+    missing = required.difference(coverage_df.columns)
+    if missing:
+        raise ValueError(
+            "coverage_df must contain columns: " + ", ".join(sorted(required))
+        )
+    if coverage_df.empty:
+        raise ValueError("coverage_df is empty")
+
+    data = coverage_df.copy()
+    try:
+        data["_bin_number"] = pd.to_numeric(data["bin"])
+    except (TypeError, ValueError) as error:
+        raise ValueError("coverage_df 'bin' values must be numeric") from error
+    data["value"] = pd.to_numeric(data["value"], errors="raise")
+    data["_sample_label"] = _coverage_sample_labels(data)
+
+    if separate:
+        grid = sns.FacetGrid(
+            data,
+            col="_sample_label",
+            col_wrap=3,
+            sharex=False,
+            sharey=False,
+            height=height,
+            aspect=aspect,
+            despine=True,
+        )
+        grid.map_dataframe(
+            _draw_clonotypes_coverage_bars,
+            trim_high_zero_bins=trim_high_zero_bins,
+        )
+        grid.set_titles("{col_name}")
+    else:
+        if group is not None:
+            raise ValueError("group is not supported for clonotypes_coverage plots")
+        split_columns = _as_list(split, "split", max_len=2)
+        data, metadata_columns, _ = _merge_stats_metadata(data, metadata)
+        _validate_metadata_columns(split_columns, metadata_columns, "split")
+        data["_sample_label"] = _coverage_sample_labels(data)
+
+        panel_column = None
+        if len(split_columns) == 1:
+            panel_column = split_columns[0]
+        elif len(split_columns) == 2:
+            panel_column = "_split_panel"
+            data[panel_column] = (
+                data[split_columns[0]].astype(str)
+                + " | "
+                + data[split_columns[1]].astype(str)
+            )
+            data[panel_column] = pd.Categorical(
+                data[panel_column],
+                categories=_interaction_order(data, split_columns),
+                ordered=True,
+            )
+
+        grid = sns.FacetGrid(
+            data,
+            col=panel_column,
+            col_wrap=3 if panel_column is not None else None,
+            hue="_sample_label",
+            palette=palette,
+            sharex=True,
+            sharey=False,
+            height=height,
+            aspect=aspect,
+            despine=True,
+        )
+        grid.map_dataframe(_draw_clonotypes_coverage_lines, marker=marker)
+        if panel_column is not None:
+            grid.set_titles("{col_name}")
+        grid.add_legend(title="Sample")
+
+    grid.set_axis_labels("Count bin upper bound", "Value")
+    grid.tight_layout()
+    plt.close(grid.fig)
+    return grid
+
 def clonoset_stats(
     stats_df,
     metadata=None,
@@ -3759,6 +3943,7 @@ __all__ = [
     "beta_metric",
     "beta_table",
     "rarefaction_curve",
+    "clonotypes_coverage",
     "clonoset_stats",
     "processing",
     "cdr3aa_stats",

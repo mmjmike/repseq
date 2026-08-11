@@ -329,6 +329,51 @@ for example `ucb_ntreg(TRA)` and `ucb_ntreg(TRB)`. Set `log_x=False` for a
 linear x-axis.
 
 
+## Clonotype coverage histograms
+
+`stats.clonotypes_coverage` groups clonotypes by half-order count bins. Bin
+labels are rounded upper bounds (`3`, `10`, `32`, `100`, `316`, ...). By
+default, `value` is the number of clonotypes in each bin; set `by_counts=True`
+to sum clonotype counts instead. Missing sample/bin combinations are returned
+as zeroes.
+
+```py
+coverage = stats.clonotypes_coverage(
+    sample_df=clonosets,
+    cl_filter=func_filter,
+    by_counts=False,
+    cpu=4,
+)
+```
+
+The output columns are `sample_id`, optional `chain`, `bin`, and `value`.
+Plot all samples as lines with equally spaced numeric bin labels:
+
+```py
+grid = rsplot.clonotypes_coverage(coverage)
+```
+
+Metadata can split the combined plot by one or two variables. Grouping is not
+available for this plot type.
+
+```py
+grid = rsplot.clonotypes_coverage(
+    coverage,
+    metadata=metadata,
+    split=["condition", "chain_group"],
+)
+```
+
+Set `separate=True` for grey barplots faceted by sample. By default, each panel
+drops zero-valued bins above both `100` and its highest non-zero bin. Set
+`trim_high_zero_bins=False` to retain them. Metadata, grouping, and splitting
+are ignored in separate mode.
+
+```py
+grid = rsplot.clonotypes_coverage(coverage, separate=True)
+```
+
+
 <br>Calculating convergence for each clonoset in `clonosets_df`. For the
 most honest comparison, use equal downsampling across samples; this is preferred
 to top-N filtering and much preferred to calculations without normalization.

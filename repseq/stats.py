@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import random
 import os
+import math
 
 
 from .common_functions import (get_column_names_from_clonoset,
@@ -676,6 +677,79 @@ def calculate_rarefaction_points_cl(clonoset_in, rarefaction_iterations=3,
             ]
             result[depth] = float(np.mean(diversities))
     return result
+
+
+def clonotypes_coverage(sample_df, cl_filter=None, by_counts=False,
+                        drop_small_samples=False, cpu=None, verbose=True):
+    """Calculate a half-order histogram of clonotype counts.
+
+    Count bins have rounded upper-bound labels ``3, 10, 32, 100, ...``.
+    By default, each clonotype contributes one to its bin. With
+    ``by_counts=True``, each clonotype contributes its count instead.
+
+    Args:
+        sample_df (pd.DataFrame): Table containing ``sample_id`` and
+            ``filename``. ``chain`` is retained when present.
+        cl_filter (Filter, optional): Filter applied before calculation.
+        by_counts (bool): Sum clonotype counts instead of clonotype numbers.
+        drop_small_samples (bool): Passed to :func:`generic_calculation`.
+        cpu (int, optional): Number of parallel worker processes.
+        verbose (bool): Show progress information.
+
+    Returns:
+        pd.DataFrame: Long table with ``sample_id``, optional ``chain``,
+        string ``bin``, and numeric ``value`` columns.
+    """
+    wide = generic_calculation(
+        sample_df,
+        clonotypes_coverage_cl,
+        clonoset_filter=cl_filter,
+        program_name="ClonotypesCoverage",
+        by_counts=by_counts,
+        drop_small_samples=drop_small_samples,
+        cpu=cpu,
+        verbose=verbose,
+    )
+    id_columns = ["sample_id"] + (["chain"] if "chain" in wide.columns else [])
+    bin_columns = [column for column in wide.columns if column not in id_columns]
+    if not bin_columns:
+        return pd.DataFrame(columns=id_columns + ["bin", "value"])
+
+    wide[bin_columns] = wide[bin_columns].fillna(0)
+    result = wide.melt(
+        id_vars=id_columns,
+        value_vars=bin_columns,
+        var_name="bin",
+        value_name="value",
+    )
+    result["bin"] = result["bin"].astype(str)
+    result["_bin_number"] = pd.to_numeric(result["bin"])
+    return (
+        result.sort_values(id_columns + ["_bin_number"])
+        .drop(columns="_bin_number")
+        .reset_index(drop=True)
+    )
+
+
+def clonotypes_coverage_cl(clonoset_in, colnames=None, by_counts=False):
+    """Calculate half-order clonotype-count bins for one clonoset."""
+    if colnames is None:
+        colnames = get_column_names_from_clonoset(clonoset_in)
+    count_column = colnames["count_column"]
+    if count_column is None:
+        raise ValueError("Could not find clonotype count column")
+
+    histogram = {}
+    for count in clonoset_in[count_column]:
+        if pd.isna(count):
+            raise ValueError("Clonotype counts must not contain missing values")
+        if count < 0:
+            raise ValueError("Negative clonotype counts are not supported")
+        bin_index = 0 if count <= 1 else math.floor(2 * math.log10(count))
+        upper_bound = str(int(round(10 ** ((bin_index + 1) / 2))))
+        increment = count if by_counts else 1
+        histogram[upper_bound] = histogram.get(upper_bound, 0) + increment
+    return histogram
 
 def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, program_name="Calculation",
                          iterations=1, seed=None, drop_small_samples=False, verbose=True,
