@@ -221,3 +221,80 @@ def test_vdjtools_save_to_vdjtools_warns_and_delegates(tmp_path):
 
     assert any(item.category is DeprecationWarning for item in caught)
     assert any("repseq.io.save_to_vdjtools" in str(item.message) for item in caught)
+
+
+def test_save_to_airr_writes_populated_columns_and_original_metadata_names(tmp_path):
+    input_folder = tmp_path / "inputs"
+    input_folder.mkdir()
+    input_file = input_folder / "sample.clones_TRB.tsv"
+    pd.DataFrame(
+        [
+            {
+                "cloneId": 7,
+                "readCount": 12,
+                "uniqueUMICount": 3,
+                "targetSequences": "TGTGCCAGC",
+                "targetQualities": "IIIIIIIII",
+                "nSeqCDR3": "TGTGCC",
+                "aaSeqCDR3": "CASSLG",
+                "allVHitsWithScore": "TRBV1*01(100)",
+                "allJHitsWithScore": "TRBJ1*01(80)",
+            }
+        ]
+    ).to_csv(input_file, sep="\t", index=False)
+    output_folder = tmp_path / "airr"
+    samples = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample1",
+                "chain": "TRB",
+                "filename": str(input_file),
+                "group": "case",
+            }
+        ]
+    )
+
+    metadata = io.save_to_airr(samples, output_folder)
+
+    output_name = "sample.clones_TRB.tsv.airr.tsv"
+    output_file = output_folder / output_name
+    airr = pd.read_csv(output_file, sep="\t")
+    metadata_from_file = pd.read_csv(output_folder / "metadata.csv")
+
+    assert list(metadata.columns) == list(samples.columns)
+    assert metadata.loc[0, "filename"] == output_name
+    assert metadata.loc[0, "sample_id"] == "sample1"
+    assert metadata.loc[0, "group"] == "case"
+    pd.testing.assert_frame_equal(metadata, metadata_from_file)
+    assert airr.loc[0, "sequence_id"] == 7
+    assert airr.loc[0, "sequence"] == "TGTGCCAGC"
+    assert airr.loc[0, "quality"] == "IIIIIIIII"
+    assert airr.loc[0, "v_call"] == "TRBV1*01"
+    assert airr.loc[0, "j_call"] == "TRBJ1*01"
+    assert airr.loc[0, "junction"] == "TGTGCC"
+    assert airr.loc[0, "junction_aa"] == "CASSLG"
+    assert airr.loc[0, "duplicate_count"] == 12
+    assert airr.loc[0, "umi_count"] == 3
+    assert bool(airr.loc[0, "productive"])
+    assert airr.loc[0, "junction_length"] == 6
+    assert airr.loc[0, "junction_aa_length"] == 6
+    assert airr.loc[0, "locus"] == "TRB"
+    assert "d_call" not in airr.columns
+    assert "germline_alignment" not in airr.columns
+
+
+def test_save_to_airr_stops_before_writing_when_any_target_exists(tmp_path, capsys):
+    input_file = tmp_path / "sample.tsv"
+    _write_mixcr_clonoset(input_file, 5)
+    output_folder = tmp_path / "airr"
+    output_folder.mkdir()
+    conflict = output_folder / "sample.tsv.airr.tsv"
+    conflict.write_text("existing\n")
+    samples = pd.DataFrame([{"sample_id": "sample1", "filename": str(input_file)}])
+
+    result = io.save_to_airr(samples, output_folder)
+
+    assert result is None
+    assert conflict.read_text() == "existing\n"
+    assert not (output_folder / "metadata.csv").exists()
+    assert "force_overwrite=True" in capsys.readouterr().out

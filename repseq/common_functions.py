@@ -443,16 +443,16 @@ def get_column_names_from_clonoset(clonoset, *, normalize=str.lower, strict=Fals
 
     # all possible names for column types
     column_alias_map = OrderedDict({
-        "umi_column": ["uniqueumicount", "uniquemoleculecount"],
+        "umi_column": ["uniqueumicount", "uniquemoleculecount", "umi_count"],
         "umi_fraction_column": ["uniqueumifraction", "uniquemoleculefraction"],
-        "count_column": ["count", "clonecount", "readcount", "read.count"],
+        "count_column": ["count", "clonecount", "readcount", "read.count", "duplicate_count", "#count"],
         "fraction_column": ["freq", "clonefraction", "frequency", "readfraction"],
         "v_column": ["v", "allvhitswithscore", "bestvgene", "v_call"],
         "d_column": ["d", "alldhitswithscore", "bestdgene", "d_call"],
         "j_column": ["j", "alljhitswithscore", "bestjgene", "j_call"],
-        "c_column": ["c", "allchitswithscore", "bestcgene"],
-        "cdr3aa_column": ["cdr3aa", "aaseqcdr3", "cdr3.amino.acid.sequence", "junction_aa"],
-        "cdr3nt_column": ["cdr3nt", "nseqcdr3", "cdr3.nucleotide.sequence", "junction"]
+        "c_column": ["c", "allchitswithscore", "bestcgene", "c_call"],
+        "cdr3aa_column": ["cdr3aa", "aaseqcdr3", "cdr3.amino.acid.sequence", "junction_aa", "cdr3_amino_acids"],
+        "cdr3nt_column": ["cdr3nt", "nseqcdr3", "cdr3.nucleotide.sequence", "junction", "cdr3_dna"]
     })
 
     cols = {normalize(c): c for c in clonoset.columns}
