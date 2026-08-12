@@ -44,7 +44,7 @@ This module implements different immune repertoire clustering analyses:
 
 Finds differentially expressing clonotypes/clusters of clonotypes in CFSE-assays or similar experiments.
 
-## [Differential Enrichment](usage_diff_enrichment.md)
+## [Differential Enrichment](usage_rsde.md)
 
 Finds clonotypes or other repertoire features enriched in experimental groups
 using recurrence, abundance, count-model, or permutation-based statistics.

@@ -712,12 +712,14 @@ fig = rsplot.de_volcano(
 
 Set `by_mean_count=True` to plot mean group count on the vertical axis and
 encode significance as point size. Point sizes use `-log10(p_adj)` or
-`-log10(p_val)` according to `p_column`.
+`-log10(p_val)` according to `p_column`. With `log_sizes=True`, the vertical
+axis uses `log1p(mean_group_count)`; use `log_sizes=False` for raw counts.
 
 ```py
 fig = rsplot.de_volcano(
     result,
     by_mean_count=True,
+    log_sizes=True,
 )
 
 fig = analyzer.plot_volcano(by_mean_count=True)

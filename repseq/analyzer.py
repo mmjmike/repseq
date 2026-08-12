@@ -644,6 +644,7 @@ class Analyzer:
         chain=None,
         postfiltered=True,
         by_mean_count=False,
+        log_sizes=True,
         **kwargs,
     ):
         from .plot import de_volcano
@@ -659,7 +660,12 @@ class Analyzer:
             table = self._get_result("statistics_df", chain=selected)
         if table is None:
             return None
-        return de_volcano(table, by_mean_count=by_mean_count, **kwargs)
+        return de_volcano(
+            table,
+            by_mean_count=by_mean_count,
+            log_sizes=log_sizes,
+            **kwargs,
+        )
 
     def plot_heatmap(self, chain=None, **kwargs):
         from .plot import de_heatmap

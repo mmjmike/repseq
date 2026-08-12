@@ -3009,7 +3009,8 @@ def de_volcano(
         Minimum and maximum scatter-point areas.
     log_sizes : bool, default True
         Scale point sizes by ``log1p(mean_group_count)``. If false, use raw
-        ``mean_group_count`` values. Ignored when ``by_mean_count=True``.
+        ``mean_group_count`` values. When ``by_mean_count=True``, apply the
+        same transformation to the mean-count vertical axis instead.
     alpha : float, default 0.7
         Point opacity.
     height, aspect : float
@@ -3042,11 +3043,16 @@ def de_volcano(
     point_sizes = _scaled_dot_sizes(size_values, size_range)
 
     fig, ax = plt.subplots(figsize=(height * aspect, height))
-    y_column = "mean_group_count" if by_mean_count else "_negative_log10_p"
+    if by_mean_count:
+        y_values = plotted["mean_group_count"].copy()
+        if log_sizes:
+            y_values = np.log1p(y_values)
+    else:
+        y_values = plotted["_negative_log10_p"]
     if filtered_out.any():
         ax.scatter(
             plotted.loc[filtered_out, "_plot_log2FC"],
-            plotted.loc[filtered_out, y_column],
+            y_values.loc[filtered_out],
             s=float(np.min(point_sizes)),
             c="#999999",
             alpha=0.3,
@@ -3057,7 +3063,7 @@ def de_volcano(
     if not retained.empty:
         ax.scatter(
             retained["_plot_log2FC"],
-            retained[y_column],
+            y_values.loc[retained.index],
             s=point_sizes[~filtered_out.to_numpy()],
             c=[color_map[group] for group in retained["enriched_in"]],
             alpha=float(alpha),
@@ -3069,7 +3075,13 @@ def de_volcano(
     ax.set_title("Differential enrichment volcano plot")
     ax.set_xlabel("log2FC")
     ax.set_ylabel(
-        "Mean group count" if by_mean_count else f"-log10({p_column})"
+        (
+            "log1p(Mean group count)"
+            if by_mean_count and log_sizes
+            else "Mean group count"
+        )
+        if by_mean_count
+        else f"-log10({p_column})"
     )
     ax.grid(color="#eeeeee", linewidth=0.6)
     ax.set_axisbelow(True)

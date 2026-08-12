@@ -37,7 +37,7 @@ nav:
       - Intersections: usage_intersections.md
       - Beta diversity: usage_beta.md
       - Clustering: usage_clustering.md
-      - Differential enrichment: usage_diff_enrichment.md
+      - Differential enrichment (`rsde`): usage_rsde.md
       - Differential expression: usage_diffexp.md
   - Functions: functions.md
   - Code Reference: reference/

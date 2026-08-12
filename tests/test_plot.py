@@ -1893,6 +1893,7 @@ def test_de_volcano_by_mean_count_uses_counts_on_y_and_p_values_for_size(
         _de_volcano_table(),
         p_column=p_column,
         by_mean_count=True,
+        log_sizes=False,
     )
     ax = fig.axes[0]
     points = ax.collections[0]
@@ -1907,6 +1908,21 @@ def test_de_volcano_by_mean_count_uses_counts_on_y_and_p_values_for_size(
     )
     assert ax.get_xlabel() == "log2FC"
     assert ax.get_ylabel() == "Mean group count"
+
+
+def test_de_volcano_by_mean_count_log_sizes_transforms_vertical_axis():
+    fig = rsplot.de_volcano(
+        _de_volcano_table(),
+        by_mean_count=True,
+        log_sizes=True,
+    )
+    ax = fig.axes[0]
+
+    np.testing.assert_allclose(
+        ax.collections[0].get_offsets()[:, 1],
+        np.log1p([10, 20, 5, 40]),
+    )
+    assert ax.get_ylabel() == "log1p(Mean group count)"
 
 
 def test_de_volcano_draws_postfiltered_points_in_background():
