@@ -1938,10 +1938,10 @@ def test_rarefaction_curve_validates_columns():
 def _clonotypes_coverage_df():
     rows = []
     for sample_id, chain, values in [
-        ("sample1", "TRA", [3, 2, 1, 0, 0]),
-        ("sample2", "TRB", [1, 2, 3, 4, 0]),
+        ("sample1", "TRA", [1, 3, 2, 1, 0, 0]),
+        ("sample2", "TRB", [0, 1, 2, 3, 4, 0]),
     ]:
-        for bin_label, value in zip(["3", "10", "32", "100", "316"], values):
+        for bin_label, value in zip(["1", "3", "10", "32", "100", "316"], values):
             rows.append({
                 "sample_id": sample_id,
                 "chain": chain,
@@ -1956,9 +1956,9 @@ def test_clonotypes_coverage_plots_numeric_bins_at_equal_spacing():
     ax = grid.axes.flat[0]
 
     assert [tick.get_text() for tick in ax.get_xticklabels()] == [
-        "3", "10", "32", "100", "316"
+        "1", "3", "10", "32", "100", "316"
     ]
-    np.testing.assert_allclose(ax.get_xticks(), [0, 1, 2, 3, 4])
+    np.testing.assert_allclose(ax.get_xticks(), [0, 1, 2, 3, 4, 5])
     assert {text.get_text() for text in grid.legend.texts} == {"sample1", "sample2"}
 
 
@@ -1985,10 +1985,10 @@ def test_clonotypes_coverage_separate_trims_panel_specific_high_zero_bins():
     axes = {ax.get_title(): ax for ax in grid.axes.flat}
 
     assert [tick.get_text() for tick in axes["sample1"].get_xticklabels()] == [
-        "3", "10", "32", "100"
+        "1", "3", "10", "32", "100"
     ]
     assert [tick.get_text() for tick in axes["sample2"].get_xticklabels()] == [
-        "3", "10", "32", "100"
+        "1", "3", "10", "32", "100"
     ]
     assert all(
         to_rgba(patch.get_facecolor()) == to_rgba("#CCCCCC")
@@ -2000,5 +2000,11 @@ def test_clonotypes_coverage_separate_trims_panel_specific_high_zero_bins():
         coverage, separate=True, trim_high_zero_bins=False
     )
     assert [tick.get_text() for tick in untrimmed.axes.flat[0].get_xticklabels()] == [
-        "3", "10", "32", "100", "316"
+        "1", "3", "10", "32", "100", "316"
     ]
+
+
+def test_clonotype_coverage_aliases_and_keeps_figure_open():
+    grid = rsplot.clonotype_coverage(_clonotypes_coverage_df())
+
+    assert plt.fignum_exists(grid.fig.number)

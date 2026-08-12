@@ -332,7 +332,8 @@ linear x-axis.
 ## Clonotype coverage histograms
 
 `stats.clonotypes_coverage` groups clonotypes by half-order count bins. Bin
-labels are rounded upper bounds (`3`, `10`, `32`, `100`, `316`, ...). By
+labels are upper bounds (`1`, `3`, `10`, `32`, `100`, `316`, ...); the first
+bin contains counts zero and one. By
 default, `value` is the number of clonotypes in each bin; set `by_counts=True`
 to sum clonotype counts instead. Missing sample/bin combinations are returned
 as zeroes.

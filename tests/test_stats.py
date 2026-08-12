@@ -576,11 +576,11 @@ def test_clonotypes_coverage_uses_half_order_bins_and_fills_zeros(tmp_path):
     result = stats.clonotypes_coverage(samples, cpu=1, verbose=False)
 
     assert list(result.columns) == ["sample_id", "chain", "bin", "value"]
-    assert result["bin"].drop_duplicates().tolist() == ["3", "10", "32", "100", "316"]
+    assert result["bin"].drop_duplicates().tolist() == ["1", "3", "10", "32", "100", "316"]
     first = result[result["sample_id"] == "first"].set_index("bin")["value"]
-    assert first.to_dict() == {"3": 3.0, "10": 2.0, "32": 2.0, "100": 1.0, "316": 1.0}
+    assert first.to_dict() == {"1": 1.0, "3": 2.0, "10": 2.0, "32": 2.0, "100": 1.0, "316": 1.0}
     second = result[result["sample_id"] == "second"].set_index("bin")["value"]
-    assert second.to_dict() == {"3": 0.0, "10": 1.0, "32": 0.0, "100": 0.0, "316": 0.0}
+    assert second.to_dict() == {"1": 0.0, "3": 0.0, "10": 1.0, "32": 0.0, "100": 0.0, "316": 0.0}
 
 
 def test_clonotypes_coverage_by_counts_sums_count_values(tmp_path):
@@ -589,11 +589,22 @@ def test_clonotypes_coverage_by_counts_sums_count_values(tmp_path):
     _write_clonoset(filename, [dict(base, count=count) for count in [1, 2, 4, 10]])
     samples = pd.DataFrame([{"sample_id": "sample", "filename": str(filename)}])
 
-    result = stats.clonotypes_coverage(
+    result = stats.clonotype_coverage(
         samples, by_counts=True, cpu=1, verbose=False
     ).set_index("bin")["value"]
 
-    assert result.to_dict() == {"3": 3.0, "10": 4.0, "32": 10.0}
+    assert result.to_dict() == {"1": 1.0, "3": 2.0, "10": 4.0, "32": 10.0}
+
+
+def test_clonotypes_coverage_cl_puts_zero_and_one_in_upper_bound_one_bin():
+    clonoset = pd.DataFrame({"count": [0, 1, 2]})
+
+    result = stats.clonotypes_coverage_cl(
+        clonoset,
+        colnames={"count_column": "count"},
+    )
+
+    assert result == {"1": 2, "3": 1}
 
 
 def test_clonotypes_coverage_cl_rejects_negative_counts():

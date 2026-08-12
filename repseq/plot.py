@@ -3884,8 +3884,10 @@ def clonotypes_coverage(
 
     grid.set_axis_labels("Count bin upper bound", "Value")
     grid.tight_layout()
-    plt.close(grid.fig)
     return grid
+
+
+clonotype_coverage = clonotypes_coverage
 
 def clonoset_stats(
     stats_df,
@@ -4055,6 +4057,7 @@ __all__ = [
     "beta_table",
     "rarefaction_curve",
     "clonotypes_coverage",
+    "clonotype_coverage",
     "clonoset_stats",
     "processing",
     "cdr3aa_stats",

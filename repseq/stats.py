@@ -683,7 +683,7 @@ def clonotypes_coverage(sample_df, cl_filter=None, by_counts=False,
                         drop_small_samples=False, cpu=None, verbose=True):
     """Calculate a half-order histogram of clonotype counts.
 
-    Count bins have rounded upper-bound labels ``3, 10, 32, 100, ...``.
+    Count bins have upper-bound labels ``1, 3, 10, 32, 100, ...``.
     By default, each clonotype contributes one to its bin. With
     ``by_counts=True``, each clonotype contributes its count instead.
 
@@ -745,11 +745,18 @@ def clonotypes_coverage_cl(clonoset_in, colnames=None, by_counts=False):
             raise ValueError("Clonotype counts must not contain missing values")
         if count < 0:
             raise ValueError("Negative clonotype counts are not supported")
-        bin_index = 0 if count <= 1 else math.floor(2 * math.log10(count))
-        upper_bound = str(int(round(10 ** ((bin_index + 1) / 2))))
+        if count <= 1:
+            upper_bound = "1"
+        else:
+            bin_index = math.floor(2 * math.log10(count))
+            upper_bound = str(int(round(10 ** ((bin_index + 1) / 2))))
         increment = count if by_counts else 1
         histogram[upper_bound] = histogram.get(upper_bound, 0) + increment
     return histogram
+
+
+clonotype_coverage = clonotypes_coverage
+clonotype_coverage_cl = clonotypes_coverage_cl
 
 def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, program_name="Calculation",
                          iterations=1, seed=None, drop_small_samples=False, verbose=True,
