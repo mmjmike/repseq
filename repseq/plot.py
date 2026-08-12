@@ -268,7 +268,10 @@ def _merge_stats_metadata(stats_df, metadata):
         merge_keys = ["sample_id"]
         if "chain" in stats_df.columns:
             merge_keys.append("chain")
-        return stats_df.copy(), set(stats_df.columns), merge_keys
+        data = stats_df.copy()
+        for column in data.select_dtypes(include="category").columns:
+            data[column] = data[column].cat.remove_unused_categories()
+        return data, set(data.columns), merge_keys
 
     if "sample_id" not in metadata.columns:
         raise ValueError("metadata must contain a 'sample_id' column")
@@ -302,6 +305,8 @@ def _merge_stats_metadata(stats_df, metadata):
             raise ValueError("metadata does not match any samples in stats_df")
 
     merged = merged.drop(columns="_merge")
+    for column in merged.select_dtypes(include="category").columns:
+        merged[column] = merged[column].cat.remove_unused_categories()
     return merged, set(merged.columns), merge_keys
 
 

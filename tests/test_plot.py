@@ -144,6 +144,56 @@ def test_plot_stats_preserves_ordered_group_categories():
     assert tick_labels == ["control", "treated"]
 
 
+def test_plot_stats_ignores_metadata_groups_without_plotted_samples():
+    metadata = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "TRA", "experimental_group": "term"},
+            {"sample_id": "sample2", "chain": "TRB", "experimental_group": "term"},
+            {"sample_id": "absent", "chain": "TRB", "experimental_group": "preterm"},
+        ]
+    )
+    metadata["experimental_group"] = pd.Categorical(
+        metadata["experimental_group"],
+        categories=["term", "preterm"],
+        ordered=True,
+    )
+
+    grouped = rsplot.plot_stats(
+        _stats_df(),
+        metadata=metadata,
+        properties=["diversity"],
+        group="experimental_group",
+    )
+
+    assert [tick.get_text() for tick in grouped.axes.flat[0].get_xticklabels()] == [
+        "term"
+    ]
+
+
+def test_plot_stats_ignores_metadata_splits_without_plotted_samples():
+    metadata = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "TRA", "experimental_group": "term"},
+            {"sample_id": "sample2", "chain": "TRB", "experimental_group": "term"},
+            {"sample_id": "absent", "chain": "TRB", "experimental_group": "preterm"},
+        ]
+    )
+    metadata["experimental_group"] = pd.Categorical(
+        metadata["experimental_group"],
+        categories=["term", "preterm"],
+        ordered=True,
+    )
+
+    split = rsplot.plot_stats(
+        _stats_df(),
+        metadata=metadata,
+        properties=["diversity"],
+        split="experimental_group",
+    )
+
+    assert [ax.get_title() for ax in split.axes.flat] == ["term"]
+
+
 def test_convergence_defaults_create_property_facets():
     grid = rsplot.convergence(_stats_df())
 
