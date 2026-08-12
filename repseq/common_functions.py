@@ -430,11 +430,16 @@ def filter_by_functionality(clonoset_in, colnames=None, functional=True):
     if colnames is None:
         colnames = get_column_names_from_clonoset(clonoset)
     cdr3aa_column = colnames["cdr3aa_column"]
+    cdr3nt_column = colnames["cdr3nt_column"]
+    cdr3aa = clonoset[cdr3aa_column].astype("string")
+    nonfunctional = cdr3aa.str.contains(r"\*|_", na=False) | cdr3aa.fillna("").eq("")
+    if cdr3nt_column is not None:
+        cdr3nt = clonoset[cdr3nt_column].astype("string")
+        nonfunctional |= cdr3nt.str.contains("region_not_covered", case=False, na=False)
     if functional:
-        clonoset = clonoset.loc[~clonoset[cdr3aa_column].str.contains(r"\*|_", na=False)]
-        clonoset = clonoset.loc[clonoset[cdr3aa_column] != ""]
+        clonoset = clonoset.loc[~nonfunctional]
     else:
-        clonoset = clonoset.loc[(clonoset[cdr3aa_column].str.contains(r"\*|_", na=False)) | (clonoset[cdr3aa_column] == "")]
+        clonoset = clonoset.loc[nonfunctional]
 
     return clonoset
 

@@ -37,6 +37,48 @@ def test_filter_by_umi_falls_back_to_clone_count_when_umi_columns_absent():
     assert result["v"].tolist() == ["TRBV1"]
 
 
+def test_filter_treats_region_not_covered_as_nonfunctional_only_in_cdr3():
+    clonoset = pd.DataFrame(
+        [
+            {
+                "cloneId": 0,
+                "cloneCount": 10,
+                "cloneFraction": 0.5,
+                "nSeqFR1": "region_not_covered",
+                "aaSeqCDR1": "region_not_covered",
+                "nSeqCDR3": "TGTGCC",
+                "aaSeqCDR3": "CASSLG",
+                "allVHitsWithScore": "TRBV1*01(100)",
+                "allJHitsWithScore": "TRBJ1*01(80)",
+            },
+            {
+                "cloneId": 1,
+                "cloneCount": 6,
+                "cloneFraction": 0.3,
+                "nSeqCDR3": "region_not_covered",
+                "aaSeqCDR3": "CASSQG",
+                "allVHitsWithScore": "TRBV2*01(90)",
+                "allJHitsWithScore": "TRBJ2*01(70)",
+            },
+            {
+                "cloneId": 2,
+                "cloneCount": 4,
+                "cloneFraction": 0.2,
+                "nSeqCDR3": "TGTGCT",
+                "aaSeqCDR3": "region_not_covered",
+                "allVHitsWithScore": "TRBV3*01(85)",
+                "allJHitsWithScore": "TRBJ2*01(65)",
+            },
+        ]
+    )
+
+    functional = Filter(functionality="f").apply(clonoset)
+    nonfunctional = Filter(functionality="n").apply(clonoset)
+
+    assert functional["cdr3aa"].tolist() == ["CASSLG"]
+    assert nonfunctional["cdr3aa"].tolist() == ["CASSQG", "region_not_covered"]
+
+
 def test_filter_can_retain_alleles_for_all_segment_types():
     clonoset = pd.DataFrame(
         [

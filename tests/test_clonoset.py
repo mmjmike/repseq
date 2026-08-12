@@ -93,6 +93,38 @@ def test_read_clonoset_detects_comma_and_mixcr4_dtypes(tmp_path):
     assert result["nSeqCDR3"].tolist() == ["00123", "00456"]
 
 
+def test_read_clonoset_accepts_mixcr_region_not_covered_values(tmp_path):
+    path = tmp_path / "sample.tsv"
+    pd.DataFrame(
+        {
+            "cloneId": [1],
+            "readCount": [10],
+            "readFraction": [1.0],
+            "nSeqFR1": ["region_not_covered"],
+            "minQualFR1": ["region_not_covered"],
+            "nSeqCDR1": ["region_not_covered"],
+            "minQualCDR1": ["region_not_covered"],
+            "nSeqCDR3": ["region_not_covered"],
+            "minQualCDR3": ["region_not_covered"],
+            "aaSeqCDR3": ["region_not_covered"],
+        }
+    ).to_csv(path, sep="\t", index=False)
+
+    result = io.read_clonoset(path)
+
+    for column in (
+        "nSeqFR1",
+        "minQualFR1",
+        "nSeqCDR1",
+        "minQualCDR1",
+        "nSeqCDR3",
+        "minQualCDR3",
+        "aaSeqCDR3",
+    ):
+        assert str(result[column].dtype) == "string"
+        assert result.loc[0, column] == "region_not_covered"
+
+
 def test_read_clonoset_detects_airr_types_inside_zip(tmp_path):
     airr_path = tmp_path / "sample.tsv"
     pd.DataFrame(
