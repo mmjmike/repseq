@@ -662,6 +662,30 @@ def test_parse_gene_name_handles_isotypes_dual_genes_and_natural_sorting():
     ) == ["TRBV2", "TRBV7-3", "TRBV7-8", "TRBV12-3-1", "TRBV12-3-2"]
 
 
+def test_segment_usage_parses_and_sorts_alleles_alphabetically():
+    usage = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "TRB", "v": allele, "usage": value}
+            for allele, value in [
+                ("TRBV6-2*A1", 0.2),
+                ("TRBV6-2*02", 0.3),
+                ("TRBV6-2*010", 0.5),
+            ]
+        ]
+    )
+
+    assert rsplot.parse_gene_name("TRBV6-2*LONG")["allele"] == "LONG"
+
+    fig = rsplot.segment_usage(usage)
+    heatmap = next(ax for ax in fig.axes if ax.get_title() == "TRB")
+
+    assert [tick.get_text() for tick in heatmap.get_xticklabels()] == [
+        "TRBV6-2*010",
+        "TRBV6-2*02",
+        "TRBV6-2*A1",
+    ]
+
+
 def test_segment_usage_detects_wide_table_and_keeps_chain_axes_independent():
     usage = pd.DataFrame(
         [
@@ -1853,6 +1877,36 @@ def test_de_volcano_can_size_points_by_raw_mean_group_count():
         points.get_sizes(),
         rsplot._scaled_dot_sizes([10, 20, 5, 40], (20, 300)),
     )
+
+
+@pytest.mark.parametrize(
+    ("p_column", "p_values"),
+    [
+        ("p_adj", [0.01, 0.02, 0.03, 0.04]),
+        ("p_val", [0.1, 0.2, 0.3, 0.4]),
+    ],
+)
+def test_de_volcano_by_mean_count_uses_counts_on_y_and_p_values_for_size(
+    p_column, p_values
+):
+    fig = rsplot.de_volcano(
+        _de_volcano_table(),
+        p_column=p_column,
+        by_mean_count=True,
+    )
+    ax = fig.axes[0]
+    points = ax.collections[0]
+
+    np.testing.assert_allclose(
+        points.get_offsets(),
+        [[13, 10], [13, 20], [11, 5], [5, 40]],
+    )
+    np.testing.assert_allclose(
+        points.get_sizes(),
+        rsplot._scaled_dot_sizes(-np.log10(p_values), (20, 300)),
+    )
+    assert ax.get_xlabel() == "log2FC"
+    assert ax.get_ylabel() == "Mean group count"
 
 
 def test_de_volcano_draws_postfiltered_points_in_background():

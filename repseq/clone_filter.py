@@ -60,6 +60,8 @@ class Filter:
             keeping the largest one, while their counts are summed.
         convert (bool): By default, columns are added to the clonotype set to convert 
             it to the VDJtools format, and the original columns are removed. If set to  `False`, all original columns are preserved.
+        retain_alleles (bool): If `True`, retain allele variants after the `*`
+            symbol in converted V, D, J, and C segment values. Default=False.
         ignore_small_clonosets (bool): If the top or downsample threshold exceeds the counts for a clonoset, the set is kept intact
     """
 
@@ -67,7 +69,7 @@ class Filter:
                  top=None, by_umi=False, mix_tails=False, count_threshold=None, 
                  unweight=False, seed=None, recount_fractions=True,
                  white_list=[], black_list=[], pool_clonoset_by="", convert=True, 
-                 ignore_small_clonosets=False):
+                 ignore_small_clonosets=False, retain_alleles=False):
         self.name = name
         self.functionality = functionality
         self.downsample_size = downsample
@@ -83,6 +85,7 @@ class Filter:
         self.pool_by = pool_clonoset_by
         self.convert = convert
         self.ignore_small_clonosets = ignore_small_clonosets
+        self.retain_alleles = retain_alleles
         self._check_input()
         
     def spawn(self):
@@ -100,7 +103,8 @@ class Filter:
                       recount_fractions=self.recount_fractions,
                       white_list = self.white_list,
                       black_list = self.black_list,
-                      ignore_small_clonosets=self.ignore_small_clonosets
+                      ignore_small_clonosets=self.ignore_small_clonosets,
+                      retain_alleles=self.retain_alleles
                       )
         
     def apply(self, input_clonoset, colnames=None):
@@ -185,19 +189,27 @@ class Filter:
         
         # In the case of MiXCR and Bioadaptive format the segment type columns
         # usually show several segment variants with particular allele and score.
-        # Here we extract only the name of the best hit without allele ane score
-        c_clonoset["v"] = c_clonoset["v"].apply(lambda x: extract_segment(x))
+        # Here we extract only the name of the best hit without its score.
+        c_clonoset["v"] = c_clonoset["v"].apply(
+            lambda x: extract_segment(x, retain_allele=self.retain_alleles)
+        )
         if "d" in c_clonoset.columns:
-            c_clonoset["d"] = c_clonoset["d"].apply(lambda x: extract_segment(x))
+            c_clonoset["d"] = c_clonoset["d"].apply(
+                lambda x: extract_segment(x, retain_allele=self.retain_alleles)
+            )
             result_columns.append("d")
         if "j" in c_clonoset.columns:
-            c_clonoset["j"] = c_clonoset["j"].apply(lambda x: extract_segment(x))
+            c_clonoset["j"] = c_clonoset["j"].apply(
+                lambda x: extract_segment(x, retain_allele=self.retain_alleles)
+            )
             result_columns.append("j")
         
         # add the column for Constant segment if it exists in the original clonoset
         if colnames["c_column"] is not None:
             c_clonoset = c_clonoset.rename(columns={colnames["c_column"]: "c"})
-            c_clonoset["c"] = c_clonoset["c"].apply(lambda x: extract_segment(x))
+            c_clonoset["c"] = c_clonoset["c"].apply(
+                lambda x: extract_segment(x, retain_allele=self.retain_alleles)
+            )
             result_columns += ["c"]
         
         # obtain the borders of the segments within CDR3 region, if possible and add them to
@@ -235,28 +247,36 @@ class Filter:
             if colnames["v_column"] is not None:
                 clonoset["v"] = clonoset[colnames["v_column"]]
         if "v" in clonoset.columns:
-            clonoset["v"] = clonoset["v"].apply(lambda x: extract_segment(x))
+            clonoset["v"] = clonoset["v"].apply(
+                lambda x: extract_segment(x, retain_allele=self.retain_alleles)
+            )
         
         # D
         if "d" not in clonoset.columns:
             if colnames["d_column"] is not None:
                 clonoset["d"] = clonoset[colnames["d_column"]]
         if "d" in clonoset.columns:
-            clonoset["d"] = clonoset["d"].apply(lambda x: extract_segment(x))
+            clonoset["d"] = clonoset["d"].apply(
+                lambda x: extract_segment(x, retain_allele=self.retain_alleles)
+            )
 
         # J
         if "j" not in clonoset.columns:
             if colnames["j_column"] is not None:
                 clonoset["j"] = clonoset[colnames["j_column"]]
         if "j" in clonoset.columns:
-            clonoset["j"] = clonoset["j"].apply(lambda x: extract_segment(x))
+            clonoset["j"] = clonoset["j"].apply(
+                lambda x: extract_segment(x, retain_allele=self.retain_alleles)
+            )
         
         # C
         if "c" not in clonoset.columns:
             if colnames["c_column"] is not None:
                 clonoset["c"] = clonoset[colnames["c_column"]]
         if "c" in clonoset.columns:
-            clonoset["c"] = clonoset["c"].apply(lambda x: extract_segment(x))
+            clonoset["c"] = clonoset["c"].apply(
+                lambda x: extract_segment(x, retain_allele=self.retain_alleles)
+            )
 
         if "cdr3aa" not in clonoset.columns:
             if colnames["cdr3aa_column"] is not None:

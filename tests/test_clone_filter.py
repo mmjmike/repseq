@@ -37,6 +37,55 @@ def test_filter_by_umi_falls_back_to_clone_count_when_umi_columns_absent():
     assert result["v"].tolist() == ["TRBV1"]
 
 
+def test_filter_can_retain_alleles_for_all_segment_types():
+    clonoset = pd.DataFrame(
+        [
+            {
+                "cloneCount": 10,
+                "cloneFraction": 1.0,
+                "nSeqCDR3": "TGTGCC",
+                "aaSeqCDR3": "CASSLG",
+                "allVHitsWithScore": "TRBV6-2*000(742.2),TRBV6-3*001(742.2)",
+                "allDHitsWithScore": "TRBD1*LONG(20),TRBD2*02(10)",
+                "allJHitsWithScore": "TRBJ2-7*A1(80),TRBJ2-3*01(70)",
+                "allCHitsWithScore": "TRBC2*XYZ(50),TRBC1*01(40)",
+            }
+        ]
+    )
+
+    result = Filter(retain_alleles=True).apply(clonoset)
+
+    assert result.loc[0, ["v", "d", "j", "c"]].tolist() == [
+        "TRBV6-2*000",
+        "TRBD1*LONG",
+        "TRBJ2-7*A1",
+        "TRBC2*XYZ",
+    ]
+
+
+def test_filter_removes_alleles_by_default_and_uses_first_hit():
+    clonoset = pd.DataFrame(
+        [
+            {
+                "cloneCount": 10,
+                "cloneFraction": 1.0,
+                "nSeqCDR3": "TGTGCC",
+                "aaSeqCDR3": "CASSLG",
+                "allVHitsWithScore": "TRBV6-2*000(742.2),TRBV6-3*001(742.2)",
+                "allJHitsWithScore": "TRBJ2-7*A1(80),TRBJ2-3*01(70)",
+            }
+        ]
+    )
+
+    result = Filter().apply(clonoset)
+
+    assert result.loc[0, ["v", "j"]].tolist() == ["TRBV6-2", "TRBJ2-7"]
+
+
+def test_filter_spawn_preserves_retain_alleles():
+    assert Filter(retain_alleles=True).spawn().retain_alleles is True
+
+
 def _filter_test_clonoset():
     return pd.DataFrame(
         [

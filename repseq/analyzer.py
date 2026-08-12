@@ -639,7 +639,13 @@ class Analyzer:
             print("Pairing matrix has not been calculated yet.")
         return self._pairing_matrix
 
-    def plot_volcano(self, chain=None, postfiltered=True, **kwargs):
+    def plot_volcano(
+        self,
+        chain=None,
+        postfiltered=True,
+        by_mean_count=False,
+        **kwargs,
+    ):
         from .plot import de_volcano
 
         self._require_samples()
@@ -653,7 +659,7 @@ class Analyzer:
             table = self._get_result("statistics_df", chain=selected)
         if table is None:
             return None
-        return de_volcano(table, **kwargs)
+        return de_volcano(table, by_mean_count=by_mean_count, **kwargs)
 
     def plot_heatmap(self, chain=None, **kwargs):
         from .plot import de_heatmap

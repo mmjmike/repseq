@@ -238,7 +238,10 @@ def test_plot_volcano_prefers_postfiltered_and_can_force_statistics(monkeypatch)
 
     assert analyzer.plot_volcano(alpha=0.5).iloc[0, 0] == "postfiltered"
     assert analyzer.plot_volcano(postfiltered=False).iloc[0, 0] == "statistics"
-    assert plotted[0][1] == {"alpha": 0.5}
+    assert analyzer.plot_volcano(by_mean_count=True).iloc[0, 0] == "postfiltered"
+    assert plotted[0][1] == {"alpha": 0.5, "by_mean_count": False}
+    assert plotted[1][1] == {"by_mean_count": False}
+    assert plotted[2][1] == {"by_mean_count": True}
 
 
 def test_plot_volcano_falls_back_to_statistics(monkeypatch):

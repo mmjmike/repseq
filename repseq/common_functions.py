@@ -181,9 +181,11 @@ def calc_gini_coefficient(counts):
     return (2 * np.sum(index * counts)) / (n * total) - (n + 1) / n
 
 
-def extract_segment(s):
-    segm = str(s).split("*")[0]
-    segm = str(segm).split("(")[0]
+def extract_segment(s, retain_allele=False):
+    segm = str(s).split(",", 1)[0]
+    segm = segm.split("(", 1)[0]
+    if not retain_allele:
+        segm = segm.split("*", 1)[0]
     if segm == "nan":
         return "."
     else:

@@ -82,7 +82,7 @@ GENE_RE = re.compile(
     (?P<chain>[ABGDHKL])
     (?P<head>[A-Z])
     (?P<body>[A-Z0-9/-]*)
-    (?:\*(?P<allele>\d{2,3}))?
+    (?:\*(?P<allele>[^(),;|\s]+))?
     $
     """,
     re.VERBOSE | re.IGNORECASE,
@@ -186,6 +186,10 @@ def _optional_number(value):
     return (1, 0) if value is None else (0, int(value))
 
 
+def _optional_text(value):
+    return (1, "") if value is None else (0, value.casefold())
+
+
 def _gene_sort_key(gene):
     parsed = parse_gene_name(gene)
     if parsed is None:
@@ -201,7 +205,7 @@ def _gene_sort_key(gene):
         _optional_number(parsed["segment"]),
         _natural_sort_key(parsed["dual_designation"] or ""),
         _natural_sort_key(parsed["subsegment"] or ""),
-        _optional_number(parsed["allele"]),
+        _optional_text(parsed["allele"]),
         _natural_sort_key(gene),
     )
 
@@ -2989,6 +2993,7 @@ def de_volcano(
     alpha=0.7,
     height=6,
     aspect=1.3,
+    by_mean_count=False,
 ):
     """Plot differential-enrichment effect sizes against p-values.
 
@@ -3004,11 +3009,15 @@ def de_volcano(
         Minimum and maximum scatter-point areas.
     log_sizes : bool, default True
         Scale point sizes by ``log1p(mean_group_count)``. If false, use raw
-        ``mean_group_count`` values.
+        ``mean_group_count`` values. Ignored when ``by_mean_count=True``.
     alpha : float, default 0.7
         Point opacity.
     height, aspect : float
         Figure height and width multiplier.
+    by_mean_count : bool, default False
+        Plot ``mean_group_count`` on the vertical axis instead of
+        ``-log10(p)``. In this mode point sizes are scaled by the selected
+        p-value column's ``-log10`` values.
 
     Returns
     -------
@@ -3024,16 +3033,20 @@ def de_volcano(
     retained = plotted.loc[~filtered_out]
     group_order = _category_order(retained["enriched_in"])
     color_map = _palette_mapping(group_order, palette=group_palette)
-    size_values = plotted["mean_group_count"].to_numpy(dtype=float)
-    if log_sizes:
+    if by_mean_count:
+        size_values = plotted["_negative_log10_p"].to_numpy(dtype=float)
+    else:
+        size_values = plotted["mean_group_count"].to_numpy(dtype=float)
+    if log_sizes and not by_mean_count:
         size_values = np.log1p(size_values)
     point_sizes = _scaled_dot_sizes(size_values, size_range)
 
     fig, ax = plt.subplots(figsize=(height * aspect, height))
+    y_column = "mean_group_count" if by_mean_count else "_negative_log10_p"
     if filtered_out.any():
         ax.scatter(
             plotted.loc[filtered_out, "_plot_log2FC"],
-            plotted.loc[filtered_out, "_negative_log10_p"],
+            plotted.loc[filtered_out, y_column],
             s=float(np.min(point_sizes)),
             c="#999999",
             alpha=0.3,
@@ -3044,7 +3057,7 @@ def de_volcano(
     if not retained.empty:
         ax.scatter(
             retained["_plot_log2FC"],
-            retained["_negative_log10_p"],
+            retained[y_column],
             s=point_sizes[~filtered_out.to_numpy()],
             c=[color_map[group] for group in retained["enriched_in"]],
             alpha=float(alpha),
@@ -3055,7 +3068,9 @@ def de_volcano(
     ax.axvline(0, color="#888888", linestyle="--", linewidth=0.8, zorder=0)
     ax.set_title("Differential enrichment volcano plot")
     ax.set_xlabel("log2FC")
-    ax.set_ylabel(f"-log10({p_column})")
+    ax.set_ylabel(
+        "Mean group count" if by_mean_count else f"-log10({p_column})"
+    )
     ax.grid(color="#eeeeee", linewidth=0.6)
     ax.set_axisbelow(True)
 
