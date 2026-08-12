@@ -17,7 +17,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap, to_rgb
-from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
+from matplotlib.patches import Ellipse, Patch
 from scipy.cluster.hierarchy import dendrogram, leaves_list, linkage
 
 
@@ -2802,6 +2803,186 @@ def de_heatmap(
         )
         grid.fig.subplots_adjust(top=0.9)
     return _close_and_return(grid.fig)
+
+
+def beta_mds(
+    mds_table,
+    metadata=None,
+    group=None,
+    split=None,
+    centroids=False,
+    dispersion=False,
+    palette=None,
+    height=4,
+    aspect=1.2,
+):
+    """Plot the two-dimensional table returned by ``beta.mds``.
+
+    One metadata column may color points and up to two metadata columns may
+    split them into facets. Optional centroids connect to their group members,
+    and dispersion draws one-standard-deviation covariance ellipses.
+    """
+    required = {"sample_id", "MDS1", "MDS2"}
+    if not isinstance(mds_table, pd.DataFrame):
+        raise TypeError("mds_table must be a pandas DataFrame")
+    missing = required.difference(mds_table.columns)
+    if missing:
+        raise ValueError(
+            f"mds_table must contain columns: {', '.join(sorted(required))}"
+        )
+    if mds_table["sample_id"].duplicated().any():
+        raise ValueError("mds_table must contain one row per sample_id")
+
+    group_columns = _as_list(group, "group", max_len=1)
+    split_columns = _as_list(split, "split", max_len=2)
+    data, available_columns, _ = _merge_stats_metadata(mds_table, metadata)
+    _validate_metadata_columns(group_columns, available_columns, "group")
+    _validate_metadata_columns(split_columns, available_columns, "split")
+    for coordinate in ["MDS1", "MDS2"]:
+        data[coordinate] = pd.to_numeric(data[coordinate], errors="coerce")
+    if data[["MDS1", "MDS2"]].isna().any().any():
+        raise ValueError("MDS1 and MDS2 must contain only finite numeric values")
+    if not np.isfinite(data[["MDS1", "MDS2"]].to_numpy()).all():
+        raise ValueError("MDS1 and MDS2 must contain only finite numeric values")
+
+    group_column = group_columns[0] if group_columns else "_beta_mds_group"
+    if not group_columns:
+        data[group_column] = "Samples"
+    group_order = _category_order(data[group_column])
+    if not group_order:
+        raise ValueError("group column must contain at least one non-missing value")
+    colors = sns.color_palette(palette, n_colors=max(1, len(group_order)))
+    color_map = dict(zip(group_order, colors))
+
+    panel_column = None
+    if len(split_columns) == 1:
+        panel_column = split_columns[0]
+    elif len(split_columns) == 2:
+        panel_column = "_split_panel"
+        data[panel_column] = (
+            data[split_columns[0]].astype(str)
+            + " | "
+            + data[split_columns[1]].astype(str)
+        )
+        data[panel_column] = pd.Categorical(
+            data[panel_column],
+            categories=_interaction_order(data, split_columns),
+            ordered=True,
+        )
+    panel_order = _category_order(data[panel_column]) if panel_column else [None]
+    if not panel_order:
+        raise ValueError("split columns must contain at least one observed panel")
+
+    column_count = min(3, len(panel_order))
+    row_count = int(np.ceil(len(panel_order) / column_count))
+    fig, axes = plt.subplots(
+        row_count,
+        column_count,
+        figsize=(height * aspect * column_count, height * row_count),
+        squeeze=False,
+    )
+    axes = list(axes.flat)
+    x_limits = _padded_limits(data["MDS1"])
+    y_limits = _padded_limits(data["MDS2"])
+
+    for axis, panel_value in zip(axes, panel_order):
+        panel_data = data if panel_column is None else data[data[panel_column] == panel_value]
+        for group_value in group_order:
+            group_data = panel_data[panel_data[group_column] == group_value]
+            if group_data.empty:
+                continue
+            color = color_map[group_value]
+            centroid = group_data[["MDS1", "MDS2"]].mean().to_numpy(dtype=float)
+            if dispersion:
+                _draw_beta_mds_ellipse(axis, group_data, centroid, color)
+            if centroids:
+                for point in group_data[["MDS1", "MDS2"]].to_numpy(dtype=float):
+                    axis.plot(
+                        [centroid[0], point[0]],
+                        [centroid[1], point[1]],
+                        color=color,
+                        linewidth=0.6,
+                        alpha=0.6,
+                        zorder=1,
+                    )
+            axis.scatter(
+                group_data["MDS1"],
+                group_data["MDS2"],
+                color=color,
+                edgecolor="black",
+                linewidth=0.5,
+                s=38,
+                zorder=3,
+            )
+            if centroids:
+                axis.scatter(
+                    [centroid[0]],
+                    [centroid[1]],
+                    marker="X",
+                    facecolor="white",
+                    edgecolor=color,
+                    linewidth=1.5,
+                    s=100,
+                    zorder=4,
+                )
+        axis.set_xlim(x_limits)
+        axis.set_ylim(y_limits)
+        axis.set_xlabel("MDS1")
+        axis.set_ylabel("MDS2")
+        if panel_column is not None:
+            axis.set_title(str(panel_value))
+
+    for axis in axes[len(panel_order):]:
+        axis.set_visible(False)
+    if group_columns:
+        handles = [
+            Line2D(
+                [], [], marker="o", linestyle="", markerfacecolor=color_map[value],
+                markeredgecolor="black", label=str(value), markersize=6,
+            )
+            for value in group_order
+        ]
+        fig.legend(
+            handles=handles,
+            title=_caption(group_column),
+            loc="upper center",
+            ncol=len(handles),
+        )
+        fig.tight_layout(rect=(0, 0, 1, 0.9))
+    else:
+        fig.tight_layout()
+    return _close_and_return(fig)
+
+
+def _padded_limits(values):
+    minimum = float(values.min())
+    maximum = float(values.max())
+    span = maximum - minimum
+    padding = span * 0.08 if span else max(abs(minimum) * 0.08, 0.1)
+    return minimum - padding, maximum + padding
+
+
+def _draw_beta_mds_ellipse(axis, group_data, centroid, color):
+    if len(group_data) < 2:
+        return
+    covariance = np.cov(group_data[["MDS1", "MDS2"]].to_numpy(dtype=float), rowvar=False)
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+    eigenvalues = np.maximum(eigenvalues, 0)
+    order = np.argsort(eigenvalues)[::-1]
+    eigenvalues = eigenvalues[order]
+    eigenvectors = eigenvectors[:, order]
+    angle = np.degrees(np.arctan2(eigenvectors[1, 0], eigenvectors[0, 0]))
+    ellipse = Ellipse(
+        centroid,
+        width=2 * np.sqrt(eigenvalues[0]),
+        height=2 * np.sqrt(eigenvalues[1]),
+        angle=angle,
+        facecolor=(*to_rgb(color), 0.2),
+        edgecolor=color,
+        linewidth=1.2,
+        zorder=0,
+    )
+    axis.add_patch(ellipse)
 
 
 def _pairing_negative_log10_values(matrix):

@@ -59,6 +59,79 @@ def test_plot_module_import_and_diversity_subset_warning():
     assert grid.fig is not None
 
 
+def _beta_mds_table():
+    return pd.DataFrame(
+        [
+            {"sample_id": "s1", "MDS1": -2.0, "MDS2": -1.0},
+            {"sample_id": "s2", "MDS1": -1.0, "MDS2": 0.0},
+            {"sample_id": "s3", "MDS1": 0.0, "MDS2": -1.0},
+            {"sample_id": "s4", "MDS1": 1.0, "MDS2": 1.0},
+            {"sample_id": "s5", "MDS1": 2.0, "MDS2": 0.0},
+            {"sample_id": "s6", "MDS1": 3.0, "MDS2": 1.0},
+        ]
+    )
+
+
+def test_beta_mds_draws_groups_centroids_spokes_and_dispersion():
+    metadata = pd.DataFrame(
+        {
+            "sample_id": [f"s{number}" for number in range(1, 7)],
+            "condition": ["control"] * 3 + ["treated"] * 3,
+        }
+    )
+    fig = rsplot.beta_mds(
+        _beta_mds_table(),
+        metadata=metadata,
+        group="condition",
+        centroids=True,
+        dispersion=True,
+    )
+    axis = fig.axes[0]
+
+    assert fig.number not in plt.get_fignums()
+    assert axis.get_xlabel() == "MDS1"
+    assert axis.get_ylabel() == "MDS2"
+    assert len(axis.lines) == 6
+    assert len(axis.patches) == 2
+    assert len(axis.collections) == 4
+    assert all(patch.get_facecolor()[-1] == pytest.approx(0.2) for patch in axis.patches)
+    assert {text.get_text() for text in fig.legends[0].get_texts()} == {
+        "control",
+        "treated",
+    }
+
+
+def test_beta_mds_supports_two_ordered_splits_and_one_group_maximum():
+    metadata = pd.DataFrame(
+        {
+            "sample_id": [f"s{number}" for number in range(1, 7)],
+            "condition": ["control"] * 3 + ["treated"] * 3,
+            "tissue": ["blood", "tumor", "blood", "tumor", "blood", "tumor"],
+            "sex": ["F", "M", "F", "M", "F", "M"],
+        }
+    )
+    metadata["tissue"] = pd.Categorical(
+        metadata["tissue"], categories=["tumor", "blood"], ordered=True
+    )
+    metadata["sex"] = pd.Categorical(
+        metadata["sex"], categories=["M", "F"], ordered=True
+    )
+    fig = rsplot.beta_mds(
+        _beta_mds_table(), metadata=metadata, split=["tissue", "sex"]
+    )
+
+    assert [axis.get_title() for axis in fig.axes if axis.get_visible()] == [
+        "tumor | M",
+        "blood | F",
+    ]
+    with pytest.raises(ValueError, match="group can contain at most 1"):
+        rsplot.beta_mds(
+            _beta_mds_table(),
+            metadata=metadata,
+            group=["condition", "sex"],
+        )
+
+
 def test_plot_stats_rejects_three_group_columns():
     metadata = pd.DataFrame(
         [

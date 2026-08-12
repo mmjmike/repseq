@@ -180,6 +180,113 @@ def metrics_from_table(full_table, metrics=None):
     return next(iter(result.values())) if single else dict(result)
 
 
+def mds(beta_data, metric=None):
+    """Project a beta-diversity matrix into two MDS dimensions.
+
+    ``beta_data`` may be a dictionary returned by :func:`metrics` or a square
+    metric matrix. When a dictionary is supplied, ``f2`` is selected by
+    default. Similarity matrices are identified by diagonal values being
+    larger than off-diagonal values and converted to distances with
+    ``-log10``. Zero similarities are replaced by one tenth of the smallest
+    positive similarity before transformation.
+
+    Args:
+        beta_data (dict or pd.DataFrame): Beta-metrics dictionary or matrix.
+        metric (str, optional): Dictionary key to use. Defaults to ``f2``.
+
+    Returns:
+        pd.DataFrame: Columns ``sample_id``, ``MDS1``, and ``MDS2``.
+    """
+    matrix = _select_mds_matrix(beta_data, metric)
+    distances = _as_mds_distance_matrix(matrix)
+    coordinates = _classical_mds(distances, dimensions=2)
+    return pd.DataFrame(
+        {
+            "sample_id": matrix.index.to_list(),
+            "MDS1": coordinates[:, 0],
+            "MDS2": coordinates[:, 1],
+        }
+    )
+
+
+def _select_mds_matrix(beta_data, metric):
+    if isinstance(beta_data, dict):
+        metric_name = "f2" if metric is None else metric
+        if metric_name not in beta_data:
+            available = ", ".join(map(str, beta_data))
+            raise ValueError(
+                f"beta-diversity dictionary does not contain metric "
+                f"'{metric_name}'. Available keys: {available}"
+            )
+        matrix = beta_data[metric_name]
+    elif isinstance(beta_data, pd.DataFrame):
+        matrix = beta_data
+    else:
+        raise TypeError("beta_data must be a beta.metrics dictionary or DataFrame")
+
+    if not isinstance(matrix, pd.DataFrame):
+        raise TypeError("Selected beta-diversity metric must be a DataFrame")
+    if matrix.empty or matrix.shape[0] != matrix.shape[1]:
+        raise ValueError("beta-diversity metric must be a non-empty square matrix")
+    if not matrix.index.is_unique or not matrix.columns.is_unique:
+        raise ValueError("beta-diversity matrix row and column labels must be unique")
+    if set(matrix.index) != set(matrix.columns):
+        raise ValueError("beta-diversity matrix must have matching row and column labels")
+
+    matrix = matrix.loc[matrix.index, matrix.index]
+    try:
+        matrix = matrix.astype(float)
+    except (TypeError, ValueError) as error:
+        raise TypeError("beta-diversity metric matrix must contain numeric values") from error
+    values = matrix.to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("beta-diversity metric matrix must contain only finite values")
+    if not np.allclose(values, values.T, rtol=1e-7, atol=1e-10):
+        raise ValueError("MDS requires a symmetric beta-diversity matrix")
+    return matrix
+
+
+def _as_mds_distance_matrix(matrix):
+    values = matrix.to_numpy(dtype=float, copy=True)
+    diagonal = np.diag(values)
+    off_diagonal = values[~np.eye(len(values), dtype=bool)]
+    if off_diagonal.size:
+        is_similarity = np.median(diagonal) > np.median(off_diagonal)
+    else:
+        is_similarity = not np.allclose(diagonal, 0)
+
+    if is_similarity:
+        if (values < 0).any():
+            raise ValueError("Similarity matrices for MDS cannot contain negative values")
+        positive = values[values > 0]
+        if positive.size == 0:
+            raise ValueError("Similarity matrix must contain at least one positive value")
+        values[values == 0] = positive.min() / 10
+        values = -np.log10(values)
+    elif (values < 0).any():
+        raise ValueError("Distance matrices for MDS cannot contain negative values")
+    return values
+
+
+def _classical_mds(distances, dimensions=2):
+    sample_count = len(distances)
+    centering = np.eye(sample_count) - np.ones((sample_count, sample_count)) / sample_count
+    gram = -0.5 * centering @ np.square(distances) @ centering
+    eigenvalues, eigenvectors = np.linalg.eigh(gram)
+    order = np.argsort(eigenvalues)[::-1]
+    eigenvalues = eigenvalues[order]
+    eigenvectors = eigenvectors[:, order]
+
+    coordinates = np.zeros((sample_count, dimensions), dtype=float)
+    positive = np.flatnonzero(eigenvalues > np.finfo(float).eps * 100)
+    retained = positive[:dimensions]
+    if retained.size:
+        coordinates[:, :retained.size] = (
+            eigenvectors[:, retained] * np.sqrt(eigenvalues[retained])
+        )
+    return coordinates
+
+
 def _normalize_metrics(metrics):
     if metrics is None:
         return [*METRICS, "full_table"], False

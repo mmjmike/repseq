@@ -85,6 +85,36 @@ smallest positive matrix value before applying log10. `show_values=True` writes
 compact original values in the cells, including `NA`; color still represents
 the transformed value.
 
+## MDS projection and plotting
+
+`beta.mds` accepts either the complete dictionary returned by `beta.metrics`
+or a square metric matrix. For dictionaries, `metric="f2"` is the default.
+The function detects similarities from their relatively high diagonal,
+replaces zero similarities with one tenth of the smallest positive value, and
+uses `-log10` to obtain distances. Distance matrices are used directly. The
+result contains `sample_id`, `MDS1`, and `MDS2`.
+
+```python
+mds_table = beta.mds(all_results)
+mds_jaccard = beta.mds(all_results, metric="jaccard_distance")
+```
+
+Plot the result with `rsplot.beta_mds`. One metadata column can color groups,
+and up to two columns can split the plot into panels. `centroids=True` adds a
+cross-shaped group centroid and thin spokes to its samples. `dispersion=True`
+adds one-standard-deviation covariance ellipses.
+
+```python
+rsplot.beta_mds(
+    mds_table,
+    metadata=metadata,
+    group="experimental_group",
+    split=["tissue", "sex"],
+    centroids=True,
+    dispersion=True,
+)
+```
+
 ## Plotting full beta tables
 
 `rsplot.beta_table` accepts a beta-results dictionary and automatically selects

@@ -65,6 +65,68 @@ def test_metrics_none_returns_all_metrics_and_full_table():
     assert list(result) == [*beta.METRICS, "full_table"]
 
 
+def test_mds_defaults_to_f2_and_converts_similarity_to_log_distance():
+    similarity = pd.DataFrame(
+        [
+            [1.0, 0.1, 0.0],
+            [0.1, 1.0, 0.1],
+            [0.0, 0.1, 1.0],
+        ],
+        index=["s1", "s2", "s3"],
+        columns=["s1", "s2", "s3"],
+    )
+    result = beta.mds({"other": similarity * 0, "f2": similarity})
+
+    assert list(result.columns) == ["sample_id", "MDS1", "MDS2"]
+    assert result["sample_id"].tolist() == ["s1", "s2", "s3"]
+    distances = np.sqrt(
+        np.square(result["MDS1"].to_numpy()[:, None] - result["MDS1"].to_numpy())
+        + np.square(result["MDS2"].to_numpy()[:, None] - result["MDS2"].to_numpy())
+    )
+    np.testing.assert_allclose(
+        distances,
+        [[0, 1, 2], [1, 0, 1], [2, 1, 0]],
+        atol=1e-7,
+    )
+
+
+def test_mds_uses_distance_matrix_as_is_and_supports_metric_selection():
+    distance = pd.DataFrame(
+        [[0.0, 1.0, 2.0], [1.0, 0.0, 1.0], [2.0, 1.0, 0.0]],
+        index=["s1", "s2", "s3"],
+        columns=["s1", "s2", "s3"],
+    )
+    result = beta.mds(
+        {
+            "f2": pd.DataFrame([[1.0]], index=["x"], columns=["x"]),
+            "l2": distance,
+        },
+        metric="l2",
+    )
+
+    coordinates = result[["MDS1", "MDS2"]].to_numpy()
+    np.testing.assert_allclose(
+        np.linalg.norm(coordinates[:, None, :] - coordinates[None, :, :], axis=2),
+        distance.to_numpy(),
+        atol=1e-7,
+    )
+
+
+def test_mds_validates_square_symmetric_matrices_and_metric_names():
+    with pytest.raises(ValueError, match="does not contain metric"):
+        beta.mds({"jaccard": pd.DataFrame([[1.0]])})
+    with pytest.raises(ValueError, match="square matrix"):
+        beta.mds(pd.DataFrame([[0.0, 1.0]]))
+    with pytest.raises(ValueError, match="symmetric"):
+        beta.mds(
+            pd.DataFrame(
+                [[0.0, 1.0], [2.0, 0.0]],
+                index=["s1", "s2"],
+                columns=["s1", "s2"],
+            )
+        )
+
+
 def test_intersection_supports_vj_and_vjlen(tmp_path):
     rows1 = [
         {"count": 6, "freq": 0.6, "cdr3nt": "AAA", "cdr3aa": "CASS", "v": "V1", "j": "J1"},
