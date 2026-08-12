@@ -2009,6 +2009,7 @@ def test_clonotypes_coverage_plots_numeric_bins_at_equal_spacing():
         "1", "3", "10", "32", "100", "316"
     ]
     np.testing.assert_allclose(ax.get_xticks(), [0, 1, 2, 3, 4, 5])
+    assert ax.get_xlabel() == "Clonotype size"
     assert {text.get_text() for text in grid.legend.texts} == {"sample1", "sample2"}
 
 
@@ -2040,6 +2041,7 @@ def test_clonotypes_coverage_separate_trims_panel_specific_high_zero_bins():
     assert [tick.get_text() for tick in axes["sample2"].get_xticklabels()] == [
         "1", "3", "10", "32", "100"
     ]
+    assert all(ax.get_xlabel() == "Clonotype size" for ax in axes.values())
     assert all(
         to_rgba(patch.get_facecolor()) == to_rgba("#CCCCCC")
         for ax in axes.values()

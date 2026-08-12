@@ -3887,7 +3887,7 @@ def clonotypes_coverage(
             grid.set_titles("{col_name}")
         grid.add_legend(title="Sample")
 
-    grid.set_axis_labels("Count bin upper bound", "Value")
+    grid.set_axis_labels("Clonotype size", "Value")
     grid.tight_layout()
     return grid
 

@@ -348,7 +348,8 @@ coverage = stats.clonotypes_coverage(
 ```
 
 The output columns are `sample_id`, optional `chain`, `bin`, and `value`.
-Plot all samples as lines with equally spaced numeric bin labels:
+Plot all samples as lines with equally spaced numeric bin labels on the
+`Clonotype size` x-axis:
 
 ```py
 grid = rsplot.clonotypes_coverage(coverage)
