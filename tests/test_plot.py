@@ -1953,6 +1953,7 @@ def test_beta_table_dots_uses_lower_triangle_and_upper_f2_values():
         {"full_table": _beta_full_table_same_set()},
         plot_type="dots",
         log_scale=True,
+        matrix_layout=True,
     )
 
     scatter_axes = [ax for ax in fig.axes if ax.collections]
@@ -1975,6 +1976,40 @@ def test_beta_table_dots_uses_lower_triangle_and_upper_f2_values():
         any(line.get_linestyle() == "--" for line in ax.lines)
         for ax in scatter_axes
     )
+
+
+def test_beta_table_dots_defaults_to_wrapped_pair_facets_without_f2_values():
+    fig = rsplot.beta_table(_beta_full_table_same_set(), plot_type="dots")
+
+    visible_axes = [ax for ax in fig.axes if ax.get_visible()]
+    assert len(visible_axes) == 3
+    assert all(len(ax.collections) == 1 for ax in visible_axes)
+    assert {ax.get_title() for ax in visible_axes} == {
+        "s1 vs s2",
+        "s1 vs s3",
+        "s2 vs s3",
+    }
+    assert not any(
+        text.get_text().startswith("F2")
+        for ax in fig.axes
+        for text in ax.texts
+    )
+
+
+def test_beta_table_dots_pads_zero_values_inside_axes():
+    linear = rsplot.beta_table(_beta_full_table_same_set(), plot_type="dots")
+    linear_axes = [ax for ax in linear.axes if ax.collections]
+    assert all(ax.get_xlim()[0] < 0 and ax.get_ylim()[0] < 0 for ax in linear_axes)
+
+    logarithmic = rsplot.beta_table(
+        _beta_full_table_same_set(),
+        plot_type="dots",
+        log_scale=True,
+    )
+    for ax in [axis for axis in logarithmic.axes if axis.collections]:
+        offsets = np.asarray(ax.collections[0].get_offsets())
+        assert ax.get_xlim()[0] < offsets[:, 0].min()
+        assert ax.get_ylim()[0] < offsets[:, 1].min()
 
 
 def test_beta_table_dots_tiles_two_sample_sets():

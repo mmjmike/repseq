@@ -94,9 +94,11 @@ With `plot_type="dots"`, each pair is a scatterplot of clonotype frequencies.
 Dots have black borders and 0.5 opacity, and a grey dashed identity line is
 drawn behind them. Set `log_scale=True` to use logarithmic axes; zero
 frequencies are placed below the smallest positive frequency using `log_base`.
-For comparisons within one sample set, pair plots occupy the lower triangle and
-F2 values occupy the upper triangle. Comparisons between two sample sets use a
-complete row-by-column tile matrix.
+By default, pair plots use a wrapped facet layout without F2 metric panels. Set
+`matrix_layout=True` to use the previous matrix layout, where comparisons within
+one sample set occupy the lower triangle and F2 values occupy the upper
+triangle, while comparisons between two sample sets use a complete
+row-by-column tile matrix.
 
 ```python
 rsplot.beta_table(all_results, plot_type="dots", log_scale=True)

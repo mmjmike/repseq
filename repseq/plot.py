@@ -3340,6 +3340,14 @@ def _draw_beta_dots_panel(
     else:
         lower = 0.0
         upper = max(float(np.max(x)), float(np.max(y)), 1e-12)
+    if log_scale:
+        padding_factor = float(log_base) ** 0.05
+        axis_lower = lower / padding_factor
+        axis_upper = upper * padding_factor
+    else:
+        padding = upper * 0.05
+        axis_lower = lower - padding
+        axis_upper = upper + padding
     ax.plot(
         [lower, upper],
         [lower, upper],
@@ -3358,8 +3366,8 @@ def _draw_beta_dots_panel(
         s=24,
         zorder=1,
     )
-    ax.set_xlim(lower, upper * (1.05 if not log_scale else float(log_base) ** 0.05))
-    ax.set_ylim(lower, upper * (1.05 if not log_scale else float(log_base) ** 0.05))
+    ax.set_xlim(axis_lower, axis_upper)
+    ax.set_ylim(axis_lower, axis_upper)
     ax.set_xlabel(str(x_sample))
     ax.set_ylabel(str(y_sample))
     ax.grid(color="#eeeeee", linewidth=0.5)
@@ -3375,9 +3383,48 @@ def _plot_beta_dots(
     log_base,
     height,
     aspect,
+    matrix_layout,
 ):
     if log_base <= 1:
         raise ValueError("log_base must be greater than 1")
+    if not matrix_layout:
+        if same_set:
+            pairs = [
+                (row_samples[first], row_samples[second])
+                for first in range(len(row_samples))
+                for second in range(first + 1, len(row_samples))
+            ]
+        else:
+            pairs = [
+                (row_sample, column_sample)
+                for row_sample in row_samples
+                for column_sample in column_samples
+            ]
+        if not pairs:
+            raise ValueError("beta_table dots plots require at least one sample pair")
+        columns = min(3, int(np.ceil(np.sqrt(len(pairs)))))
+        rows = int(np.ceil(len(pairs) / columns))
+        fig, axes = plt.subplots(
+            rows,
+            columns,
+            figsize=(height * aspect * columns, height * rows),
+            squeeze=False,
+        )
+        for ax, (row_sample, column_sample) in zip(axes.flat, pairs):
+            _draw_beta_dots_panel(
+                ax,
+                table,
+                column_sample,
+                row_sample,
+                log_scale,
+                log_base,
+            )
+            ax.set_title(f"{row_sample} vs {column_sample}")
+        for ax in list(axes.flat)[len(pairs):]:
+            ax.set_visible(False)
+        fig.tight_layout()
+        return fig
+
     fig, axes = plt.subplots(
         len(row_samples),
         len(column_samples),
@@ -3591,6 +3638,7 @@ def beta_table(
     top=20,
     height=3.2,
     aspect=1.0,
+    matrix_layout=False,
 ):
     """Plot pairwise clonotype frequencies from beta-diversity full tables.
 
@@ -3609,6 +3657,10 @@ def beta_table(
         displayed individually in ``diff`` plots.
     height, aspect : float
         Per-panel height and width multiplier.
+    matrix_layout : bool, default False
+        For ``dots`` plots, use the legacy sample-by-sample matrix with F2
+        values when True. By default, show pair panels in a wrapped facet
+        layout without F2 panels. This option does not affect ``diff`` plots.
 
     Returns
     -------
@@ -3628,6 +3680,7 @@ def beta_table(
             float(log_base),
             float(height),
             float(aspect),
+            bool(matrix_layout),
         )
     elif plot_type == "diff":
         fig = _plot_beta_diff(
