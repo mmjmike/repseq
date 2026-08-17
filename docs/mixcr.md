@@ -6,6 +6,11 @@
     options:
       show_root_toc_entry: false
 
+## find_alleles
+::: mixcr.find_alleles
+    options:
+      show_root_toc_entry: false
+
 ## mixcr_7genes_run_batch 
 ::: mixcr.mixcr_7genes_run_batch
     options:

@@ -284,8 +284,115 @@ def test_mixcr4_analyze_batch_passes_constraint_to_slurm(tmp_path, monkeypatch):
     assert jobs.loc[0, "status"] == "submitted"
 
 
+def test_find_alleles_groups_clns_files_by_donor_and_exports_results(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    for filename in ["sample_1.clns", "mix.sample_2.clns", "sample_10.clns", "unlisted.clns"]:
+        (input_dir / filename).touch()
+    sample_df = pd.DataFrame([
+        {"sample_id": "sample_1", "donor_id": "donor_a"},
+        {"sample_id": "sample_2", "donor_id": "donor_a"},
+        {"sample_id": "sample_10", "donor_id": "donor_b"},
+        {"sample_id": "missing", "donor_id": "donor_c"},
+    ])
+
+    jobs = mixcr.find_alleles(
+        str(input_dir),
+        str(output_dir),
+        "echo",
+        sample_df,
+        backend="local",
+    )
+
+    assert jobs["jobname"].tolist() == [
+        "mixcr_find_alleles_donor_a",
+        "mixcr_find_alleles_donor_b",
+    ]
+    donor_a_command = jobs.loc[
+        jobs["jobname"] == "mixcr_find_alleles_donor_a", "command"
+    ].iloc[0]
+    command_parts = [shlex.split(command) for command in donor_a_command.split(" && ")]
+    assert command_parts[0][:4] == ["echo", "-Xmx32g", "findAlleles", "-f"]
+    assert command_parts[0][-2:] == [
+        str(input_dir / "mix.sample_2.clns"),
+        str(input_dir / "sample_1.clns"),
+    ]
+    assert command_parts[1][-2:] == [
+        str(output_dir / "mix.sample_2.clns"),
+        str(output_dir / "mix.sample_2.clones.tsv"),
+    ]
+    assert command_parts[2][-2:] == [
+        str(output_dir / "sample_1.clns"),
+        str(output_dir / "sample_1.clones.tsv"),
+    ]
+    assert (output_dir / "find_alleles_batch.log").exists()
+    assert (output_dir / "logs" / "find_alleles_batch_jobs.csv").exists()
+    assert (output_dir / "logs" / "mixcr_find_alleles_donor_a.log").exists()
+
+    output = capsys.readouterr().out
+    assert "Donor donor_a: 2 .clns file(s)" in output
+    assert str(input_dir / "sample_1.clns") in output
+    assert str(input_dir / "mix.sample_2.clns") in output
+    assert "Donor donor_c: 0 .clns file(s)" in output
+
+
+def test_find_alleles_uses_default_slurm_resources(tmp_path, monkeypatch):
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    (input_dir / "sample_1.clns").touch()
+    captured = {}
+
+    def fake_submit(command, jobname, cpus, time_estimate, memory, **kwargs):
+        captured.update({
+            "command": command,
+            "jobname": jobname,
+            "cpus": cpus,
+            "time_estimate": time_estimate,
+            "memory": memory,
+            "log_filename": kwargs["log_filename"],
+        })
+        return b"Submitted batch job 42\n", b""
+
+    monkeypatch.setattr(mixcr, "run_slurm_command_from_jupyter", fake_submit)
+    jobs = mixcr.find_alleles(
+        str(input_dir),
+        str(output_dir),
+        sample_df=pd.DataFrame([{"sample_id": "sample_1", "donor_id": "donor_a"}]),
+        backend="slurm",
+    )
+
+    assert captured["jobname"] == "mixcr_find_alleles_donor_a"
+    assert captured["cpus"] == 4
+    assert captured["time_estimate"] == 0.5
+    assert captured["memory"] == 32
+    assert captured["log_filename"] == str(
+        output_dir / "logs" / "mixcr_find_alleles_donor_a.log"
+    )
+    assert "findAlleles" in captured["command"]
+    assert "exportClones" in captured["command"]
+    assert jobs.loc[0, "status"] == "submitted"
+    assert str(jobs.loc[0, "job_id"]) == "42"
+
+
+@pytest.mark.parametrize("missing_column", ["sample_id", "donor_id"])
+def test_find_alleles_requires_sample_and_donor_columns(tmp_path, missing_column):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    sample_df = pd.DataFrame([{"sample_id": "sample_1", "donor_id": "donor_a"}])
+
+    with pytest.raises(ValueError, match=missing_column):
+        mixcr.find_alleles(
+            str(input_dir),
+            str(tmp_path / "output"),
+            sample_df=sample_df.drop(columns=missing_column),
+        )
+
+
 def test_mixcr_public_batch_functions_do_not_expose_max_workers():
     assert "max_workers" not in inspect.signature(mixcr.mixcr4_analyze_batch).parameters
+    assert "max_workers" not in inspect.signature(mixcr.find_alleles).parameters
     assert "max_workers" not in inspect.signature(mixcr.mixcr_7genes_run_batch).parameters
     assert "max_workers" not in inspect.signature(mixcr.mixcr4_reports).parameters
 

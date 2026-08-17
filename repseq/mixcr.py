@@ -684,6 +684,148 @@ def mixcr4_analyze_batch(sample_df, output_folder, command_template=None,
     )
 
 
+def _find_donor_clns_files(clns_filenames, sample_ids):
+    sample_ids = {str(sample_id) for sample_id in sample_ids}
+    matched_filenames = []
+    for filename in clns_filenames:
+        file_stem = os.path.basename(filename)[:-len(".clns")]
+        if any(file_stem == sample_id or file_stem.endswith(f".{sample_id}")
+               for sample_id in sample_ids):
+            matched_filenames.append(filename)
+    return matched_filenames
+
+
+def find_alleles(input_dir, output_dir, mixcr_path="mixcr", sample_df=None,
+                 backend="local", cpus=4, memory=32, time_estimate=0.5,
+                 constraint=None):
+    """
+    Run MiXCR ``findAlleles`` once per donor and export the resulting clonotypes.
+
+    Each donor job uses all ``.clns`` files in ``input_dir`` whose filename is
+    either ``<sample_id>.clns`` or ends with ``.<sample_id>.clns``. The latter
+    form supports clonosets produced by MiXCR sample splitting. After allele
+    calling, every newly produced ``.clns`` file is exported to
+    ``<filename>.clones.tsv`` in ``output_dir``.
+
+    Args:
+        input_dir (str): Folder containing preprocessed MiXCR ``.clns`` files.
+        output_dir (str): Folder for allele-called ``.clns`` files, allele
+            reports, libraries, exported clonotype tables, and job logs.
+        mixcr_path (str): Path to the MiXCR binary.
+        sample_df (pd.DataFrame): Sample metadata containing ``sample_id`` and
+            ``donor_id`` columns. It may also be passed as the third positional
+            argument when ``mixcr_path`` is omitted.
+        backend (str): ``local`` or ``slurm``.
+        cpus (int): CPU request for SLURM jobs.
+        memory (int): MiXCR memory and SLURM memory request in GB.
+        time_estimate (numeric): Time limit in hours for SLURM jobs.
+        constraint (str): Optional SLURM node constraint expression.
+
+    Returns:
+        pd.DataFrame: Submitted or completed job records. Donors without any
+        matching ``.clns`` files are printed and omitted from execution.
+    """
+    _validate_backend(backend)
+    if sample_df is None and isinstance(mixcr_path, pd.DataFrame):
+        sample_df = mixcr_path
+        mixcr_path = "mixcr"
+    if sample_df is None:
+        raise ValueError("sample_df must be provided")
+    required_columns = {"sample_id", "donor_id"}
+    missing_columns = sorted(required_columns - set(sample_df.columns))
+    if missing_columns:
+        raise ValueError(f"sample_df is missing required columns: {', '.join(missing_columns)}")
+    if sample_df[["sample_id", "donor_id"]].isna().any().any():
+        raise ValueError("sample_df columns 'sample_id' and 'donor_id' must not contain empty values")
+    if any(not str(value).strip()
+           for value in sample_df[["sample_id", "donor_id"]].to_numpy().flat):
+        raise ValueError("sample_df columns 'sample_id' and 'donor_id' must not contain empty values")
+
+    input_dir = os.path.abspath(input_dir)
+    if not os.path.isdir(input_dir):
+        raise FileNotFoundError(f"Input directory does not exist: {input_dir}")
+    output_dir = os.path.abspath(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
+    log_folder = os.path.join(output_dir, "logs")
+    os.makedirs(log_folder, exist_ok=True)
+
+    memory = _normalize_memory(memory)
+    clns_filenames = sorted(
+        os.path.join(input_dir, filename)
+        for filename in os.listdir(input_dir)
+        if filename.endswith(".clns") and os.path.isfile(os.path.join(input_dir, filename))
+    )
+
+    jobs = []
+    for donor_id, donor_samples in sample_df.groupby("donor_id", sort=False):
+        donor_id = str(donor_id)
+        sample_ids = donor_samples["sample_id"].astype(str).unique()
+        donor_clns_filenames = _find_donor_clns_files(clns_filenames, sample_ids)
+
+        print(f"Donor {donor_id}: {len(donor_clns_filenames)} .clns file(s)")
+        for filename in donor_clns_filenames:
+            print(f"  - {filename}")
+        if not donor_clns_filenames:
+            continue
+
+        report_filename = os.path.join(output_dir, f"{donor_id}.findAlleles.report.txt")
+        json_report_filename = os.path.join(output_dir, f"{donor_id}.findAlleles.report.json")
+        mutations_filename = os.path.join(output_dir, f"{donor_id}_alleles.tsv")
+        library_filename = os.path.join(output_dir, f"{donor_id}_alleles.json")
+        output_template = os.path.join(output_dir, "{file_name}.clns")
+        find_alleles_command = shlex.join([
+            mixcr_path,
+            f"-Xmx{memory}g",
+            "findAlleles",
+            "-f",
+            "--report",
+            report_filename,
+            "--json-report",
+            json_report_filename,
+            "--export-alleles-mutations",
+            mutations_filename,
+            "--export-library",
+            library_filename,
+            "--output-template",
+            output_template,
+            *donor_clns_filenames,
+        ])
+
+        export_commands = []
+        for input_filename in donor_clns_filenames:
+            output_stem = os.path.basename(input_filename)[:-len(".clns")]
+            output_clns_filename = os.path.join(output_dir, f"{output_stem}.clns")
+            output_tsv_filename = os.path.join(output_dir, f"{output_stem}.clones.tsv")
+            export_commands.append(shlex.join([
+                mixcr_path,
+                f"-Xmx{memory}g",
+                "exportClones",
+                output_clns_filename,
+                output_tsv_filename,
+            ]))
+
+        jobname = f"mixcr_find_alleles_{donor_id}"
+        jobs.append({
+            "jobname": jobname,
+            "sample_id": donor_id,
+            "command": " && ".join([find_alleles_command, *export_commands]),
+            "cwd": output_dir,
+            "log_filename": os.path.join(log_folder, f"{jobname}.log"),
+        })
+
+    batch_filename = os.path.join(output_dir, "find_alleles_batch.log")
+    return _run_mixcr_jobs(
+        jobs,
+        "MiXCR Find Alleles Batch",
+        batch_filename,
+        backend=backend,
+        cpus=cpus,
+        time_estimate=time_estimate,
+        memory=memory,
+        constraint=constraint,
+    )
+
+
 def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=32,
                            time_estimate=1.5, backend="local", cpus=40,
                            constraint=None):

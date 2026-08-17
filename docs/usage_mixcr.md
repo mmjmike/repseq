@@ -98,6 +98,38 @@ mx.check_batch_progress(output_dir, loop=True)
 
 <br>
 
+## Calling donor alleles and exporting clonotypes
+
+Run one `findAlleles` job per donor. The metadata table must contain
+`sample_id` and `donor_id`; matching `.clns` files are selected from
+`input_dir`, and each allele-called clonoset is exported as `.clones.tsv`.
+
+```py
+jobs = mx.find_alleles(
+    input_dir,
+    alleles_output_dir,
+    mixcr_path=path_to_mixcr_binary,
+    sample_df=sample_df,
+    backend="slurm",
+    cpus=4,
+    memory=32,
+    time_estimate=0.5,
+)
+```
+
+The function prints every donor's selected input files. Job logs and the
+saved job table are written to `logs/` inside `alleles_output_dir`.
+
+```py
+mx.check_batch_progress(
+    alleles_output_dir,
+    default_filename="find_alleles_batch.log",
+    loop=True,
+)
+```
+
+<br>
+
 ## Making report images
 
 Make reports (combines `mixcr exportQc align`, `chainUsage` and `tags`) and get report images (both .pdf and .svg for `align` and `chainUsage`, only .pdf for `tags`). To see report images examples, visit the [MiXCR website](https://mixcr.com/mixcr/reference/qc-overview/).
