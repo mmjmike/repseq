@@ -30,7 +30,6 @@ requirements:
     - networkx
     - dill
     - pyyaml
-    - requests
 
 test:
   imports:

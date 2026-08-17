@@ -43,7 +43,6 @@ dependencies = [
   "networkx",
   "dill",
   "PyYAML",
-  "requests",
 ]
 
 [project.optional-dependencies]

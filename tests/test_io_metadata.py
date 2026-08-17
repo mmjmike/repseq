@@ -1,10 +1,35 @@
 import warnings
 import json
+import os
+from pathlib import Path
+import subprocess
+import sys
 
 import pandas as pd
 
 from repseq import io
 from repseq import vdjtools
+
+
+def test_mixcr_import_does_not_require_requests(tmp_path):
+    (tmp_path / "requests.py").write_text(
+        'raise AttributeError("requests dependency is broken")\n'
+    )
+    project_root = Path(__file__).resolve().parents[1]
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = os.pathsep.join(
+        [str(tmp_path), str(project_root), environment.get("PYTHONPATH", "")]
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from repseq import mixcr"],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_read_ngsik_metadata_returns_empty_dataframe_for_missing_file(tmp_path):

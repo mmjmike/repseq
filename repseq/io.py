@@ -8,7 +8,6 @@ import bz2
 import gzip
 import lzma
 import zipfile
-import requests
 import io
 import warnings
 from contextlib import contextmanager
