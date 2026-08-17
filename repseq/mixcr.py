@@ -826,6 +826,133 @@ def find_alleles(input_dir, output_dir, mixcr_path="mixcr", sample_df=None,
     )
 
 
+def find_shm_trees(input_dir, output_dir, mixcr_path="mixcr", sample_df=None,
+                   backend="local", cpus=4, memory=32, time_estimate=0.5,
+                   constraint=None):
+    """
+    Build and export MiXCR somatic hypermutation trees once per donor.
+
+    Each donor job uses all allele-called ``.clns`` files in ``input_dir``
+    whose filename is either ``<sample_id>.clns`` or ends with
+    ``.<sample_id>.clns``. The job consecutively runs ``findShmTrees``,
+    ``exportShmTreesWithNodes``, and ``exportShmTreesNewick``.
+
+    Args:
+        input_dir (str): Folder containing allele-called MiXCR ``.clns`` files.
+        output_dir (str): Folder for ``.shmt``, TSV, Newick, report, and job log
+            outputs.
+        mixcr_path (str): Path to the MiXCR binary.
+        sample_df (pd.DataFrame): Sample metadata containing ``sample_id`` and
+            ``donor_id`` columns. It may also be passed as the third positional
+            argument when ``mixcr_path`` is omitted.
+        backend (str): ``local`` or ``slurm``.
+        cpus (int): CPU request for SLURM jobs.
+        memory (int): MiXCR memory and SLURM memory request in GB.
+        time_estimate (numeric): Time limit in hours for SLURM jobs.
+        constraint (str): Optional SLURM node constraint expression.
+
+    Returns:
+        pd.DataFrame: Submitted or completed job records. Donors without any
+        matching ``.clns`` files are printed and omitted from execution.
+    """
+    _validate_backend(backend)
+    if sample_df is None and isinstance(mixcr_path, pd.DataFrame):
+        sample_df = mixcr_path
+        mixcr_path = "mixcr"
+    if sample_df is None:
+        raise ValueError("sample_df must be provided")
+    required_columns = {"sample_id", "donor_id"}
+    missing_columns = sorted(required_columns - set(sample_df.columns))
+    if missing_columns:
+        raise ValueError(f"sample_df is missing required columns: {', '.join(missing_columns)}")
+    if sample_df[["sample_id", "donor_id"]].isna().any().any():
+        raise ValueError("sample_df columns 'sample_id' and 'donor_id' must not contain empty values")
+    if any(not str(value).strip()
+           for value in sample_df[["sample_id", "donor_id"]].to_numpy().flat):
+        raise ValueError("sample_df columns 'sample_id' and 'donor_id' must not contain empty values")
+
+    input_dir = os.path.abspath(input_dir)
+    if not os.path.isdir(input_dir):
+        raise FileNotFoundError(f"Input directory does not exist: {input_dir}")
+    output_dir = os.path.abspath(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
+    log_folder = os.path.join(output_dir, "logs")
+    os.makedirs(log_folder, exist_ok=True)
+
+    memory = _normalize_memory(memory)
+    clns_filenames = sorted(
+        os.path.join(input_dir, filename)
+        for filename in os.listdir(input_dir)
+        if filename.endswith(".clns") and os.path.isfile(os.path.join(input_dir, filename))
+    )
+
+    jobs = []
+    for donor_id, donor_samples in sample_df.groupby("donor_id", sort=False):
+        donor_id = str(donor_id)
+        sample_ids = donor_samples["sample_id"].astype(str).unique()
+        donor_clns_filenames = _find_donor_clns_files(clns_filenames, sample_ids)
+
+        print(f"Donor {donor_id}: {len(donor_clns_filenames)} .clns file(s)")
+        for filename in donor_clns_filenames:
+            print(f"  - {filename}")
+        if not donor_clns_filenames:
+            continue
+
+        trees_report = os.path.join(output_dir, f"{donor_id}_trees.log")
+        output_shmt = os.path.join(output_dir, f"{donor_id}_trees.shmt")
+        trees_export_filename = os.path.join(output_dir, f"{donor_id}_trees.tsv")
+        trees_newick_dir = os.path.join(output_dir, f"{donor_id}_newick")
+        find_trees_command = shlex.join([
+            mixcr_path,
+            f"-Xmx{memory}g",
+            "findShmTrees",
+            "-f",
+            "--report",
+            trees_report,
+            *donor_clns_filenames,
+            output_shmt,
+        ])
+        export_trees_command = shlex.join([
+            mixcr_path,
+            f"-Xmx{memory}g",
+            "exportShmTreesWithNodes",
+            output_shmt,
+            trees_export_filename,
+        ])
+        export_newick_command = shlex.join([
+            mixcr_path,
+            f"-Xmx{memory}g",
+            "exportShmTreesNewick",
+            output_shmt,
+            trees_newick_dir,
+        ])
+
+        jobname = f"mixcr_find_shm_trees_{donor_id}"
+        jobs.append({
+            "jobname": jobname,
+            "sample_id": donor_id,
+            "command": " && ".join([
+                find_trees_command,
+                export_trees_command,
+                export_newick_command,
+            ]),
+            "cwd": output_dir,
+            "log_filename": os.path.join(log_folder, f"{jobname}.log"),
+        })
+
+    batch_filename = os.path.join(output_dir, "find_shm_trees_batch.log")
+    return _run_mixcr_jobs(
+        jobs,
+        "MiXCR Find SHM Trees Batch",
+        batch_filename,
+        backend=backend,
+        cpus=cpus,
+        time_estimate=time_estimate,
+        memory=memory,
+        constraint=constraint,
+    )
+
+
 def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=32,
                            time_estimate=1.5, backend="local", cpus=40,
                            constraint=None):

@@ -130,6 +130,38 @@ mx.check_batch_progress(
 
 <br>
 
+## Building and exporting donor SHM trees
+
+Use allele-called `.clns` files to build one SHM-tree dataset per donor. Each
+job runs `findShmTrees`, exports a TSV table with nodes, and exports Newick
+trees into a donor-specific directory.
+
+```py
+jobs = mx.find_shm_trees(
+    alleles_output_dir,
+    trees_output_dir,
+    mixcr_path=path_to_mixcr_binary,
+    sample_df=sample_df,
+    backend="slurm",
+    cpus=4,
+    memory=32,
+    time_estimate=0.5,
+)
+```
+
+The function prints every donor's selected allele-called `.clns` files. Track
+the jobs using the generated batch log:
+
+```py
+mx.check_batch_progress(
+    trees_output_dir,
+    default_filename="find_shm_trees_batch.log",
+    loop=True,
+)
+```
+
+<br>
+
 ## Making report images
 
 Make reports (combines `mixcr exportQc align`, `chainUsage` and `tags`) and get report images (both .pdf and .svg for `align` and `chainUsage`, only .pdf for `tags`). To see report images examples, visit the [MiXCR website](https://mixcr.com/mixcr/reference/qc-overview/).

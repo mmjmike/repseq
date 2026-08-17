@@ -390,9 +390,74 @@ def test_find_alleles_requires_sample_and_donor_columns(tmp_path, missing_column
         )
 
 
+def test_find_shm_trees_groups_donor_files_and_runs_three_commands(tmp_path, capsys):
+    input_dir = tmp_path / "alleles"
+    output_dir = tmp_path / "trees"
+    input_dir.mkdir()
+    for filename in ["sample_1.clns", "mix.sample_2.clns", "sample_10.clns"]:
+        (input_dir / filename).touch()
+    sample_df = pd.DataFrame([
+        {"sample_id": "sample_1", "donor_id": "donor_a"},
+        {"sample_id": "sample_2", "donor_id": "donor_a"},
+        {"sample_id": "missing", "donor_id": "donor_b"},
+    ])
+
+    jobs = mixcr.find_shm_trees(
+        str(input_dir),
+        str(output_dir),
+        "echo",
+        sample_df,
+        backend="local",
+    )
+
+    assert jobs["jobname"].tolist() == ["mixcr_find_shm_trees_donor_a"]
+    commands = [shlex.split(command) for command in jobs.loc[0, "command"].split(" && ")]
+    assert commands[0][:4] == ["echo", "-Xmx32g", "findShmTrees", "-f"]
+    assert commands[0][-3:] == [
+        str(input_dir / "mix.sample_2.clns"),
+        str(input_dir / "sample_1.clns"),
+        str(output_dir / "donor_a_trees.shmt"),
+    ]
+    assert commands[0][commands[0].index("--report") + 1] == str(
+        output_dir / "donor_a_trees.log"
+    )
+    assert commands[1] == [
+        "echo",
+        "-Xmx32g",
+        "exportShmTreesWithNodes",
+        str(output_dir / "donor_a_trees.shmt"),
+        str(output_dir / "donor_a_trees.tsv"),
+    ]
+    assert commands[2] == [
+        "echo",
+        "-Xmx32g",
+        "exportShmTreesNewick",
+        str(output_dir / "donor_a_trees.shmt"),
+        str(output_dir / "donor_a_newick"),
+    ]
+    assert (output_dir / "find_shm_trees_batch.log").exists()
+    assert (output_dir / "logs" / "find_shm_trees_batch_jobs.csv").exists()
+    assert (output_dir / "logs" / "mixcr_find_shm_trees_donor_a.log").exists()
+
+    output = capsys.readouterr().out
+    assert "Donor donor_a: 2 .clns file(s)" in output
+    assert str(input_dir / "sample_1.clns") in output
+    assert str(input_dir / "mix.sample_2.clns") in output
+    assert "Donor donor_b: 0 .clns file(s)" in output
+
+
+def test_find_shm_trees_default_resources():
+    signature = inspect.signature(mixcr.find_shm_trees)
+
+    assert signature.parameters["cpus"].default == 4
+    assert signature.parameters["memory"].default == 32
+    assert signature.parameters["time_estimate"].default == 0.5
+
+
 def test_mixcr_public_batch_functions_do_not_expose_max_workers():
     assert "max_workers" not in inspect.signature(mixcr.mixcr4_analyze_batch).parameters
     assert "max_workers" not in inspect.signature(mixcr.find_alleles).parameters
+    assert "max_workers" not in inspect.signature(mixcr.find_shm_trees).parameters
     assert "max_workers" not in inspect.signature(mixcr.mixcr_7genes_run_batch).parameters
     assert "max_workers" not in inspect.signature(mixcr.mixcr4_reports).parameters
 
