@@ -61,7 +61,7 @@ def _write_tree_inputs(tmp_path):
     pd.DataFrame(
         {"cloneId": [1, 2], "readCount": [5, 2], "readFraction": [0.7, 0.3],
          "uniqueMoleculeCount": [10, 2]}
-    ).to_csv(repertoires_dir / "mix.sample.one.clones.tsv", sep="\t", index=False)
+    ).to_csv(repertoires_dir / "mix.sample.one.clones_IGH.tsv", sep="\t", index=False)
     newick_dir = tmp_path / "newick"
     newick_dir.mkdir()
     (newick_dir / "1.tree").write_text("(1:0.1,2:0.2)3;")
@@ -118,6 +118,37 @@ def test_read_trees_newick_attaches_paths_without_reading(tmp_path, monkeypatch)
     assert analyzer.trees_df.loc[
         analyzer.trees_df["treeId"] == 1, "newick_filename"
     ].nunique() == 1
+
+
+def test_umi_enrichment_discovers_and_pools_clonosets_once(tmp_path, monkeypatch):
+    trees_filename, _ = _write_tree_inputs(tmp_path)
+    find_calls = []
+    pool_calls = []
+    original_find = bcr.clonosets.find_all_mixcr_clonosets
+    original_pool = bcr.clonosets.pool_clonotypes_from_clonosets_df
+
+    def tracked_find(folders, *args, **kwargs):
+        find_calls.append(folders)
+        return original_find(folders, *args, **kwargs)
+
+    def tracked_pool(clonosets_df, cl_filter=None):
+        pool_calls.append((clonosets_df.copy(), cl_filter))
+        return original_pool(clonosets_df, cl_filter=cl_filter)
+
+    monkeypatch.setattr(bcr.clonosets, "find_all_mixcr_clonosets", tracked_find)
+    monkeypatch.setattr(bcr.clonosets, "pool_clonotypes_from_clonosets_df", tracked_pool)
+
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    analyzer.trees_properties
+
+    assert len(find_calls) == 1
+    assert len(pool_calls) == 1
+    assert pool_calls[0][0]["sample_id"].tolist() == ["sample.one"]
+    assert pool_calls[0][1].convert is False
+    assert analyzer.trees_df.loc[
+        analyzer.trees_df["nodeId"] == 2, "uniqueMoleculeCount"
+    ].iloc[0] == 2
 
 
 def test_tree_analyzer_draw_tree_wrapper(tmp_path, monkeypatch):

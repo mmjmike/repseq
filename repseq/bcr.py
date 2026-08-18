@@ -10,7 +10,8 @@ import numpy as np
 import pandas as pd
 
 from . import plot as rsplot
-from .io import read_clonoset
+from . import clonosets
+from .clone_filter import Filter
 
 
 _SEQUENCE_COLUMNS = {
@@ -90,7 +91,7 @@ class TreeAnalyzer:
         self.metadata = None
         self.newick_trees = {}
         self._trees_table_dir = None
-        self._clonoset_cache = {}
+        self._umi_enriched = False
 
     def _invalidate_properties(self):
         self.__dict__.pop("trees_properties", None)
@@ -100,7 +101,7 @@ class TreeAnalyzer:
         filename = Path(filename)
         self.trees_df = pd.read_csv(filename, sep="\t")
         self._trees_table_dir = filename.resolve().parent
-        self._clonoset_cache.clear()
+        self._umi_enriched = False
         self._add_sample_ids()
         self._attach_newick_trees()
         self._ensure_umi_values()
@@ -154,58 +155,50 @@ class TreeAnalyzer:
                 return max(matches, key=len)
         return stem.rsplit(".", 1)[-1]
 
-    def _clonoset_filename(self, clns_filename):
+    def _resolve_clns_filename(self, clns_filename):
         raw_path = Path(str(clns_filename))
-        stem = raw_path.name[:-5] if raw_path.name.endswith(".clns") else raw_path.stem
-        sample_id = self._sample_id(clns_filename)
-        candidate_names = list(dict.fromkeys([
-            f"{stem}.tsv",
-            f"{stem}.clones.tsv",
-            f"{sample_id}.tsv",
-            f"{sample_id}.clones.tsv",
-        ]))
-
-        directories = []
         if raw_path.is_absolute():
-            directories.append(raw_path.parent)
-        else:
-            directories.append((Path.cwd() / raw_path).parent)
-            if self._trees_table_dir is not None:
-                directories.append((self._trees_table_dir / raw_path).parent)
-        for directory in dict.fromkeys(directories):
-            for candidate_name in candidate_names:
-                candidate = directory / candidate_name
-                if candidate.is_file():
-                    return candidate.resolve()
-
+            return raw_path
+        candidates = [Path.cwd() / raw_path]
         if self._trees_table_dir is not None:
-            search_roots = [self._trees_table_dir, self._trees_table_dir.parent]
-            matches = []
-            for search_root in dict.fromkeys(search_roots):
-                for candidate_name in candidate_names:
-                    matches.extend(search_root.rglob(candidate_name))
+            candidates.append(self._trees_table_dir / raw_path)
+        for candidate in candidates:
+            if candidate.is_file():
+                return candidate.resolve()
+        if self._trees_table_dir is not None:
             matches = sorted(
-                {match.resolve() for match in matches if match.is_file()},
+                {
+                    match.resolve()
+                    for root in [self._trees_table_dir, self._trees_table_dir.parent]
+                    for match in root.rglob(raw_path.name)
+                    if match.is_file()
+                },
                 key=lambda match: (len(match.parts), os.fspath(match)),
             )
             if matches:
                 return matches[0]
         return None
 
-    def _read_clonoset_umi(self, clns_filename, clone_id):
-        filename = self._clonoset_filename(clns_filename)
-        if filename is None:
-            return np.nan
-        cache_key = os.fspath(filename)
-        if cache_key not in self._clonoset_cache:
-            clonoset = read_clonoset(filename)
-            if "cloneId" not in clonoset.columns or "uniqueMoleculeCount" not in clonoset.columns:
-                self._clonoset_cache[cache_key] = {}
-            else:
-                clone_ids = clonoset["cloneId"].map(_id_key)
-                umi = pd.to_numeric(clonoset["uniqueMoleculeCount"], errors="coerce")
-                self._clonoset_cache[cache_key] = dict(zip(clone_ids, umi))
-        return self._clonoset_cache[cache_key].get(_id_key(clone_id), np.nan)
+    def _source_folders_and_filenames(self, data):
+        filenames = data.loc[_observed_mask(data), "fileName"].dropna().astype(str).unique()
+        resolved = {}
+        for filename in filenames:
+            resolved_filename = self._resolve_clns_filename(filename)
+            if resolved_filename is not None:
+                resolved[filename] = resolved_filename
+        folders = sorted({os.fspath(filename.parent) for filename in resolved.values()})
+        return folders, resolved
+
+    @staticmethod
+    def _matching_sample_id(clns_filename, sample_ids):
+        stem = Path(str(clns_filename)).name
+        if stem.endswith(".clns"):
+            stem = stem[:-5]
+        matches = [
+            sample_id for sample_id in sample_ids
+            if stem == sample_id or stem.endswith(f".{sample_id}")
+        ]
+        return max(matches, key=len) if matches else None
 
     def _add_umi_values(self, data):
         if "uniqueMoleculeCount" not in data.columns:
@@ -215,17 +208,79 @@ class TreeAnalyzer:
                 data["uniqueMoleculeCount"], errors="coerce"
             )
         required = {"fileName", "cloneId"}
-        if required.issubset(data.columns):
-            missing = _observed_mask(data) & data["uniqueMoleculeCount"].isna()
-            for index, row in data.loc[missing, ["fileName", "cloneId"]].iterrows():
-                data.at[index, "uniqueMoleculeCount"] = self._read_clonoset_umi(
-                    row["fileName"], row["cloneId"]
-                )
+        missing = _observed_mask(data) & data["uniqueMoleculeCount"].isna()
+        if not required.issubset(data.columns) or not missing.any():
+            return data
+
+        folders, resolved_filenames = self._source_folders_and_filenames(data)
+        if not folders:
+            return data
+        clonosets_df = clonosets.find_all_mixcr_clonosets(folders)
+        if clonosets_df.empty:
+            return data
+
+        discovered_sample_ids = clonosets_df["sample_id"].dropna().astype(str).unique()
+        filename_to_sample = {
+            filename: self._matching_sample_id(resolved, discovered_sample_ids)
+            for filename, resolved in resolved_filenames.items()
+        }
+        filename_to_sample = {
+            filename: sample_id
+            for filename, sample_id in filename_to_sample.items()
+            if sample_id is not None
+        }
+        if not filename_to_sample:
+            return data
+
+        observed = _observed_mask(data)
+        discovered_ids = data.loc[observed, "fileName"].astype(str).map(filename_to_sample)
+        discovered_ids = discovered_ids.dropna()
+        data.loc[discovered_ids.index, "sample_id"] = discovered_ids
+        source_sample_ids = set(filename_to_sample.values())
+        clonosets_df = clonosets_df.loc[
+            clonosets_df["sample_id"].astype(str).isin(source_sample_ids)
+        ].reset_index(drop=True)
+        if clonosets_df.empty:
+            return data
+
+        pooled = clonosets.pool_clonotypes_from_clonosets_df(
+            clonosets_df,
+            cl_filter=Filter(convert=False),
+        )
+        umi_columns = {"sample_id", "cloneId", "uniqueMoleculeCount"}
+        if not umi_columns.issubset(pooled.columns):
+            return data
+        umi_df = pooled.loc[:, ["sample_id", "cloneId", "uniqueMoleculeCount"]].copy()
+        umi_df["sample_id"] = umi_df["sample_id"].astype(str)
+        umi_df["_clone_id"] = umi_df["cloneId"].map(_id_key)
+        umi_df["uniqueMoleculeCount"] = pd.to_numeric(
+            umi_df["uniqueMoleculeCount"], errors="coerce"
+        )
+        umi_df = umi_df.drop(columns="cloneId").drop_duplicates(
+            ["sample_id", "_clone_id"], keep="first"
+        )
+
+        data["_clone_id"] = data["cloneId"].map(_id_key)
+        data = data.merge(
+            umi_df,
+            on=["sample_id", "_clone_id"],
+            how="left",
+            suffixes=("", "_pooled"),
+            sort=False,
+        )
+        data["uniqueMoleculeCount"] = data["uniqueMoleculeCount"].fillna(
+            data.pop("uniqueMoleculeCount_pooled")
+        )
+        data = data.drop(columns="_clone_id")
         return data
 
     def _ensure_umi_values(self):
+        if self._umi_enriched:
+            return self.trees_df.copy()
         enriched = self._add_umi_values(self.trees_df.copy())
-        self.trees_df["uniqueMoleculeCount"] = enriched["uniqueMoleculeCount"]
+        self.trees_df = enriched
+        self._attach_newick_trees()
+        self._umi_enriched = True
         return enriched
 
     @cached_property
