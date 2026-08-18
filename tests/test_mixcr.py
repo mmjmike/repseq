@@ -443,7 +443,11 @@ def test_find_shm_trees_groups_donor_files_and_runs_three_commands(tmp_path, cap
     assert "Donor donor_a: 2 .clns file(s)" in output
     assert str(input_dir / "sample_1.clns") in output
     assert str(input_dir / "mix.sample_2.clns") in output
+    assert f"SHM trees: {output_dir / 'donor_a_trees.shmt'}" in output
+    assert f"Trees TSV: {output_dir / 'donor_a_trees.tsv'}" in output
+    assert f"Newick folder: {output_dir / 'donor_a_newick'}" in output
     assert "Donor donor_b: 0 .clns file(s)" in output
+    assert "Outputs: not generated because no matching .clns files were found" in output
 
 
 def test_find_shm_trees_default_resources():

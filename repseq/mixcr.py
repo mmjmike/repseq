@@ -896,12 +896,17 @@ def find_shm_trees(input_dir, output_dir, mixcr_path="mixcr", sample_df=None,
         for filename in donor_clns_filenames:
             print(f"  - {filename}")
         if not donor_clns_filenames:
+            print("  Outputs: not generated because no matching .clns files were found")
             continue
 
         trees_report = os.path.join(output_dir, f"{donor_id}_trees.log")
         output_shmt = os.path.join(output_dir, f"{donor_id}_trees.shmt")
         trees_export_filename = os.path.join(output_dir, f"{donor_id}_trees.tsv")
         trees_newick_dir = os.path.join(output_dir, f"{donor_id}_newick")
+        print("  Output files:")
+        print(f"    SHM trees: {output_shmt}")
+        print(f"    Trees TSV: {trees_export_filename}")
+        print(f"    Newick folder: {trees_newick_dir}")
         find_trees_command = shlex.join([
             mixcr_path,
             f"-Xmx{memory}g",
