@@ -12,6 +12,7 @@ import re
 import warnings
 from collections.abc import Iterable
 from itertools import count
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -4371,15 +4372,22 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
     """Draw a MiXCR SHM tree from a node table loaded by ``TreeAnalyzer``."""
     if "treeId" not in trees_df.columns:
         raise ValueError("trees_df must contain a 'treeId' column")
-    newick_trees = trees_df.attrs.get("newick_trees", {})
-    newick = newick_trees.get(str(treeId))
-    if newick is None:
-        raise ValueError(f"Newick tree {treeId!r} has not been loaded")
     tree_rows = trees_df.loc[trees_df["treeId"].astype(str) == str(treeId)].copy()
     if tree_rows.empty:
         raise ValueError(f"treeId {treeId!r} is not present in trees_df")
     if "nodeId" not in tree_rows.columns:
         raise ValueError("trees_df must contain a 'nodeId' column")
+    if "newick_filename" not in tree_rows.columns:
+        raise ValueError("Newick tree filenames have not been attached to trees_df")
+    filenames = tree_rows["newick_filename"].dropna().astype(str).unique()
+    if len(filenames) == 0:
+        raise ValueError(f"Newick tree {treeId!r} has not been attached")
+    if len(filenames) > 1:
+        raise ValueError(f"treeId {treeId!r} has multiple Newick filenames")
+    newick_filename = Path(filenames[0])
+    if not newick_filename.is_file():
+        raise ValueError(f"Newick tree file does not exist: {newick_filename}")
+    newick = newick_filename.read_text().strip()
 
     graph, root = _parse_newick(newick)
     positions = _tree_layout(graph, root)

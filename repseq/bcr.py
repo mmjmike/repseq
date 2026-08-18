@@ -103,16 +103,17 @@ class TreeAnalyzer:
         self._clonoset_cache.clear()
         self._add_sample_ids()
         self._attach_newick_trees()
+        self._ensure_umi_values()
         self._invalidate_properties()
         return self.trees_df
 
     def read_trees_newick(self, folder):
-        """Read all ``<treeId>.tree`` Newick files from a folder."""
-        folder = Path(folder)
+        """Attach ``<treeId>.tree`` filenames without reading their contents."""
+        folder = Path(folder).resolve()
         if not folder.is_dir():
             raise ValueError(f"Newick tree folder does not exist: {folder}")
         self.newick_trees = {
-            path.stem: path.read_text().strip()
+            path.stem: os.fspath(path)
             for path in sorted(folder.iterdir())
             if path.is_file() and path.suffix == ".tree"
         }
@@ -130,7 +131,9 @@ class TreeAnalyzer:
 
     def _attach_newick_trees(self):
         if self.trees_df is not None:
-            self.trees_df.attrs["newick_trees"] = self.newick_trees
+            self.trees_df["newick_filename"] = self.trees_df["treeId"].map(
+                lambda tree_id: self.newick_trees.get(_id_key(tree_id), pd.NA)
+            )
 
     def _add_sample_ids(self):
         if self.trees_df is not None and "fileName" in self.trees_df.columns:
@@ -152,15 +155,42 @@ class TreeAnalyzer:
         return stem.rsplit(".", 1)[-1]
 
     def _clonoset_filename(self, clns_filename):
-        path = Path(str(clns_filename))
-        if not path.is_absolute():
-            path = (self._trees_table_dir or Path.cwd()) / path
-        stem = path.name[:-5] if path.name.endswith(".clns") else path.stem
-        candidates = [
-            path.with_name(f"{stem}.tsv"),
-            path.with_name(f"{stem}.clones.tsv"),
-        ]
-        return next((candidate for candidate in candidates if candidate.is_file()), None)
+        raw_path = Path(str(clns_filename))
+        stem = raw_path.name[:-5] if raw_path.name.endswith(".clns") else raw_path.stem
+        sample_id = self._sample_id(clns_filename)
+        candidate_names = list(dict.fromkeys([
+            f"{stem}.tsv",
+            f"{stem}.clones.tsv",
+            f"{sample_id}.tsv",
+            f"{sample_id}.clones.tsv",
+        ]))
+
+        directories = []
+        if raw_path.is_absolute():
+            directories.append(raw_path.parent)
+        else:
+            directories.append((Path.cwd() / raw_path).parent)
+            if self._trees_table_dir is not None:
+                directories.append((self._trees_table_dir / raw_path).parent)
+        for directory in dict.fromkeys(directories):
+            for candidate_name in candidate_names:
+                candidate = directory / candidate_name
+                if candidate.is_file():
+                    return candidate.resolve()
+
+        if self._trees_table_dir is not None:
+            search_roots = [self._trees_table_dir, self._trees_table_dir.parent]
+            matches = []
+            for search_root in dict.fromkeys(search_roots):
+                for candidate_name in candidate_names:
+                    matches.extend(search_root.rglob(candidate_name))
+            matches = sorted(
+                {match.resolve() for match in matches if match.is_file()},
+                key=lambda match: (len(match.parts), os.fspath(match)),
+            )
+            if matches:
+                return matches[0]
+        return None
 
     def _read_clonoset_umi(self, clns_filename, clone_id):
         filename = self._clonoset_filename(clns_filename)
