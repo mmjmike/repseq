@@ -106,7 +106,16 @@ class TreeAnalyzer:
         self._attach_newick_trees()
         self._ensure_umi_values()
         self._invalidate_properties()
-        return self.trees_df
+        observed = _observed_mask(self.trees_df)
+        tree_count = self.trees_df["treeId"].nunique(dropna=True)
+        sample_count = (
+            self.trees_df.loc[observed, "sample_id"].nunique(dropna=True)
+            if "sample_id" in self.trees_df.columns else 0
+        )
+        print(
+            f"Read {tree_count} trees from {sample_count} samples: "
+            f"{len(self.trees_df)} nodes, {int(observed.sum())} observed nodes"
+        )
 
     def read_trees_newick(self, folder):
         """Attach ``<treeId>.tree`` filenames without reading their contents."""
@@ -119,7 +128,7 @@ class TreeAnalyzer:
             if path.is_file() and path.suffix == ".tree"
         }
         self._attach_newick_trees()
-        return self.newick_trees
+        print(f"Read {len(self.newick_trees)} Newick tree filenames")
 
     def read_metadata(self, metadata):
         """Store sample metadata from a DataFrame or delimited text file."""
@@ -328,8 +337,20 @@ class TreeAnalyzer:
                 "reads": int(reads),
                 "umi": pd.NA if pd.isna(umi) else int(umi),
                 "isotypes": isotypes,
-                "v": _weighted_mode(observed.get("bestVHit", pd.Series(index=observed.index)), weights),
-                "j": _weighted_mode(observed.get("bestJHit", pd.Series(index=observed.index)), weights),
+                "v": _weighted_mode(
+                    observed.get(
+                        "bestVHit",
+                        pd.Series(index=observed.index, dtype="object"),
+                    ),
+                    weights,
+                ),
+                "j": _weighted_mode(
+                    observed.get(
+                        "bestJHit",
+                        pd.Series(index=observed.index, dtype="object"),
+                    ),
+                    weights,
+                ),
             }
             for name, column in _SEQUENCE_COLUMNS.items():
                 values = observed.get(column, pd.Series(index=observed.index, dtype="object"))

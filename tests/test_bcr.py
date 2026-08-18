@@ -69,14 +69,16 @@ def _write_tree_inputs(tmp_path):
     return trees_filename, newick_dir
 
 
-def test_tree_analyzer_properties_are_enriched_sorted_and_cached(tmp_path):
+def test_tree_analyzer_properties_are_enriched_sorted_and_cached(tmp_path, capsys):
     trees_filename, newick_dir = _write_tree_inputs(tmp_path)
     analyzer = bcr.TreeAnalyzer()
-    analyzer.read_trees_table(trees_filename)
+    assert analyzer.read_trees_table(trees_filename) is None
+    assert "Read 2 trees from 2 samples: 4 nodes, 3 observed nodes" in capsys.readouterr().out
     assert analyzer.trees_df.loc[
         analyzer.trees_df["nodeId"] == 1, "uniqueMoleculeCount"
     ].iloc[0] == 10
-    analyzer.read_trees_newick(newick_dir)
+    assert analyzer.read_trees_newick(newick_dir) is None
+    assert "Read 2 Newick tree filenames" in capsys.readouterr().out
     analyzer.read_metadata(pd.DataFrame({"sample_id": ["sample.one", "two"], "timepoint": [1, 2]}))
 
     properties = analyzer.trees_properties
@@ -102,7 +104,7 @@ def test_tree_analyzer_properties_are_enriched_sorted_and_cached(tmp_path):
     ].unique().tolist() == [str((newick_dir / "1.tree").resolve())]
 
 
-def test_read_trees_newick_attaches_paths_without_reading(tmp_path, monkeypatch):
+def test_read_trees_newick_attaches_paths_without_reading(tmp_path, monkeypatch, capsys):
     trees_filename, newick_dir = _write_tree_inputs(tmp_path)
     analyzer = bcr.TreeAnalyzer()
     analyzer.read_trees_table(trees_filename)
@@ -112,9 +114,11 @@ def test_read_trees_newick_attaches_paths_without_reading(tmp_path, monkeypatch)
 
     with monkeypatch.context() as patcher:
         patcher.setattr(Path, "read_text", fail_if_read)
-        filenames = analyzer.read_trees_newick(newick_dir)
+        result = analyzer.read_trees_newick(newick_dir)
 
-    assert filenames["1"] == str((newick_dir / "1.tree").resolve())
+    assert result is None
+    assert analyzer.newick_trees["1"] == str((newick_dir / "1.tree").resolve())
+    assert "Read 2 Newick tree filenames" in capsys.readouterr().out
     assert analyzer.trees_df.loc[
         analyzer.trees_df["treeId"] == 1, "newick_filename"
     ].nunique() == 1
