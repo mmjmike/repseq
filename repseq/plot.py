@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 import warnings
 from collections.abc import Iterable
+from itertools import count
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,6 +21,8 @@ from matplotlib.colors import LinearSegmentedColormap, to_rgb
 from matplotlib.lines import Line2D
 from matplotlib.patches import Ellipse, Patch
 from scipy.cluster.hierarchy import dendrogram, leaves_list, linkage
+
+import networkx as nx
 
 
 CDR3AA_STATS_PROPERTIES = [
@@ -4305,6 +4308,134 @@ def convergence(
     )
 
 
+def _parse_newick(newick):
+    text = re.sub(r"\[[^]]*\]", "", str(newick).strip())
+    tokens = re.findall(r"\s*(\(|\)|,|:|;|'(?:''|[^'])*'|[^\s(),:;]+)", text)
+    position = 0
+    unnamed = count()
+    graph = nx.Graph()
+
+    def parse_subtree():
+        nonlocal position
+        children = []
+        if position < len(tokens) and tokens[position] == "(":
+            position += 1
+            while True:
+                children.append(parse_subtree())
+                if position >= len(tokens) or tokens[position] != ",":
+                    break
+                position += 1
+            if position >= len(tokens) or tokens[position] != ")":
+                raise ValueError("Invalid Newick tree: missing closing parenthesis")
+            position += 1
+
+        label = None
+        if position < len(tokens) and tokens[position] not in {",", ")", ":", ";"}:
+            label = tokens[position]
+            position += 1
+            if label.startswith("'") and label.endswith("'"):
+                label = label[1:-1].replace("''", "'")
+        if label in {None, ""}:
+            label = f"__internal_{next(unnamed)}"
+        if position < len(tokens) and tokens[position] == ":":
+            position += 2
+        graph.add_node(str(label))
+        for child in children:
+            graph.add_edge(str(label), child)
+        return str(label)
+
+    root = parse_subtree()
+    if position < len(tokens) and tokens[position] == ";":
+        position += 1
+    if position != len(tokens):
+        raise ValueError("Invalid Newick tree: unexpected trailing content")
+    return graph, root
+
+
+def _tree_layout(graph, root):
+    positions = {}
+    next_leaf = count()
+
+    def place(node, parent=None, depth=0):
+        children = [child for child in graph.neighbors(node) if child != parent]
+        child_positions = [place(child, node, depth + 1) for child in children]
+        y = float(next(next_leaf)) if not child_positions else float(np.mean(child_positions))
+        positions[node] = (depth, y)
+        return y
+
+    place(root)
+    return positions
+
+
+def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
+    """Draw a MiXCR SHM tree from a node table loaded by ``TreeAnalyzer``."""
+    if "treeId" not in trees_df.columns:
+        raise ValueError("trees_df must contain a 'treeId' column")
+    newick_trees = trees_df.attrs.get("newick_trees", {})
+    newick = newick_trees.get(str(treeId))
+    if newick is None:
+        raise ValueError(f"Newick tree {treeId!r} has not been loaded")
+    tree_rows = trees_df.loc[trees_df["treeId"].astype(str) == str(treeId)].copy()
+    if tree_rows.empty:
+        raise ValueError(f"treeId {treeId!r} is not present in trees_df")
+    if "nodeId" not in tree_rows.columns:
+        raise ValueError("trees_df must contain a 'nodeId' column")
+
+    graph, root = _parse_newick(newick)
+    positions = _tree_layout(graph, root)
+    node_data = tree_rows.assign(_node_key=tree_rows["nodeId"].astype(str)).set_index("_node_key")
+    if "sample_id" not in node_data.columns and "fileName" in node_data.columns:
+        node_data["sample_id"] = node_data["fileName"].apply(
+            lambda filename: str(filename).rsplit("/", 1)[-1][:-5].rsplit(".", 1)[-1]
+            if str(filename).endswith(".clns") else str(filename)
+        )
+    if metadata is not None:
+        if "sample_id" not in metadata.columns:
+            raise ValueError("metadata must contain a 'sample_id' column")
+        node_data = node_data.reset_index().merge(metadata, on="sample_id", how="left").set_index("_node_key")
+
+    color_values = node_data[group] if group is not None and group in node_data.columns else None
+    categories = [] if color_values is None else sorted(color_values.dropna().astype(str).unique())
+    palette = dict(zip(categories, sns.color_palette(n_colors=len(categories))))
+    read_counts = (
+        pd.to_numeric(node_data["readCount"], errors="coerce")
+        if "readCount" in node_data.columns
+        else pd.Series(1, index=node_data.index, dtype=float)
+    )
+    counts = (
+        pd.to_numeric(node_data["uniqueMoleculeCount"], errors="coerce").fillna(read_counts)
+        if "uniqueMoleculeCount" in node_data.columns else read_counts
+    ).fillna(1)
+    max_count = max(float(counts.max()), 1)
+
+    if ax is None:
+        _, ax = plt.subplots(figsize=(8, max(4, len(graph) * 0.22)))
+    for left, right in graph.edges:
+        x1, y1 = positions[left]
+        x2, y2 = positions[right]
+        ax.plot([x1, x2], [y1, y2], color="0.7", linewidth=1, zorder=1)
+    for node, (x, y) in positions.items():
+        if node in node_data.index:
+            row = node_data.loc[node]
+            category = str(row[group]) if group is not None and group in row and pd.notna(row[group]) else None
+            color = palette.get(category, "0.45")
+            size = 30 + 270 * np.sqrt(float(counts.loc[node]) / max_count)
+            ax.scatter(x, y, s=size, color=color, edgecolor="white", linewidth=0.6, zorder=2)
+            annotations = [str(row["sample_id"])] if "sample_id" in row and pd.notna(row["sample_id"]) else []
+            if label is not None and label in row and pd.notna(row[label]):
+                annotations.append(str(row[label]))
+            if annotations:
+                ax.annotate(" | ".join(annotations), (x, y), xytext=(5, 3), textcoords="offset points", fontsize=8)
+        else:
+            ax.scatter(x, y, s=18, color="white", edgecolor="0.45", linewidth=0.8, zorder=2)
+    if categories:
+        handles = [Line2D([], [], marker="o", linestyle="", color=palette[value], label=value) for value in categories]
+        ax.legend(handles=handles, title=group, frameon=False)
+    ax.set_title(f"Tree {treeId}")
+    ax.set_axis_off()
+    return ax
+
+
 __all__ = [
     "CDR3AA_STATS_PROPERTIES",
     "DIVERSITY_STATS_PROPERTIES",
@@ -4329,4 +4460,5 @@ __all__ = [
     "cdr3aa_stats",
     "diversity_stats",
     "convergence",
+    "draw_tree",
 ]

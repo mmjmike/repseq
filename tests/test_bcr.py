@@ -1,0 +1,131 @@
+import matplotlib
+import pandas as pd
+import pytest
+
+matplotlib.use("Agg")
+
+from repseq import bcr
+from repseq import plot as rsplot
+
+
+REGIONS = ["aaSeqCDR1", "aaSeqFR2", "aaSeqCDR2", "aaSeqFR3", "aaSeqCDR3", "aaSeqFR4"]
+
+
+def _write_tree_inputs(tmp_path):
+    rows = [
+        {
+            "treeId": 1, "nodeId": 1, "isObserved": True,
+            "fileName": "mix.sample.one.clns", "cloneId": 1,
+            "readCount": 5, "isotype": "IgM", "bestVHit": "IGHV1",
+            "bestJHit": "IGHJ1", "mutationRate": 0.1,
+            "distanceFromGermline": 2,
+        },
+        {
+            "treeId": 1, "nodeId": 2, "isObserved": True,
+            "fileName": "mix.sample.one.clns", "cloneId": 2,
+            "readCount": 2, "isotype": "IgG", "bestVHit": "IGHV2",
+            "bestJHit": "IGHJ2", "mutationRate": 0.2,
+            "distanceFromGermline": 4,
+        },
+        {
+            "treeId": 1, "nodeId": 3, "isObserved": False,
+            "fileName": pd.NA, "cloneId": 999, "readCount": 0,
+            "isotype": pd.NA, "bestVHit": "IGHV1", "bestJHit": "IGHJ1",
+            "mutationRate": 0.3, "distanceFromGermline": 5,
+        },
+        {
+            "treeId": 2, "nodeId": 4, "isObserved": True,
+            "fileName": "sample.two.clns", "cloneId": 4,
+            "readCount": 20, "uniqueMoleculeCount": 3, "isotype": "IgD",
+            "bestVHit": "IGHV3", "bestJHit": "IGHJ3", "mutationRate": 0.05,
+            "distanceFromGermline": 1,
+        },
+    ]
+    sequences = {
+        1: ["CAR", "WAA", "GG", "TTT", "AAA", "WG"],
+        2: ["CAS", "WAA", "GA", "TTA", "ABA", "WG"],
+        3: ["CAT", "WAA", "GA", "TTA", "ACA", "WG"],
+        4: ["CCC", "FFF", "GG", "HHH", "ZZZ", "WW"],
+    }
+    for row in rows:
+        for column, sequence in zip(REGIONS, sequences[row["nodeId"]]):
+            row[column] = sequence
+    trees_filename = tmp_path / "donor_trees.tsv"
+    pd.DataFrame(rows).to_csv(trees_filename, sep="\t", index=False)
+    pd.DataFrame(
+        {"cloneId": [1, 2], "readCount": [5, 2], "readFraction": [0.7, 0.3],
+         "uniqueMoleculeCount": [10, 2]}
+    ).to_csv(tmp_path / "mix.sample.one.tsv", sep="\t", index=False)
+    newick_dir = tmp_path / "newick"
+    newick_dir.mkdir()
+    (newick_dir / "1.tree").write_text("(1:0.1,2:0.2)3;")
+    (newick_dir / "2.tree").write_text("4;")
+    return trees_filename, newick_dir
+
+
+def test_tree_analyzer_properties_are_enriched_sorted_and_cached(tmp_path):
+    trees_filename, newick_dir = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    analyzer.read_trees_newick(newick_dir)
+    analyzer.read_metadata(pd.DataFrame({"sample_id": ["sample.one", "two"], "timepoint": [1, 2]}))
+
+    properties = analyzer.trees_properties
+
+    assert analyzer.trees_properties is properties
+    assert properties["treeId"].tolist() == [1, 2]
+    first = properties.iloc[0]
+    assert first["nodes"] == 3
+    assert first["nodes_obs"] == 2
+    assert first["reads"] == 7
+    assert first["umi"] == 12
+    assert first["isotypes"] == ["IgG", "IgM"]
+    assert first["v"] == "IGHV1"
+    assert first["j"] == "IGHJ1"
+    assert first["consensus_CDR1"] == "CAR"
+    assert first["consensus_CDR3"] == "AAA"
+    assert first["mean_mutation_rate"] == pytest.approx(0.15)
+    assert bool(first["isotype_switched"])
+    assert first["max_distance_from_germline"] == 5
+    assert analyzer.trees_df.loc[analyzer.trees_df["nodeId"] == 1, "uniqueMoleculeCount"].iloc[0] == 10
+    assert analyzer.trees_df.loc[analyzer.trees_df["nodeId"] == 1, "sample_id"].iloc[0] == "sample.one"
+    assert analyzer.trees_df.attrs["newick_trees"]["1"] == "(1:0.1,2:0.2)3;"
+
+
+def test_tree_analyzer_draw_tree_wrapper(tmp_path, monkeypatch):
+    trees_filename, _ = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    metadata = pd.DataFrame({"sample_id": ["one"]})
+    analyzer.read_metadata(metadata)
+    captured = {}
+
+    def fake_draw_tree(trees_df, tree_id, **kwargs):
+        captured.update(trees_df=trees_df, tree_id=tree_id, **kwargs)
+        return "axis"
+
+    monkeypatch.setattr(bcr.rsplot, "draw_tree", fake_draw_tree)
+    assert analyzer.draw_tree(1) == "axis"
+    assert captured == {
+        "trees_df": analyzer.trees_df,
+        "tree_id": 1,
+        "metadata": analyzer.metadata,
+        "group": "isotype",
+        "label": "timepoint",
+    }
+
+
+def test_draw_tree_returns_axis(tmp_path):
+    trees_filename, newick_dir = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    analyzer.read_trees_newick(newick_dir)
+    analyzer.read_metadata(pd.DataFrame({"sample_id": ["sample.one"], "timepoint": ["day 1"]}))
+    analyzer.trees_properties
+
+    axis = rsplot.draw_tree(
+        analyzer.trees_df, 1, metadata=analyzer.metadata, group="isotype", label="timepoint"
+    )
+
+    assert axis.get_title() == "Tree 1"
+    assert len(axis.collections) == 3
