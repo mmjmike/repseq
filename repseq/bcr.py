@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from functools import cached_property
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +11,7 @@ import pandas as pd
 from . import plot as rsplot
 from . import clonosets
 from .clone_filter import Filter
+from .common_functions import print_progress_bar
 
 
 _SEQUENCE_COLUMNS = {
@@ -83,6 +83,20 @@ def _is_unswitched_isotype(isotype):
     return normalized in {"M", "D", "IGM", "IGD", "IGHM", "IGHD"}
 
 
+class _TreePropertiesTable(pd.DataFrame):
+    _metadata = ["_analyzer"]
+
+    @property
+    def _constructor(self):
+        return pd.DataFrame
+
+    def __call__(self, all_consensuses=False, verbose=True):
+        return self._analyzer._get_trees_properties(
+            all_consensuses=all_consensuses,
+            verbose=verbose,
+        )
+
+
 class TreeAnalyzer:
     """Analyze MiXCR SHM-tree node tables and their Newick trees."""
 
@@ -92,9 +106,12 @@ class TreeAnalyzer:
         self.newick_trees = {}
         self._trees_table_dir = None
         self._umi_enriched = False
+        self._trees_properties_cache = None
+        self._all_consensuses_cached = False
 
     def _invalidate_properties(self):
-        self.__dict__.pop("trees_properties", None)
+        self._trees_properties_cache = None
+        self._all_consensuses_cached = False
 
     def read_trees_table(self, filename):
         """Read a MiXCR ``exportShmTreesWithNodes`` TSV table."""
@@ -333,25 +350,46 @@ class TreeAnalyzer:
         self._umi_enriched = True
         return enriched
 
-    @cached_property
+    @property
     def trees_properties(self):
-        """Return one cached summary row per tree."""
+        """Return the cached tree summary; call it to request all consensuses."""
+        return self._get_trees_properties(all_consensuses=False, verbose=True)
+
+    def _get_trees_properties(self, all_consensuses=False, verbose=True):
         if self.trees_df is None:
             raise ValueError("Read a trees table before calculating tree properties")
         if "treeId" not in self.trees_df.columns:
             raise ValueError("trees table must contain a 'treeId' column")
 
+        if self._trees_properties_cache is None:
+            self._calculate_base_tree_properties(verbose=verbose)
+        if all_consensuses and not self._all_consensuses_cached:
+            self._add_consensus_columns(verbose=verbose)
+        return self._trees_properties_cache
+
+    def _calculate_base_tree_properties(self, verbose=True):
         data = self._ensure_umi_values()
+        grouped_trees = list(data.groupby("treeId", sort=False, dropna=False))
+        tree_total = len(grouped_trees)
+        if verbose:
+            print(f"Calculating properties for {tree_total} trees (CDR3 consensus only)")
+            print_progress_bar(0, tree_total, "Tree properties", object_name="tree(s)")
+
         mutation_column = _first_existing(
             data.columns,
             ["mutationRate", "nMutationRate", "nMutationsRate", "mutation_rate"],
         )
         distance_column = _first_existing(
             data.columns,
-            ["distanceFromGermline", "distance_from_germline", "distanceFromRoot"],
+            [
+                "DistanceFromGermline",
+                "distanceFromGermline",
+                "distance_from_germline",
+                "distanceFromRoot",
+            ],
         )
         rows = []
-        for tree_id, tree in data.groupby("treeId", sort=False, dropna=False):
+        for tree_index, (tree_id, tree) in enumerate(grouped_trees, start=1):
             observed = tree.loc[_observed_mask(tree)].copy()
             read_values = (
                 pd.to_numeric(observed["readCount"], errors="coerce").fillna(1)
@@ -393,9 +431,11 @@ class TreeAnalyzer:
                     weights,
                 ),
             }
-            for name, column in _SEQUENCE_COLUMNS.items():
-                values = observed.get(column, pd.Series(index=observed.index, dtype="object"))
-                row[f"consensus_{name}"] = _weighted_consensus(values, weights)
+            cdr3_values = observed.get(
+                _SEQUENCE_COLUMNS["CDR3"],
+                pd.Series(index=observed.index, dtype="object"),
+            )
+            row["consensus_CDR3"] = _weighted_consensus(cdr3_values, weights)
             if mutation_column is None:
                 row["mean_mutation_rate"] = np.nan
             else:
@@ -412,6 +452,13 @@ class TreeAnalyzer:
                     tree[distance_column], errors="coerce"
                 ).max()
             rows.append(row)
+            if verbose:
+                print_progress_bar(
+                    tree_index,
+                    tree_total,
+                    "Tree properties",
+                    object_name="tree(s)",
+                )
 
         properties = pd.DataFrame(rows)
         properties["umi"] = properties["umi"].astype("Int64")
@@ -422,7 +469,79 @@ class TreeAnalyzer:
             na_position="last",
             kind="stable",
         )
-        return properties.drop(columns="_sort_count").reset_index(drop=True)
+        properties = properties.drop(columns="_sort_count").reset_index(drop=True)
+        cached = _TreePropertiesTable(properties)
+        cached._analyzer = self
+        self._trees_properties_cache = cached
+        if verbose:
+            print("Finished calculating tree properties")
+
+    def _add_consensus_columns(self, verbose=True):
+        data = self._ensure_umi_values()
+        grouped_trees = list(data.groupby("treeId", sort=False, dropna=False))
+        tree_total = len(grouped_trees)
+        extra_sequences = {
+            name: column
+            for name, column in _SEQUENCE_COLUMNS.items()
+            if name != "CDR3"
+        }
+        consensus_by_name = {name: {} for name in extra_sequences}
+        if verbose:
+            print(f"Calculating additional consensus sequences for {tree_total} trees")
+            print_progress_bar(0, tree_total, "Tree consensuses", object_name="tree(s)")
+
+        for tree_index, (tree_id, tree) in enumerate(grouped_trees, start=1):
+            observed = tree.loc[_observed_mask(tree)].copy()
+            read_values = (
+                pd.to_numeric(observed["readCount"], errors="coerce").fillna(1)
+                if "readCount" in observed.columns
+                else pd.Series(1, index=observed.index, dtype=float)
+            )
+            weights = observed["uniqueMoleculeCount"].where(
+                observed["uniqueMoleculeCount"].notna(),
+                read_values,
+            )
+            for name, column in extra_sequences.items():
+                values = observed.get(
+                    column,
+                    pd.Series(index=observed.index, dtype="object"),
+                )
+                consensus_by_name[name][_id_key(tree_id)] = _weighted_consensus(
+                    values,
+                    weights,
+                )
+            if verbose:
+                print_progress_bar(
+                    tree_index,
+                    tree_total,
+                    "Tree consensuses",
+                    object_name="tree(s)",
+                )
+
+        cdr3_position = self._trees_properties_cache.columns.get_loc("consensus_CDR3")
+        insert_position = cdr3_position
+        for name in ["CDR1", "FR2", "CDR2", "FR3"]:
+            values = self._trees_properties_cache["treeId"].map(
+                lambda tree_id: consensus_by_name[name].get(_id_key(tree_id), pd.NA)
+            )
+            self._trees_properties_cache.insert(
+                insert_position,
+                f"consensus_{name}",
+                values,
+            )
+            insert_position += 1
+        fr4_values = self._trees_properties_cache["treeId"].map(
+            lambda tree_id: consensus_by_name["FR4"].get(_id_key(tree_id), pd.NA)
+        )
+        cdr3_position = self._trees_properties_cache.columns.get_loc("consensus_CDR3")
+        self._trees_properties_cache.insert(
+            cdr3_position + 1,
+            "consensus_FR4",
+            fr4_values,
+        )
+        self._all_consensuses_cached = True
+        if verbose:
+            print("Finished calculating additional consensus sequences")
 
     def draw_tree(self, treeId, group="isotype", label="timepoint"):
         """Draw one loaded tree, optionally colored and labeled by metadata."""
@@ -464,7 +583,7 @@ class TreeAnalyzer:
             observed["_count"] = read_counts
         observed["_count"] = observed["_count"].fillna(0)
 
-        properties = self.trees_properties.loc[
+        properties = self.trees_properties(all_consensuses=False).loc[
             :, ["treeId", "v", "j", "consensus_CDR3"]
         ].rename(columns={"consensus_CDR3": "consensus_cdr3"})
         found_samples = observed["sample_id"].dropna().astype(str).unique().tolist()

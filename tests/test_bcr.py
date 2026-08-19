@@ -22,27 +22,27 @@ def _write_tree_inputs(tmp_path):
             "fileName": "mix.sample.one.clns", "cloneId": 1,
             "readCount": 5, "isotype": "IgM", "bestVHit": "IGHV1",
             "bestJHit": "IGHJ1", "mutationRate": 0.1,
-            "distanceFromGermline": 2,
+            "DistanceFromGermline": 2,
         },
         {
             "treeId": 1, "nodeId": 2, "isObserved": True,
             "fileName": "mix.sample.one.clns", "cloneId": 2,
             "readCount": 2, "isotype": "IgG", "bestVHit": "IGHV2",
             "bestJHit": "IGHJ2", "mutationRate": 0.2,
-            "distanceFromGermline": 4,
+            "DistanceFromGermline": 4,
         },
         {
             "treeId": 1, "nodeId": 3, "isObserved": False,
             "fileName": pd.NA, "cloneId": 999, "readCount": 0,
             "isotype": pd.NA, "bestVHit": "IGHV1", "bestJHit": "IGHJ1",
-            "mutationRate": 0.3, "distanceFromGermline": 5,
+            "mutationRate": 0.3, "DistanceFromGermline": 5,
         },
         {
             "treeId": 2, "nodeId": 4, "isObserved": True,
             "fileName": "sample.two.clns", "cloneId": 4,
             "readCount": 20, "uniqueMoleculeCount": 3, "isotype": "IgD",
             "bestVHit": "IGHV3", "bestJHit": "IGHJ3", "mutationRate": 0.05,
-            "distanceFromGermline": 1,
+            "DistanceFromGermline": 1,
         },
     ]
     sequences = {
@@ -94,8 +94,12 @@ def test_tree_analyzer_properties_are_enriched_sorted_and_cached(tmp_path, capsy
     )
 
     properties = analyzer.trees_properties
+    output = capsys.readouterr().out
 
     assert analyzer.trees_properties is properties
+    assert "Calculating properties for 2 trees (CDR3 consensus only)" in output
+    assert "Finished calculating tree properties" in output
+    assert capsys.readouterr().out == ""
     assert properties["treeId"].tolist() == [1, 2]
     first = properties.iloc[0]
     assert first["nodes"] == 3
@@ -105,7 +109,7 @@ def test_tree_analyzer_properties_are_enriched_sorted_and_cached(tmp_path, capsy
     assert first["isotypes"] == ["IgG", "IgM"]
     assert first["v"] == "IGHV1"
     assert first["j"] == "IGHJ1"
-    assert first["consensus_CDR1"] == "CAR"
+    assert "consensus_CDR1" not in properties.columns
     assert first["consensus_CDR3"] == "AAA"
     assert first["mean_mutation_rate"] == pytest.approx(0.15)
     assert bool(first["isotype_switched"])
@@ -114,6 +118,19 @@ def test_tree_analyzer_properties_are_enriched_sorted_and_cached(tmp_path, capsy
     assert analyzer.trees_df.loc[
         analyzer.trees_df["treeId"] == 1, "newick_filename"
     ].unique().tolist() == [str((newick_dir / "1.tree").resolve())]
+
+    full_properties = properties(all_consensuses=True)
+    output = capsys.readouterr().out
+    assert full_properties is properties
+    assert "Calculating additional consensus sequences for 2 trees" in output
+    assert "Finished calculating additional consensus sequences" in output
+    assert full_properties.loc[0, "consensus_CDR1"] == "CAR"
+    assert full_properties.loc[0, "consensus_FR2"] == "WAA"
+    assert full_properties.loc[0, "consensus_CDR2"] == "GG"
+    assert full_properties.loc[0, "consensus_FR3"] == "TTT"
+    assert full_properties.loc[0, "consensus_FR4"] == "WG"
+    assert analyzer.trees_properties is full_properties
+    assert capsys.readouterr().out == ""
 
 
 def test_read_trees_newick_attaches_paths_without_reading(tmp_path, monkeypatch, capsys):
