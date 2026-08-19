@@ -200,6 +200,54 @@ def test_read_metadata_before_trees_table_does_nothing(capsys):
     assert "Trees table has not been read. Metadata was not loaded" in capsys.readouterr().out
 
 
+def test_to_count_table_uses_metadata_order_and_umi_counts(tmp_path):
+    trees_filename, _ = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    analyzer.read_metadata(
+        pd.DataFrame(
+            {
+                "sample_id": ["two", "sample.one"],
+                "timepoint": [2, 1],
+            }
+        )
+    )
+
+    count_table = analyzer.to_count_table()
+
+    assert count_table.columns.tolist() == [
+        "treeId",
+        "v",
+        "j",
+        "consensus_cdr3",
+        "two",
+        "sample.one",
+    ]
+    assert count_table.loc[count_table["treeId"] == 1, "sample.one"].iloc[0] == 12
+    assert count_table.loc[count_table["treeId"] == 1, "two"].iloc[0] == 0
+    assert count_table.loc[count_table["treeId"] == 2, "two"].iloc[0] == 3
+
+
+def test_to_count_table_sorts_samples_and_falls_back_to_reads(tmp_path):
+    trees_filename, _ = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    analyzer.trees_df["uniqueMoleculeCount"] = pd.NA
+
+    count_table = analyzer.to_count_table()
+
+    assert count_table.columns.tolist() == [
+        "treeId",
+        "v",
+        "j",
+        "consensus_cdr3",
+        "sample.one",
+        "two",
+    ]
+    assert count_table.loc[count_table["treeId"] == 1, "sample.one"].iloc[0] == 7
+    assert count_table.loc[count_table["treeId"] == 2, "two"].iloc[0] == 20
+
+
 def test_draw_tree_returns_axis(tmp_path):
     trees_filename, newick_dir = _write_tree_inputs(tmp_path)
     analyzer = bcr.TreeAnalyzer()

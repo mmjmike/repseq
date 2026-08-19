@@ -437,5 +437,55 @@ class TreeAnalyzer:
             label=label,
         )
 
+    def to_count_table(self):
+        """Create a wide table of tree abundance by sample."""
+        if self.trees_df is None:
+            raise ValueError("Read a trees table before creating a count table")
+        data = self._ensure_umi_values()
+        required_columns = {"treeId", "sample_id", "isObserved"}
+        missing_columns = sorted(required_columns - set(data.columns))
+        if missing_columns:
+            raise ValueError(
+                f"trees table is missing required columns: {', '.join(missing_columns)}"
+            )
+
+        observed = data.loc[_observed_mask(data)].copy()
+        observed = observed.loc[observed["sample_id"].notna()]
+        read_counts = (
+            pd.to_numeric(observed["readCount"], errors="coerce")
+            if "readCount" in observed.columns
+            else pd.Series(0, index=observed.index, dtype=float)
+        )
+        if "uniqueMoleculeCount" in observed.columns:
+            observed["_count"] = pd.to_numeric(
+                observed["uniqueMoleculeCount"], errors="coerce"
+            ).fillna(read_counts)
+        else:
+            observed["_count"] = read_counts
+        observed["_count"] = observed["_count"].fillna(0)
+
+        properties = self.trees_properties.loc[
+            :, ["treeId", "v", "j", "consensus_CDR3"]
+        ].rename(columns={"consensus_CDR3": "consensus_cdr3"})
+        found_samples = observed["sample_id"].dropna().astype(str).unique().tolist()
+        if self.metadata is not None and "sample_id" in self.metadata.columns:
+            metadata_order = self.metadata["sample_id"].dropna().astype(str).tolist()
+            sample_ids = [sample_id for sample_id in metadata_order if sample_id in found_samples]
+            sample_ids.extend(sorted(set(found_samples) - set(sample_ids)))
+        else:
+            sample_ids = sorted(found_samples)
+
+        abundance = observed.assign(sample_id=observed["sample_id"].astype(str)).groupby(
+            ["treeId", "sample_id"], sort=False, dropna=False
+        )["_count"].sum()
+        count_table = properties.copy()
+        for sample_id in sample_ids:
+            sample_counts = abundance.xs(sample_id, level="sample_id", drop_level=True)
+            values = count_table["treeId"].map(sample_counts).fillna(0)
+            if np.all(np.isclose(values, np.round(values))):
+                values = values.round().astype("Int64")
+            count_table[sample_id] = values
+        return count_table
+
 
 __all__ = ["TreeAnalyzer"]
