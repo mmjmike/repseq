@@ -1,4 +1,5 @@
 import matplotlib
+import numpy as np
 import pandas as pd
 import pytest
 from pathlib import Path
@@ -194,7 +195,24 @@ def test_draw_tree_returns_axis(tmp_path):
     )
 
     assert axis.get_title() == "Tree 1"
-    assert sum(isinstance(collection, PathCollection) for collection in axis.collections) == 3
+    point_collections = [
+        collection
+        for collection in axis.collections
+        if isinstance(collection, PathCollection)
+    ]
+    assert len(point_collections) == 3
+    observed_points = [
+        collection for collection in point_collections
+        if collection.get_sizes()[0] > 22
+    ]
+    reconstructed_points = [
+        collection for collection in point_collections
+        if collection.get_sizes()[0] == 22
+    ]
+    observed_x = [collection.get_offsets()[0, 0] for collection in observed_points]
+    reconstructed_x = reconstructed_points[0].get_offsets()[0, 0]
+    assert np.allclose(observed_x, observed_x[0])
+    assert observed_x[0] > reconstructed_x
     assert axis.get_xlabel() == "Branch length"
 
 
@@ -236,10 +254,18 @@ def test_observed_internal_nodes_are_moved_to_sampled_ancestor_tips():
         if plot_rows.get(clade.name, {}).get("nodeId") == 1
     )
     reconstructed_root = next(clade for clade in tree.find_clades() if clade.name == "3")
+    observed_terminal = next(
+        clade
+        for clade in tree.get_terminals()
+        if plot_rows.get(clade.name, {}).get("nodeId") == 2
+    )
     observed_path = tree.get_path(observed_internal)
     assert observed_internal.is_terminal()
     assert observed_path[-2].name is None
     assert tree.depths()[observed_internal] > tree.depths()[observed_path[-2]]
+    assert tree.depths()[observed_internal] == pytest.approx(
+        tree.depths()[observed_terminal]
+    )
     assert not reconstructed_root.is_terminal()
 
 
@@ -258,4 +284,4 @@ def test_draw_tree_supports_multiple_observations_for_one_node(tmp_path):
     axis = analyzer.draw_tree(1)
 
     assert axis.get_title() == "Tree 1"
-    assert sum(isinstance(collection, PathCollection) for collection in axis.collections) == 5
+    assert sum(isinstance(collection, PathCollection) for collection in axis.collections) == 4

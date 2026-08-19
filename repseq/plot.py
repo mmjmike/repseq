@@ -4338,7 +4338,7 @@ def _restore_numeric_internal_node_names(tree, valid_node_ids=None):
     return tree
 
 
-def _sampled_tip_length(tree):
+def _sampled_tip_target(tree):
     depths = tree.depths()
     max_depth = max(depths.values(), default=0)
     if max_depth == 0:
@@ -4353,12 +4353,14 @@ def _sampled_tip_length(tree):
         for clade in tree.find_clades(order="preorder")
         if clade.branch_length is not None and clade.branch_length > 0
     ]
-    shortest_branch = min(positive_lengths, default=max_depth)
-    return max(max_depth * 0.04, shortest_branch * 0.2)
+    depth_scale = max(max_depth, 1)
+    shortest_branch = min(positive_lengths, default=depth_scale)
+    margin = max(depth_scale * 0.04, shortest_branch * 0.2)
+    return depths, max_depth + margin, margin
 
 
 def _prepare_tree_plot_nodes(tree, node_data):
-    tip_length = _sampled_tip_length(tree)
+    depths, target_depth, minimum_tip_length = _sampled_tip_target(tree)
     node_groups = {
         node_id: rows
         for node_id, rows in node_data.groupby("_node_key", sort=False)
@@ -4380,12 +4382,6 @@ def _prepare_tree_plot_nodes(tree, node_data):
         if observed_rows.empty:
             plot_rows[node_id] = rows.iloc[0]
             continue
-        if clade.is_terminal() and len(observed_rows) == 1 and non_observed_rows.empty:
-            plot_key = f"__repseq_observed_{observed_index}"
-            observed_index += 1
-            clade.name = plot_key
-            plot_rows[plot_key] = observed_rows.iloc[0]
-            continue
 
         if non_observed_rows.empty:
             clade.name = None
@@ -4396,7 +4392,10 @@ def _prepare_tree_plot_nodes(tree, node_data):
             plot_key = f"__repseq_observed_{observed_index}"
             observed_index += 1
             observed_tip = clade.__class__(
-                branch_length=tip_length,
+                branch_length=max(
+                    target_depth - depths.get(clade, 0),
+                    minimum_tip_length,
+                ),
                 name=plot_key,
             )
             clade.clades.append(observed_tip)
@@ -4532,8 +4531,6 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
                     linewidth=0.8,
                     zorder=3,
                 )
-        else:
-            ax.scatter(x, y, s=16, color="white", edgecolor="0.45", linewidth=0.7, zorder=3)
     if categories:
         handles = [Line2D([], [], marker="o", linestyle="", color=palette[value], label=value) for value in categories]
         ax.legend(handles=handles, title=group, frameon=False)
