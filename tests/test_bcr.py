@@ -2,6 +2,7 @@ import matplotlib
 import pandas as pd
 import pytest
 from pathlib import Path
+from matplotlib.collections import PathCollection
 
 matplotlib.use("Agg")
 
@@ -191,7 +192,8 @@ def test_draw_tree_returns_axis(tmp_path):
     )
 
     assert axis.get_title() == "Tree 1"
-    assert len(axis.collections) == 3
+    assert sum(isinstance(collection, PathCollection) for collection in axis.collections) == 3
+    assert axis.get_xlabel() == "Branch length"
 
 
 @pytest.mark.parametrize("requested_tree_id", [6388, "6388"])
@@ -210,4 +212,4 @@ def test_draw_tree_normalizes_integer_string_and_float_tree_ids(
     axis = analyzer.draw_tree(requested_tree_id)
 
     assert axis.get_title() == f"Tree {requested_tree_id}"
-    assert len(axis.collections) == 3
+    assert sum(isinstance(collection, PathCollection) for collection in axis.collections) == 3

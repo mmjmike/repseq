@@ -11,7 +11,6 @@ from __future__ import annotations
 import re
 import warnings
 from collections.abc import Iterable
-from itertools import count
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -22,8 +21,6 @@ from matplotlib.colors import LinearSegmentedColormap, to_rgb
 from matplotlib.lines import Line2D
 from matplotlib.patches import Ellipse, Patch
 from scipy.cluster.hierarchy import dendrogram, leaves_list, linkage
-
-import networkx as nx
 
 
 CDR3AA_STATS_PROPERTIES = [
@@ -4309,51 +4306,6 @@ def convergence(
     )
 
 
-def _parse_newick(newick):
-    text = re.sub(r"\[[^]]*\]", "", str(newick).strip())
-    tokens = re.findall(r"\s*(\(|\)|,|:|;|'(?:''|[^'])*'|[^\s(),:;]+)", text)
-    position = 0
-    unnamed = count()
-    graph = nx.Graph()
-
-    def parse_subtree():
-        nonlocal position
-        children = []
-        if position < len(tokens) and tokens[position] == "(":
-            position += 1
-            while True:
-                children.append(parse_subtree())
-                if position >= len(tokens) or tokens[position] != ",":
-                    break
-                position += 1
-            if position >= len(tokens) or tokens[position] != ")":
-                raise ValueError("Invalid Newick tree: missing closing parenthesis")
-            position += 1
-
-        label = None
-        if position < len(tokens) and tokens[position] not in {",", ")", ":", ";"}:
-            label = tokens[position]
-            position += 1
-            if label.startswith("'") and label.endswith("'"):
-                label = label[1:-1].replace("''", "'")
-        if label in {None, ""}:
-            label = f"__internal_{next(unnamed)}"
-        if position < len(tokens) and tokens[position] == ":":
-            position += 2
-        label = _identifier_key(label)
-        graph.add_node(label)
-        for child in children:
-            graph.add_edge(label, child)
-        return label
-
-    root = parse_subtree()
-    if position < len(tokens) and tokens[position] == ";":
-        position += 1
-    if position != len(tokens):
-        raise ValueError("Invalid Newick tree: unexpected trailing content")
-    return graph, root
-
-
 def _identifier_key(value):
     if pd.isna(value):
         return None
@@ -4367,19 +4319,28 @@ def _identifier_key(value):
     return text
 
 
-def _tree_layout(graph, root):
-    positions = {}
-    next_leaf = count()
+def _phylo_positions(tree):
+    x_positions = tree.depths()
+    if not x_positions or max(x_positions.values()) == 0:
+        x_positions = tree.depths(unit_branch_lengths=True)
 
-    def place(node, parent=None, depth=0):
-        children = [child for child in graph.neighbors(node) if child != parent]
-        child_positions = [place(child, node, depth + 1) for child in children]
-        y = float(next(next_leaf)) if not child_positions else float(np.mean(child_positions))
-        positions[node] = (depth, y)
-        return y
+    terminals = tree.get_terminals()
+    y_positions = {
+        terminal: float(len(terminals) - index)
+        for index, terminal in enumerate(terminals)
+    }
 
-    place(root)
-    return positions
+    def set_internal_y(clade):
+        for child in clade.clades:
+            if child not in y_positions:
+                set_internal_y(child)
+        if clade.clades:
+            y_positions[clade] = (
+                y_positions[clade.clades[0]] + y_positions[clade.clades[-1]]
+            ) / 2
+
+    set_internal_y(tree.root)
+    return x_positions, y_positions
 
 
 def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
@@ -4404,10 +4365,14 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
     newick_filename = Path(filenames[0])
     if not newick_filename.is_file():
         raise ValueError(f"Newick tree file does not exist: {newick_filename}")
-    newick = newick_filename.read_text().strip()
-
-    graph, root = _parse_newick(newick)
-    positions = _tree_layout(graph, root)
+    try:
+        from Bio import Phylo
+    except ImportError as error:
+        raise ImportError(
+            "draw_tree requires Biopython. Install repseq with the biopython dependency."
+        ) from error
+    tree = Phylo.read(str(newick_filename), "newick")
+    x_positions, y_positions = _phylo_positions(tree)
     node_data = tree_rows.assign(
         _node_key=tree_rows["nodeId"].map(_identifier_key)
     ).set_index("_node_key")
@@ -4436,13 +4401,19 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
     max_count = max(float(counts.max()), 1)
 
     if ax is None:
-        _, ax = plt.subplots(figsize=(8, max(4, len(graph) * 0.22)))
-    for left, right in graph.edges:
-        x1, y1 = positions[left]
-        x2, y2 = positions[right]
-        ax.plot([x1, x2], [y1, y2], color="0.7", linewidth=1, zorder=1)
-    for node, (x, y) in positions.items():
-        if node in node_data.index:
+        _, ax = plt.subplots(figsize=(10, max(4, len(tree.get_terminals()) * 0.35)))
+    Phylo.draw(
+        tree,
+        axes=ax,
+        do_show=False,
+        label_func=lambda _clade: None,
+        show_confidence=False,
+    )
+    for clade in tree.find_clades(order="preorder"):
+        x = x_positions[clade]
+        y = y_positions[clade]
+        node = _identifier_key(clade.name)
+        if node is not None and node in node_data.index:
             row = node_data.loc[node]
             category = str(row[group]) if group is not None and group in row and pd.notna(row[group]) else None
             color = palette.get(category, "0.45")
@@ -4459,7 +4430,10 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
         handles = [Line2D([], [], marker="o", linestyle="", color=palette[value], label=value) for value in categories]
         ax.legend(handles=handles, title=group, frameon=False)
     ax.set_title(f"Tree {treeId}")
-    ax.set_axis_off()
+    ax.set_xlabel("Branch length")
+    ax.set_ylabel("")
+    ax.set_yticks([])
+    ax.spines[["top", "right", "left"]].set_visible(False)
     return ax
 
 

@@ -10,6 +10,7 @@ conda install pandas
 conda install -c jmcmurray json
 conda install pyyaml
 conda install networkx
+conda install biopython
 conda install scipy
 conda install dill
 conda install matplotlib

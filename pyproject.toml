@@ -41,6 +41,7 @@ dependencies = [
   "seaborn>=0.13",
   "statsmodels",
   "networkx",
+  "biopython>=1.80",
   "dill",
   "PyYAML",
 ]
