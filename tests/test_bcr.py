@@ -1,4 +1,5 @@
 import matplotlib
+import numpy as np
 import pandas as pd
 import pytest
 from pathlib import Path
@@ -263,6 +264,28 @@ def test_to_count_table_sorts_samples_and_falls_back_to_reads(tmp_path):
     ]
     assert count_table.loc[count_table["treeId"] == 1, "sample.one"].iloc[0] == 7
     assert count_table.loc[count_table["treeId"] == 2, "two"].iloc[0] == 20
+
+
+def test_to_count_table_after_full_properties_cache_uses_numeric_numpy_values(
+    tmp_path, monkeypatch
+):
+    trees_filename, _ = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    analyzer.trees_properties(all_consensuses=True)
+    original_isclose = np.isclose
+
+    def checked_isclose(left, right, *args, **kwargs):
+        assert np.asarray(left).dtype.kind in "fiu"
+        assert np.asarray(right).dtype.kind in "fiu"
+        return original_isclose(left, right, *args, **kwargs)
+
+    monkeypatch.setattr(bcr.np, "isclose", checked_isclose)
+
+    count_table = analyzer.to_count_table()
+
+    assert count_table.loc[count_table["treeId"] == 1, "sample.one"].iloc[0] == 12
+    assert count_table.loc[count_table["treeId"] == 2, "two"].iloc[0] == 3
 
 
 def test_draw_tree_returns_axis(tmp_path):

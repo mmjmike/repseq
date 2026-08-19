@@ -600,9 +600,17 @@ class TreeAnalyzer:
         count_table = properties.copy()
         for sample_id in sample_ids:
             sample_counts = abundance.xs(sample_id, level="sample_id", drop_level=True)
-            values = count_table["treeId"].map(sample_counts).fillna(0)
-            if np.all(np.isclose(values, np.round(values))):
-                values = values.round().astype("Int64")
+            values = pd.to_numeric(
+                count_table["treeId"].map(sample_counts),
+                errors="coerce",
+            ).fillna(0)
+            numeric_values = values.astype(float).to_numpy()
+            if np.all(np.isclose(numeric_values, np.round(numeric_values))):
+                values = pd.Series(
+                    np.round(numeric_values),
+                    index=values.index,
+                    dtype="Int64",
+                )
             count_table[sample_id] = values
         return count_table
 
