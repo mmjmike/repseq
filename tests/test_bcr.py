@@ -220,13 +220,42 @@ def test_draw_tree_normalizes_integer_string_and_float_tree_ids(
 def test_observed_internal_nodes_are_moved_to_sampled_ancestor_tips():
     tree = Phylo.read(StringIO("((2:1)1:1)3;"), "newick")
     rsplot._restore_numeric_internal_node_names(tree, {"1", "2", "3"})
+    node_data = pd.DataFrame(
+        {
+            "_node_key": ["1", "2", "3"],
+            "nodeId": [1, 2, 3],
+            "isObserved": [True, True, False],
+        }
+    )
 
-    rsplot._move_observed_nodes_to_tips(tree, {"1", "2"})
+    tree, plot_rows = rsplot._prepare_tree_plot_nodes(tree, node_data)
 
-    observed_internal = next(clade for clade in tree.find_clades() if clade.name == "1")
+    observed_internal = next(
+        clade
+        for clade in tree.get_terminals()
+        if plot_rows.get(clade.name, {}).get("nodeId") == 1
+    )
     reconstructed_root = next(clade for clade in tree.find_clades() if clade.name == "3")
     observed_path = tree.get_path(observed_internal)
     assert observed_internal.is_terminal()
     assert observed_path[-2].name is None
     assert tree.depths()[observed_internal] > tree.depths()[observed_path[-2]]
     assert not reconstructed_root.is_terminal()
+
+
+def test_draw_tree_supports_multiple_observations_for_one_node(tmp_path):
+    trees_filename, newick_dir = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    duplicate = analyzer.trees_df.loc[analyzer.trees_df["nodeId"] == 1].copy()
+    duplicate["sample_id"] = "sample.duplicate"
+    duplicate["fileName"] = "mix.sample.duplicate.clns"
+    duplicate["isotype"] = "IgA"
+    duplicate["uniqueMoleculeCount"] = 4
+    analyzer.trees_df = pd.concat([analyzer.trees_df, duplicate], ignore_index=True)
+    analyzer.read_trees_newick(newick_dir)
+
+    axis = analyzer.draw_tree(1)
+
+    assert axis.get_title() == "Tree 1"
+    assert sum(isinstance(collection, PathCollection) for collection in axis.collections) == 5

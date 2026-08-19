@@ -4338,7 +4338,7 @@ def _restore_numeric_internal_node_names(tree, valid_node_ids=None):
     return tree
 
 
-def _move_observed_nodes_to_tips(tree, observed_node_ids):
+def _sampled_tip_length(tree):
     depths = tree.depths()
     max_depth = max(depths.values(), default=0)
     if max_depth == 0:
@@ -4354,18 +4354,54 @@ def _move_observed_nodes_to_tips(tree, observed_node_ids):
         if clade.branch_length is not None and clade.branch_length > 0
     ]
     shortest_branch = min(positive_lengths, default=max_depth)
-    tip_length = max(max_depth * 0.04, shortest_branch * 0.2)
+    return max(max_depth * 0.04, shortest_branch * 0.2)
+
+
+def _prepare_tree_plot_nodes(tree, node_data):
+    tip_length = _sampled_tip_length(tree)
+    node_groups = {
+        node_id: rows
+        for node_id, rows in node_data.groupby("_node_key", sort=False)
+    }
+    plot_rows = {}
+    observed_index = 0
 
     for clade in list(tree.find_clades(order="preorder")):
         node_id = _identifier_key(clade.name)
-        if node_id in observed_node_ids and not clade.is_terminal():
+        rows = node_groups.get(node_id)
+        if rows is None:
+            continue
+        if "isObserved" in rows.columns:
+            observed_rows = rows.loc[rows["isObserved"].map(_is_observed_value)]
+        else:
+            observed_rows = rows
+        non_observed_rows = rows.drop(index=observed_rows.index)
+
+        if observed_rows.empty:
+            plot_rows[node_id] = rows.iloc[0]
+            continue
+        if clade.is_terminal() and len(observed_rows) == 1 and non_observed_rows.empty:
+            plot_key = f"__repseq_observed_{observed_index}"
+            observed_index += 1
+            clade.name = plot_key
+            plot_rows[plot_key] = observed_rows.iloc[0]
+            continue
+
+        if non_observed_rows.empty:
+            clade.name = None
+        else:
+            clade.name = node_id
+            plot_rows[node_id] = non_observed_rows.iloc[0]
+        for _, row in observed_rows.iterrows():
+            plot_key = f"__repseq_observed_{observed_index}"
+            observed_index += 1
             observed_tip = clade.__class__(
                 branch_length=tip_length,
-                name=clade.name,
+                name=plot_key,
             )
-            clade.name = None
-            clade.clades.insert(0, observed_tip)
-    return tree
+            clade.clades.append(observed_tip)
+            plot_rows[plot_key] = row
+    return tree, plot_rows
 
 
 def _phylo_positions(tree):
@@ -4425,7 +4461,7 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
     tree = _restore_numeric_internal_node_names(tree, valid_node_ids)
     node_data = tree_rows.assign(
         _node_key=tree_rows["nodeId"].map(_identifier_key)
-    ).set_index("_node_key")
+    )
     if "sample_id" not in node_data.columns and "fileName" in node_data.columns:
         node_data["sample_id"] = node_data["fileName"].apply(
             lambda filename: str(filename).rsplit("/", 1)[-1][:-5].rsplit(".", 1)[-1]
@@ -4434,14 +4470,24 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
     if metadata is not None:
         if "sample_id" not in metadata.columns:
             raise ValueError("metadata must contain a 'sample_id' column")
-        node_data = node_data.reset_index().merge(metadata, on="sample_id", how="left").set_index("_node_key")
+        node_data = node_data.merge(metadata, on="sample_id", how="left")
 
     if "isObserved" in node_data.columns:
         observed_mask = node_data["isObserved"].map(_is_observed_value)
     else:
         observed_mask = pd.Series(True, index=node_data.index, dtype=bool)
-    observed_node_ids = set(node_data.index[observed_mask])
-    tree = _move_observed_nodes_to_tips(tree, observed_node_ids)
+    read_counts = (
+        pd.to_numeric(node_data["readCount"], errors="coerce")
+        if "readCount" in node_data.columns
+        else pd.Series(1, index=node_data.index, dtype=float)
+    )
+    node_data["_plot_count"] = (
+        pd.to_numeric(node_data["uniqueMoleculeCount"], errors="coerce").fillna(read_counts)
+        if "uniqueMoleculeCount" in node_data.columns else read_counts
+    ).fillna(1)
+    observed_counts = node_data.loc[observed_mask, "_plot_count"]
+    max_count = max(float(observed_counts.max()) if not observed_counts.empty else 1, 1)
+    tree, plot_rows = _prepare_tree_plot_nodes(tree, node_data)
     x_positions, y_positions = _phylo_positions(tree)
 
     color_values = (
@@ -4450,16 +4496,6 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
     )
     categories = [] if color_values is None else sorted(color_values.dropna().astype(str).unique())
     palette = dict(zip(categories, sns.color_palette(n_colors=len(categories))))
-    read_counts = (
-        pd.to_numeric(node_data["readCount"], errors="coerce")
-        if "readCount" in node_data.columns
-        else pd.Series(1, index=node_data.index, dtype=float)
-    )
-    counts = (
-        pd.to_numeric(node_data["uniqueMoleculeCount"], errors="coerce").fillna(read_counts)
-        if "uniqueMoleculeCount" in node_data.columns else read_counts
-    ).fillna(1)
-    max_count = max(float(counts.max()), 1)
 
     if ax is None:
         _, ax = plt.subplots(figsize=(10, max(4, len(tree.get_terminals()) * 0.35)))
@@ -4474,12 +4510,12 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
         x = x_positions[clade]
         y = y_positions[clade]
         node = _identifier_key(clade.name)
-        if node is not None and node in node_data.index:
-            row = node_data.loc[node]
-            if node in observed_node_ids:
+        row = plot_rows.get(node)
+        if row is not None:
+            if _is_observed_value(row.get("isObserved", True)):
                 category = str(row[group]) if group is not None and group in row and pd.notna(row[group]) else None
                 color = palette.get(category, "0.45")
-                size = 30 + 270 * np.sqrt(float(counts.loc[node]) / max_count)
+                size = 30 + 270 * np.sqrt(float(row["_plot_count"]) / max_count)
                 ax.scatter(x, y, s=size, color=color, edgecolor="white", linewidth=0.6, zorder=3)
                 annotations = [str(row["sample_id"])] if "sample_id" in row and pd.notna(row["sample_id"]) else []
                 if label is not None and label in row and pd.notna(row[label]):
