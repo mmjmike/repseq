@@ -131,13 +131,54 @@ class TreeAnalyzer:
         print(f"Read {len(self.newick_trees)} Newick tree filenames")
 
     def read_metadata(self, metadata):
-        """Store sample metadata from a DataFrame or delimited text file."""
+        """Left-join sample metadata into the loaded trees table."""
+        if self.trees_df is None:
+            print("Trees table has not been read. Metadata was not loaded")
+            return
         if isinstance(metadata, pd.DataFrame):
-            self.metadata = metadata.copy()
+            metadata_df = metadata.copy()
         else:
-            self.metadata = pd.read_csv(metadata, sep=None, engine="python")
+            metadata_df = pd.read_csv(metadata, sep=None, engine="python")
+        if "sample_id" not in metadata_df.columns:
+            raise ValueError("metadata must contain a 'sample_id' column")
+        if metadata_df["sample_id"].duplicated().any():
+            raise ValueError("metadata must contain one row per sample_id")
+
+        self.metadata = metadata_df
         self._add_sample_ids()
-        return self.metadata
+        self.trees_df["sample_id"] = self.trees_df["sample_id"].astype("string")
+        metadata_df = metadata_df.copy()
+        metadata_df["sample_id"] = metadata_df["sample_id"].astype("string")
+        observed = _observed_mask(self.trees_df)
+        tree_samples = set(self.trees_df.loc[observed, "sample_id"].dropna())
+        metadata_samples = set(metadata_df["sample_id"].dropna())
+        matched_samples = tree_samples & metadata_samples
+        updated_nodes = int(
+            (observed & self.trees_df["sample_id"].isin(matched_samples)).sum()
+        )
+
+        metadata_columns = [column for column in metadata_df.columns if column != "sample_id"]
+        overlapping_columns = [
+            column for column in metadata_columns if column in self.trees_df.columns
+        ]
+        self.trees_df = self.trees_df.merge(
+            metadata_df,
+            on="sample_id",
+            how="left",
+            suffixes=("", "_metadata"),
+            sort=False,
+        )
+        for column in overlapping_columns:
+            metadata_column = f"{column}_metadata"
+            self.trees_df[column] = self.trees_df[metadata_column].combine_first(
+                self.trees_df[column]
+            )
+            self.trees_df = self.trees_df.drop(columns=metadata_column)
+        self._invalidate_properties()
+        print(
+            f"Metadata updated for {len(matched_samples)} samples and "
+            f"{updated_nodes} observed nodes"
+        )
 
     def _attach_newick_trees(self):
         if self.trees_df is not None:
@@ -391,7 +432,7 @@ class TreeAnalyzer:
         return rsplot.draw_tree(
             self.trees_df,
             treeId,
-            metadata=self.metadata,
+            metadata=None,
             group=group,
             label=label,
         )

@@ -82,7 +82,16 @@ def test_tree_analyzer_properties_are_enriched_sorted_and_cached(tmp_path, capsy
     ].iloc[0] == 10
     assert analyzer.read_trees_newick(newick_dir) is None
     assert "Read 2 Newick tree filenames" in capsys.readouterr().out
-    analyzer.read_metadata(pd.DataFrame({"sample_id": ["sample.one", "two"], "timepoint": [1, 2]}))
+    assert analyzer.read_metadata(
+        pd.DataFrame({"sample_id": ["sample.one", "two"], "timepoint": [1, 2]})
+    ) is None
+    assert "Metadata updated for 2 samples and 3 observed nodes" in capsys.readouterr().out
+    assert analyzer.trees_df.loc[
+        analyzer.trees_df["nodeId"] == 1, "timepoint"
+    ].iloc[0] == 1
+    assert pd.isna(
+        analyzer.trees_df.loc[analyzer.trees_df["nodeId"] == 3, "timepoint"].iloc[0]
+    )
 
     properties = analyzer.trees_properties
 
@@ -175,10 +184,20 @@ def test_tree_analyzer_draw_tree_wrapper(tmp_path, monkeypatch):
     assert captured == {
         "trees_df": analyzer.trees_df,
         "tree_id": 1,
-        "metadata": analyzer.metadata,
+        "metadata": None,
         "group": "isotype",
         "label": "timepoint",
     }
+
+
+def test_read_metadata_before_trees_table_does_nothing(capsys):
+    analyzer = bcr.TreeAnalyzer()
+
+    assert analyzer.read_metadata(pd.DataFrame({"sample_id": ["sample.one"]})) is None
+
+    assert analyzer.metadata is None
+    assert analyzer.trees_df is None
+    assert "Trees table has not been read. Metadata was not loaded" in capsys.readouterr().out
 
 
 def test_draw_tree_returns_axis(tmp_path):

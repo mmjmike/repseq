@@ -4404,7 +4404,17 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
     if metadata is not None:
         if "sample_id" not in metadata.columns:
             raise ValueError("metadata must contain a 'sample_id' column")
-        node_data = node_data.merge(metadata, on="sample_id", how="left")
+        missing_metadata_columns = [
+            column
+            for column in metadata.columns
+            if column == "sample_id" or column not in node_data.columns
+        ]
+        if len(missing_metadata_columns) > 1:
+            node_data = node_data.merge(
+                metadata.loc[:, missing_metadata_columns],
+                on="sample_id",
+                how="left",
+            )
 
     if "isObserved" in node_data.columns:
         observed_mask = node_data["isObserved"].map(_is_observed_value)
