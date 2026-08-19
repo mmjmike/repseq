@@ -192,3 +192,22 @@ def test_draw_tree_returns_axis(tmp_path):
 
     assert axis.get_title() == "Tree 1"
     assert len(axis.collections) == 3
+
+
+@pytest.mark.parametrize("requested_tree_id", [6388, "6388"])
+def test_draw_tree_normalizes_integer_string_and_float_tree_ids(
+    tmp_path, requested_tree_id
+):
+    trees_filename, newick_dir = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    analyzer.trees_df["treeId"] = analyzer.trees_df["treeId"].astype(float)
+    analyzer.trees_df.loc[analyzer.trees_df["treeId"] == 1.0, "treeId"] = 6388.0
+    analyzer.trees_df["nodeId"] = analyzer.trees_df["nodeId"].astype(float)
+    (newick_dir / "1.tree").rename(newick_dir / "6388.tree")
+    analyzer.read_trees_newick(newick_dir)
+
+    axis = analyzer.draw_tree(requested_tree_id)
+
+    assert axis.get_title() == f"Tree {requested_tree_id}"
+    assert len(axis.collections) == 3

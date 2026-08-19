@@ -4340,10 +4340,11 @@ def _parse_newick(newick):
             label = f"__internal_{next(unnamed)}"
         if position < len(tokens) and tokens[position] == ":":
             position += 2
-        graph.add_node(str(label))
+        label = _identifier_key(label)
+        graph.add_node(label)
         for child in children:
-            graph.add_edge(str(label), child)
-        return str(label)
+            graph.add_edge(label, child)
+        return label
 
     root = parse_subtree()
     if position < len(tokens) and tokens[position] == ";":
@@ -4351,6 +4352,19 @@ def _parse_newick(newick):
     if position != len(tokens):
         raise ValueError("Invalid Newick tree: unexpected trailing content")
     return graph, root
+
+
+def _identifier_key(value):
+    if pd.isna(value):
+        return None
+    if isinstance(value, (int, np.integer)):
+        return str(int(value))
+    if isinstance(value, (float, np.floating)) and np.isfinite(value) and value.is_integer():
+        return str(int(value))
+    text = str(value).strip()
+    if re.fullmatch(r"[+-]?\d+\.0+", text):
+        return text.split(".", 1)[0]
+    return text
 
 
 def _tree_layout(graph, root):
@@ -4372,7 +4386,10 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
     """Draw a MiXCR SHM tree from a node table loaded by ``TreeAnalyzer``."""
     if "treeId" not in trees_df.columns:
         raise ValueError("trees_df must contain a 'treeId' column")
-    tree_rows = trees_df.loc[trees_df["treeId"].astype(str) == str(treeId)].copy()
+    tree_id_key = _identifier_key(treeId)
+    tree_rows = trees_df.loc[
+        trees_df["treeId"].map(_identifier_key) == tree_id_key
+    ].copy()
     if tree_rows.empty:
         raise ValueError(f"treeId {treeId!r} is not present in trees_df")
     if "nodeId" not in tree_rows.columns:
@@ -4391,7 +4408,9 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
 
     graph, root = _parse_newick(newick)
     positions = _tree_layout(graph, root)
-    node_data = tree_rows.assign(_node_key=tree_rows["nodeId"].astype(str)).set_index("_node_key")
+    node_data = tree_rows.assign(
+        _node_key=tree_rows["nodeId"].map(_identifier_key)
+    ).set_index("_node_key")
     if "sample_id" not in node_data.columns and "fileName" in node_data.columns:
         node_data["sample_id"] = node_data["fileName"].apply(
             lambda filename: str(filename).rsplit("/", 1)[-1][:-5].rsplit(".", 1)[-1]

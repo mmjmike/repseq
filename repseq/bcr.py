@@ -123,7 +123,7 @@ class TreeAnalyzer:
         if not folder.is_dir():
             raise ValueError(f"Newick tree folder does not exist: {folder}")
         self.newick_trees = {
-            path.stem: os.fspath(path)
+            _id_key(path.stem): os.fspath(path)
             for path in sorted(folder.iterdir())
             if path.is_file() and path.suffix == ".tree"
         }
