@@ -1,5 +1,4 @@
 import matplotlib
-import numpy as np
 import pandas as pd
 import pytest
 from pathlib import Path
@@ -211,8 +210,8 @@ def test_draw_tree_returns_axis(tmp_path):
     ]
     observed_x = [collection.get_offsets()[0, 0] for collection in observed_points]
     reconstructed_x = reconstructed_points[0].get_offsets()[0, 0]
-    assert np.allclose(observed_x, observed_x[0])
-    assert observed_x[0] > reconstructed_x
+    assert sorted(observed_x) == pytest.approx([0.1, 0.2])
+    assert reconstructed_x == pytest.approx(0)
     assert axis.get_xlabel() == "Branch length"
 
 
@@ -235,37 +234,18 @@ def test_draw_tree_normalizes_integer_string_and_float_tree_ids(
     assert sum(isinstance(collection, PathCollection) for collection in axis.collections) == 3
 
 
-def test_observed_internal_nodes_are_moved_to_sampled_ancestor_tips():
+def test_phylo_positions_preserve_actual_branch_lengths():
     tree = Phylo.read(StringIO("((2:1)1:1)3;"), "newick")
     rsplot._restore_numeric_internal_node_names(tree, {"1", "2", "3"})
-    node_data = pd.DataFrame(
-        {
-            "_node_key": ["1", "2", "3"],
-            "nodeId": [1, 2, 3],
-            "isObserved": [True, True, False],
-        }
-    )
+    x_positions, _ = rsplot._phylo_positions(tree)
 
-    tree, plot_rows = rsplot._prepare_tree_plot_nodes(tree, node_data)
-
-    observed_internal = next(
-        clade
-        for clade in tree.get_terminals()
-        if plot_rows.get(clade.name, {}).get("nodeId") == 1
-    )
+    observed_internal = next(clade for clade in tree.find_clades() if clade.name == "1")
     reconstructed_root = next(clade for clade in tree.find_clades() if clade.name == "3")
-    observed_terminal = next(
-        clade
-        for clade in tree.get_terminals()
-        if plot_rows.get(clade.name, {}).get("nodeId") == 2
-    )
-    observed_path = tree.get_path(observed_internal)
-    assert observed_internal.is_terminal()
-    assert observed_path[-2].name is None
-    assert tree.depths()[observed_internal] > tree.depths()[observed_path[-2]]
-    assert tree.depths()[observed_internal] == pytest.approx(
-        tree.depths()[observed_terminal]
-    )
+    observed_terminal = next(clade for clade in tree.find_clades() if clade.name == "2")
+    assert x_positions[reconstructed_root] == pytest.approx(0)
+    assert x_positions[observed_internal] == pytest.approx(1)
+    assert x_positions[observed_terminal] == pytest.approx(2)
+    assert not observed_internal.is_terminal()
     assert not reconstructed_root.is_terminal()
 
 

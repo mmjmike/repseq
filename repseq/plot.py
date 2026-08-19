@@ -4338,71 +4338,6 @@ def _restore_numeric_internal_node_names(tree, valid_node_ids=None):
     return tree
 
 
-def _sampled_tip_target(tree):
-    depths = tree.depths()
-    max_depth = max(depths.values(), default=0)
-    if max_depth == 0:
-        for clade in tree.find_clades(order="preorder"):
-            if clade is not tree.root:
-                clade.branch_length = 1.0
-        depths = tree.depths()
-        max_depth = max(depths.values(), default=1)
-
-    positive_lengths = [
-        float(clade.branch_length)
-        for clade in tree.find_clades(order="preorder")
-        if clade.branch_length is not None and clade.branch_length > 0
-    ]
-    depth_scale = max(max_depth, 1)
-    shortest_branch = min(positive_lengths, default=depth_scale)
-    margin = max(depth_scale * 0.04, shortest_branch * 0.2)
-    return depths, max_depth + margin, margin
-
-
-def _prepare_tree_plot_nodes(tree, node_data):
-    depths, target_depth, minimum_tip_length = _sampled_tip_target(tree)
-    node_groups = {
-        node_id: rows
-        for node_id, rows in node_data.groupby("_node_key", sort=False)
-    }
-    plot_rows = {}
-    observed_index = 0
-
-    for clade in list(tree.find_clades(order="preorder")):
-        node_id = _identifier_key(clade.name)
-        rows = node_groups.get(node_id)
-        if rows is None:
-            continue
-        if "isObserved" in rows.columns:
-            observed_rows = rows.loc[rows["isObserved"].map(_is_observed_value)]
-        else:
-            observed_rows = rows
-        non_observed_rows = rows.drop(index=observed_rows.index)
-
-        if observed_rows.empty:
-            plot_rows[node_id] = rows.iloc[0]
-            continue
-
-        if non_observed_rows.empty:
-            clade.name = None
-        else:
-            clade.name = node_id
-            plot_rows[node_id] = non_observed_rows.iloc[0]
-        for _, row in observed_rows.iterrows():
-            plot_key = f"__repseq_observed_{observed_index}"
-            observed_index += 1
-            observed_tip = clade.__class__(
-                branch_length=max(
-                    target_depth - depths.get(clade, 0),
-                    minimum_tip_length,
-                ),
-                name=plot_key,
-            )
-            clade.clades.append(observed_tip)
-            plot_rows[plot_key] = row
-    return tree, plot_rows
-
-
 def _phylo_positions(tree):
     x_positions = tree.depths()
     if not x_positions or max(x_positions.values()) == 0:
@@ -4486,8 +4421,11 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
     ).fillna(1)
     observed_counts = node_data.loc[observed_mask, "_plot_count"]
     max_count = max(float(observed_counts.max()) if not observed_counts.empty else 1, 1)
-    tree, plot_rows = _prepare_tree_plot_nodes(tree, node_data)
     x_positions, y_positions = _phylo_positions(tree)
+    node_groups = {
+        node_id: rows
+        for node_id, rows in node_data.groupby("_node_key", sort=False)
+    }
 
     color_values = (
         node_data.loc[observed_mask, group]
@@ -4509,9 +4447,20 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
         x = x_positions[clade]
         y = y_positions[clade]
         node = _identifier_key(clade.name)
-        row = plot_rows.get(node)
-        if row is not None:
-            if _is_observed_value(row.get("isObserved", True)):
+        rows = node_groups.get(node)
+        if rows is None:
+            continue
+        if "isObserved" in rows.columns:
+            row_observed = rows["isObserved"].map(_is_observed_value)
+        else:
+            row_observed = pd.Series(True, index=rows.index, dtype=bool)
+        observed_rows = rows.loc[row_observed]
+        non_observed_rows = rows.loc[~row_observed]
+
+        if clade.is_terminal() and not observed_rows.empty:
+            observed_rows = observed_rows.sort_values("_plot_count", ascending=False)
+            label_count = len(observed_rows)
+            for label_index, (_, row) in enumerate(observed_rows.iterrows()):
                 category = str(row[group]) if group is not None and group in row and pd.notna(row[group]) else None
                 color = palette.get(category, "0.45")
                 size = 30 + 270 * np.sqrt(float(row["_plot_count"]) / max_count)
@@ -4520,20 +4469,34 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
                 if label is not None and label in row and pd.notna(row[label]):
                     annotations.append(str(row[label]))
                 if annotations:
-                    ax.annotate(" | ".join(annotations), (x, y), xytext=(5, 3), textcoords="offset points", fontsize=8)
-            else:
-                ax.scatter(
-                    x,
-                    y,
-                    s=22,
-                    color="white",
-                    edgecolor="0.35",
-                    linewidth=0.8,
-                    zorder=3,
-                )
+                    label_y_offset = (label_index - (label_count - 1) / 2) * 11
+                    ax.annotate(
+                        " | ".join(annotations),
+                        (x, y),
+                        xytext=(6, label_y_offset),
+                        textcoords="offset points",
+                        fontsize=8,
+                    )
+        if not non_observed_rows.empty:
+            ax.scatter(
+                x,
+                y,
+                s=22,
+                color="white",
+                edgecolor="0.35",
+                linewidth=0.8,
+                zorder=3,
+            )
     if categories:
         handles = [Line2D([], [], marker="o", linestyle="", color=palette[value], label=value) for value in categories]
-        ax.legend(handles=handles, title=group, frameon=False)
+        ax.legend(
+            handles=handles,
+            title=group,
+            frameon=False,
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.08),
+            ncol=min(len(handles), 5),
+        )
     ax.set_title(f"Tree {treeId}")
     ax.set_xlabel("Branch length")
     ax.set_ylabel("")
