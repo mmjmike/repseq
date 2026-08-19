@@ -3,6 +3,8 @@ import pandas as pd
 import pytest
 from pathlib import Path
 from matplotlib.collections import PathCollection
+from io import StringIO
+from Bio import Phylo
 
 matplotlib.use("Agg")
 
@@ -213,3 +215,18 @@ def test_draw_tree_normalizes_integer_string_and_float_tree_ids(
 
     assert axis.get_title() == f"Tree {requested_tree_id}"
     assert sum(isinstance(collection, PathCollection) for collection in axis.collections) == 3
+
+
+def test_observed_internal_nodes_are_moved_to_sampled_ancestor_tips():
+    tree = Phylo.read(StringIO("((2:1)1:1)3;"), "newick")
+    rsplot._restore_numeric_internal_node_names(tree, {"1", "2", "3"})
+
+    rsplot._move_observed_nodes_to_tips(tree, {"1", "2"})
+
+    observed_internal = next(clade for clade in tree.find_clades() if clade.name == "1")
+    reconstructed_root = next(clade for clade in tree.find_clades() if clade.name == "3")
+    observed_path = tree.get_path(observed_internal)
+    assert observed_internal.is_terminal()
+    assert observed_path[-2].name is None
+    assert tree.depths()[observed_internal] > tree.depths()[observed_path[-2]]
+    assert not reconstructed_root.is_terminal()

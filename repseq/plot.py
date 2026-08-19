@@ -4319,6 +4319,55 @@ def _identifier_key(value):
     return text
 
 
+def _is_observed_value(value):
+    if pd.isna(value):
+        return False
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    return str(value).strip().lower() in {"true", "t", "1", "yes"}
+
+
+def _restore_numeric_internal_node_names(tree, valid_node_ids=None):
+    valid_node_ids = None if valid_node_ids is None else set(valid_node_ids)
+    for clade in tree.get_nonterminals(order="preorder"):
+        if clade.name is None and clade.confidence is not None:
+            node_id = _identifier_key(clade.confidence)
+            if valid_node_ids is None or node_id in valid_node_ids:
+                clade.name = node_id
+                clade.confidence = None
+    return tree
+
+
+def _move_observed_nodes_to_tips(tree, observed_node_ids):
+    depths = tree.depths()
+    max_depth = max(depths.values(), default=0)
+    if max_depth == 0:
+        for clade in tree.find_clades(order="preorder"):
+            if clade is not tree.root:
+                clade.branch_length = 1.0
+        depths = tree.depths()
+        max_depth = max(depths.values(), default=1)
+
+    positive_lengths = [
+        float(clade.branch_length)
+        for clade in tree.find_clades(order="preorder")
+        if clade.branch_length is not None and clade.branch_length > 0
+    ]
+    shortest_branch = min(positive_lengths, default=max_depth)
+    tip_length = max(max_depth * 0.04, shortest_branch * 0.2)
+
+    for clade in list(tree.find_clades(order="preorder")):
+        node_id = _identifier_key(clade.name)
+        if node_id in observed_node_ids and not clade.is_terminal():
+            observed_tip = clade.__class__(
+                branch_length=tip_length,
+                name=clade.name,
+            )
+            clade.name = None
+            clade.clades.insert(0, observed_tip)
+    return tree
+
+
 def _phylo_positions(tree):
     x_positions = tree.depths()
     if not x_positions or max(x_positions.values()) == 0:
@@ -4371,8 +4420,9 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
         raise ImportError(
             "draw_tree requires Biopython. Install repseq with the biopython dependency."
         ) from error
+    valid_node_ids = set(tree_rows["nodeId"].map(_identifier_key).dropna())
     tree = Phylo.read(str(newick_filename), "newick")
-    x_positions, y_positions = _phylo_positions(tree)
+    tree = _restore_numeric_internal_node_names(tree, valid_node_ids)
     node_data = tree_rows.assign(
         _node_key=tree_rows["nodeId"].map(_identifier_key)
     ).set_index("_node_key")
@@ -4386,7 +4436,18 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
             raise ValueError("metadata must contain a 'sample_id' column")
         node_data = node_data.reset_index().merge(metadata, on="sample_id", how="left").set_index("_node_key")
 
-    color_values = node_data[group] if group is not None and group in node_data.columns else None
+    if "isObserved" in node_data.columns:
+        observed_mask = node_data["isObserved"].map(_is_observed_value)
+    else:
+        observed_mask = pd.Series(True, index=node_data.index, dtype=bool)
+    observed_node_ids = set(node_data.index[observed_mask])
+    tree = _move_observed_nodes_to_tips(tree, observed_node_ids)
+    x_positions, y_positions = _phylo_positions(tree)
+
+    color_values = (
+        node_data.loc[observed_mask, group]
+        if group is not None and group in node_data.columns else None
+    )
     categories = [] if color_values is None else sorted(color_values.dropna().astype(str).unique())
     palette = dict(zip(categories, sns.color_palette(n_colors=len(categories))))
     read_counts = (
@@ -4415,17 +4476,28 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
         node = _identifier_key(clade.name)
         if node is not None and node in node_data.index:
             row = node_data.loc[node]
-            category = str(row[group]) if group is not None and group in row and pd.notna(row[group]) else None
-            color = palette.get(category, "0.45")
-            size = 30 + 270 * np.sqrt(float(counts.loc[node]) / max_count)
-            ax.scatter(x, y, s=size, color=color, edgecolor="white", linewidth=0.6, zorder=2)
-            annotations = [str(row["sample_id"])] if "sample_id" in row and pd.notna(row["sample_id"]) else []
-            if label is not None and label in row and pd.notna(row[label]):
-                annotations.append(str(row[label]))
-            if annotations:
-                ax.annotate(" | ".join(annotations), (x, y), xytext=(5, 3), textcoords="offset points", fontsize=8)
+            if node in observed_node_ids:
+                category = str(row[group]) if group is not None and group in row and pd.notna(row[group]) else None
+                color = palette.get(category, "0.45")
+                size = 30 + 270 * np.sqrt(float(counts.loc[node]) / max_count)
+                ax.scatter(x, y, s=size, color=color, edgecolor="white", linewidth=0.6, zorder=3)
+                annotations = [str(row["sample_id"])] if "sample_id" in row and pd.notna(row["sample_id"]) else []
+                if label is not None and label in row and pd.notna(row[label]):
+                    annotations.append(str(row[label]))
+                if annotations:
+                    ax.annotate(" | ".join(annotations), (x, y), xytext=(5, 3), textcoords="offset points", fontsize=8)
+            else:
+                ax.scatter(
+                    x,
+                    y,
+                    s=22,
+                    color="white",
+                    edgecolor="0.35",
+                    linewidth=0.8,
+                    zorder=3,
+                )
         else:
-            ax.scatter(x, y, s=18, color="white", edgecolor="0.45", linewidth=0.8, zorder=2)
+            ax.scatter(x, y, s=16, color="white", edgecolor="0.45", linewidth=0.7, zorder=3)
     if categories:
         handles = [Line2D([], [], marker="o", linestyle="", color=palette[value], label=value) for value in categories]
         ax.legend(handles=handles, title=group, frameon=False)
