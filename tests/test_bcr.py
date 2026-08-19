@@ -209,9 +209,13 @@ def test_draw_tree_returns_axis(tmp_path):
         if collection.get_sizes()[0] == 22
     ]
     observed_x = [collection.get_offsets()[0, 0] for collection in observed_points]
+    observed_xy = [tuple(collection.get_offsets()[0]) for collection in observed_points]
     reconstructed_x = reconstructed_points[0].get_offsets()[0, 0]
+    reconstructed_y = reconstructed_points[0].get_offsets()[0, 1]
     assert sorted(observed_x) == pytest.approx([0.1, 0.2])
+    assert sorted(observed_xy) == pytest.approx([(0.1, 1.0), (0.2, 2.0)])
     assert reconstructed_x == pytest.approx(0)
+    assert reconstructed_y == pytest.approx(1.5)
     assert axis.get_xlabel() == "Branch length"
 
 

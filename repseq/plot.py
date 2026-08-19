@@ -4346,7 +4346,7 @@ def _phylo_positions(tree):
     terminals = tree.get_terminals()
     y_positions = {
         terminal: float(len(terminals) - index)
-        for index, terminal in enumerate(terminals)
+        for index, terminal in enumerate(reversed(terminals))
     }
 
     def set_internal_y(clade):
