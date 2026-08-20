@@ -78,7 +78,6 @@ def _write_tree_inputs(tmp_path):
 def _mutation_ref_points():
     points = [""] * 22
     positions = {
-        4: 0,
         5: 2,
         6: 4,
         7: 6,
@@ -349,9 +348,9 @@ def test_plot_mutations_rate_uses_observed_nodes_and_region_boundaries(tmp_path)
     empty_alignment = "0|0|0|0|0||0"
     analyzer.trees_df["refPoints"] = _mutation_ref_points()
     analyzer.trees_df["allVAlignments"] = [
-        "0|15|15|0|15|SA1GSC2T|100;0|15|15|0|15|SA9G|90",
+        "0|15|15|0|15|SC2TSA3G|100;0|15|15|0|15|SA9G|90",
+        "0|15|15|0|15|SA3G|100",
         "0|15|15|0|15|SC2T|100",
-        "0|15|15|0|15|SA1G|100",
         empty_alignment,
     ]
     analyzer.trees_df["allDAlignments"] = empty_alignment
@@ -360,16 +359,16 @@ def test_plot_mutations_rate_uses_observed_nodes_and_region_boundaries(tmp_path)
     mutation_rates = analyzer._get_mutation_rate_df("1")
     axis = analyzer.plot_mutations_rate(1)
 
-    assert len(mutation_rates) == 15
-    assert mutation_rates.loc[mutation_rates["position"] == 1, "rate"].iloc[0] == 0.5
-    assert mutation_rates.loc[mutation_rates["position"] == 2, "rate"].iloc[0] == 1.0
-    assert mutation_rates.loc[mutation_rates["position"] == 9, "rate"].iloc[0] == 0
-    assert mutation_rates.loc[mutation_rates["position"] == 0, "region"].iloc[0] == "FR1"
-    assert mutation_rates.loc[mutation_rates["position"] == 2, "region"].iloc[0] == "CDR1"
-    assert mutation_rates.loc[mutation_rates["position"] == 10, "region"].iloc[0] == "CDR3"
-    assert mutation_rates.loc[mutation_rates["position"] == 13, "region"].iloc[0] == "FR4"
-    assert len(axis.patches) == 15
-    assert len(axis.lines) == 6
+    assert len(mutation_rates) == 13
+    assert mutation_rates.loc[mutation_rates["position"] == 0, "rate"].iloc[0] == 0.5
+    assert mutation_rates.loc[mutation_rates["position"] == 1, "rate"].iloc[0] == 1.0
+    assert mutation_rates.loc[mutation_rates["position"] == 7, "rate"].iloc[0] == 0
+    assert mutation_rates.loc[mutation_rates["position"] == 0, "region"].iloc[0] == "CDR1"
+    assert mutation_rates.loc[mutation_rates["position"] == 2, "region"].iloc[0] == "FR2"
+    assert mutation_rates.loc[mutation_rates["position"] == 8, "region"].iloc[0] == "CDR3"
+    assert mutation_rates.loc[mutation_rates["position"] == 11, "region"].iloc[0] == "FR4"
+    assert len(axis.patches) == 13
+    assert len(axis.lines) == 5
     assert all(line.get_linestyle() == "--" for line in axis.lines)
     assert axis.get_title() == "Tree 1 mutation frequencies"
     assert axis.get_ylabel() == "Mutation frequency"

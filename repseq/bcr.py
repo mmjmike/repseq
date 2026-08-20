@@ -26,7 +26,6 @@ _SEQUENCE_COLUMNS = {
 }
 
 _MUTATION_REGIONS = [
-    ("FR1", 4, 5),
     ("CDR1", 5, 6),
     ("FR2", 6, 7),
     ("CDR2", 7, 8),
@@ -121,15 +120,15 @@ def _parse_refpoint_regions(ref_points):
     if any(index >= len(points) or points[index] is None for index in required_indices):
         return None
 
-    fr1_begin = points[4]
+    cdr1_begin = points[5]
     regions = []
     for region, start_index, end_index in _MUTATION_REGIONS:
-        start = points[start_index] - fr1_begin
-        end = points[end_index] - fr1_begin
+        start = points[start_index] - cdr1_begin
+        end = points[end_index] - cdr1_begin
         if start < 0 or end <= start:
             return None
         regions.append((region, start, end))
-    return fr1_begin, regions
+    return cdr1_begin, regions
 
 
 def _observed_mask(data):
@@ -711,16 +710,16 @@ class TreeAnalyzer:
             parsed_ref_points = _parse_refpoint_regions(row["refPoints"])
             if parsed_ref_points is None:
                 continue
-            fr1_begin, regions = parsed_ref_points
+            cdr1_begin, regions = parsed_ref_points
             region_lengths = tuple(end - start for _, start, end in regions)
             mutation_positions = set()
             for segment in ["v", "d", "j"]:
                 mutation_positions.update(_absolute_mutation_positions(row, segment))
-            parsed_rows.append((fr1_begin, region_lengths, mutation_positions))
+            parsed_rows.append((cdr1_begin, region_lengths, mutation_positions))
 
         if not parsed_rows:
             raise ValueError(
-                f"treeId {treeId!r} does not contain complete FR1-to-FR4 refPoints"
+                f"treeId {treeId!r} does not contain complete CDR1-to-FR4 refPoints"
             )
 
         canonical_lengths = Counter(
@@ -734,11 +733,11 @@ class TreeAnalyzer:
         total_length = region_start
 
         mutation_counts = np.zeros(total_length, dtype=float)
-        for fr1_begin, _, mutation_positions in parsed_rows:
+        for cdr1_begin, _, mutation_positions in parsed_rows:
             relative_positions = {
-                position - fr1_begin
+                position - cdr1_begin
                 for position in mutation_positions
-                if 0 <= position - fr1_begin < total_length
+                if 0 <= position - cdr1_begin < total_length
             }
             for position in relative_positions:
                 mutation_counts[position] += 1
@@ -759,7 +758,7 @@ class TreeAnalyzer:
         return mutation_rate_df
 
     def plot_mutations_rate(self, treeId, ax=None):
-        """Plot observed-node mutation frequencies across FR1 through FR4."""
+        """Plot observed-node mutation frequencies across CDR1 through FR4."""
         import matplotlib.pyplot as plt
         import seaborn as sns
         from matplotlib.patches import Patch
