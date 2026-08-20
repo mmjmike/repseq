@@ -989,18 +989,20 @@ class TreeAnalyzer:
             .dropna()
             .reset_index(name="value")
         )
-        if sample_values.empty:
+        all_timepoints = data.loc[
+            _observed_mask(data), feature
+        ].dropna()
+        if all_timepoints.empty:
             print(
-                f"Cannot plot timepoint trajectory: treeId {treeId!r} has no "
-                f"'{value_column}' values with '{feature}' metadata"
+                f"Cannot plot timepoint trajectory: trees_df has no '{feature}' values"
             )
             return None
 
-        timepoint_values = sample_values[feature].drop_duplicates().tolist()
-        if isinstance(sample_values[feature].dtype, pd.CategoricalDtype):
+        timepoint_values = all_timepoints.drop_duplicates().tolist()
+        if isinstance(all_timepoints.dtype, pd.CategoricalDtype):
             present = set(timepoint_values)
             timepoint_order = [
-                value for value in sample_values[feature].cat.categories
+                value for value in all_timepoints.cat.categories
                 if value in present
             ]
         else:
@@ -1009,14 +1011,32 @@ class TreeAnalyzer:
             except TypeError:
                 timepoint_order = sorted(timepoint_values, key=lambda value: str(value))
 
-        trajectory = (
-            sample_values.groupby(feature, sort=False, dropna=False)["value"]
-            .agg(mean="mean", minimum="min", maximum="max", dispersion="std", samples="size")
-            .reset_index()
+        if sample_values.empty:
+            trajectory = pd.DataFrame(
+                columns=[feature, "mean", "minimum", "maximum", "dispersion", "samples"]
+            )
+        else:
+            trajectory = (
+                sample_values.groupby(feature, sort=False, dropna=False)["value"]
+                .agg(
+                    mean="mean",
+                    minimum="min",
+                    maximum="max",
+                    dispersion="std",
+                    samples="size",
+                )
+                .reset_index()
+            )
+        trajectory = pd.DataFrame({feature: timepoint_order}).merge(
+            trajectory,
+            on=feature,
+            how="left",
+            sort=False,
         )
-        order = {value: index for index, value in enumerate(timepoint_order)}
-        trajectory["_order"] = trajectory[feature].map(order)
-        return trajectory.sort_values("_order").drop(columns="_order").reset_index(drop=True)
+        value_columns = ["mean", "minimum", "maximum", "dispersion"]
+        trajectory[value_columns] = trajectory[value_columns].fillna(0)
+        trajectory["samples"] = trajectory["samples"].fillna(0).astype(int)
+        return trajectory
 
     def timepoint_trajectory(
         self,

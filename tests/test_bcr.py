@@ -435,15 +435,22 @@ def _trajectory_analyzer(tmp_path, timepoint_column="timepoint"):
     late_replicate["cloneId"] = 102
     late_replicate["uniqueMoleculeCount"] = 1
     late_replicate["uniqueMoleculeFraction"] = 0.1
+    global_only = analyzer.trees_df.loc[analyzer.trees_df["nodeId"] == 4].copy()
+    global_only["treeId"] = 2
+    global_only["fileName"] = "mix.global.only.clns"
+    global_only["sample_id"] = "global.only"
+    global_only["cloneId"] = 103
+    global_only["uniqueMoleculeCount"] = 5
+    global_only["uniqueMoleculeFraction"] = 0.4
     analyzer.trees_df = pd.concat(
-        [analyzer.trees_df, early_replicate, late_replicate],
+        [analyzer.trees_df, early_replicate, late_replicate, global_only],
         ignore_index=True,
     )
 
     metadata = pd.DataFrame(
         {
-            "sample_id": ["sample.one", "early.rep", "two", "late.rep"],
-            timepoint_column: [1, 1, 2, 2],
+            "sample_id": ["sample.one", "early.rep", "two", "late.rep", "global.only"],
+            timepoint_column: [1, 1, 2, 2, 3],
         }
     )
     analyzer.read_metadata(metadata)
@@ -456,13 +463,13 @@ def test_timepoint_trajectory_summarizes_fraction_and_dispersion(tmp_path):
     trajectory = analyzer._get_timepoint_trajectory_df(1)
     axis = analyzer.timepoint_trajectory(1)
 
-    assert trajectory["timepoint"].tolist() == [1, 2]
-    assert trajectory["mean"].tolist() == pytest.approx([0.16, 0.2])
-    assert trajectory["minimum"].tolist() == pytest.approx([0.12, 0.1])
-    assert trajectory["maximum"].tolist() == pytest.approx([0.2, 0.3])
-    assert trajectory["samples"].tolist() == [2, 2]
-    assert axis.lines[0].get_ydata().tolist() == pytest.approx([0.16, 0.2])
-    assert [tick.get_text() for tick in axis.get_xticklabels()] == ["1", "2"]
+    assert trajectory["timepoint"].tolist() == [1, 2, 3]
+    assert trajectory["mean"].tolist() == pytest.approx([0.16, 0.2, 0])
+    assert trajectory["minimum"].tolist() == pytest.approx([0.12, 0.1, 0])
+    assert trajectory["maximum"].tolist() == pytest.approx([0.2, 0.3, 0])
+    assert trajectory["samples"].tolist() == [2, 2, 0]
+    assert axis.lines[0].get_ydata().tolist() == pytest.approx([0.16, 0.2, 0])
+    assert [tick.get_text() for tick in axis.get_xticklabels()] == ["1", "2", "3"]
     assert axis.get_ylabel() == "Lineage fraction in repertoire by UMI count"
 
 
@@ -480,10 +487,10 @@ def test_timepoint_trajectory_supports_counts_and_custom_feature(tmp_path):
         by_freq=False,
     )
 
-    assert trajectory["Timepoints"].tolist() == [1, 2]
-    assert trajectory["mean"].tolist() == pytest.approx([8, 2])
-    assert trajectory["minimum"].tolist() == pytest.approx([4, 1])
-    assert trajectory["maximum"].tolist() == pytest.approx([12, 3])
+    assert trajectory["Timepoints"].tolist() == [1, 2, 3]
+    assert trajectory["mean"].tolist() == pytest.approx([8, 2, 0])
+    assert trajectory["minimum"].tolist() == pytest.approx([4, 1, 0])
+    assert trajectory["maximum"].tolist() == pytest.approx([12, 3, 0])
     assert axis.get_xlabel() == "Timepoints"
     assert axis.get_ylabel() == "Lineage UMI count"
 
