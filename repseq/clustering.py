@@ -432,15 +432,7 @@ class Clusters(list):
             tuple: (single nodes, edges)
         """
         clonoset = self.clonotypes
-        aa = False
-        if overlap_type[0:2] == "aa":
-            aa = True
-        check_v = False
-        if "V" in overlap_type:
-            check_v = True
-        check_j = False
-        if "J" in overlap_type:
-            check_j = True
+        aa, check_v, check_j = overlap_type_to_flags(overlap_type)
         clonoset = Filter(by_umi=True).apply(clonoset)
         
         igh = "c" in clonoset.columns
@@ -451,7 +443,7 @@ class Clusters(list):
         # if is_count:
         #     clonoset["count"] = 1
 
-        nodes_by_len={}
+        nodes_by_comparison_group = {}
         list_of_all_nodes = []
 
         
@@ -470,8 +462,14 @@ class Clusters(list):
             count = row["count"]
             sample_id = row["sample_id"]
             len_cdr3aa = len(cdr3aa)
-            if len_cdr3aa not in nodes_by_len:
-                nodes_by_len[len_cdr3aa] = []
+            comparison_group = [len_cdr3aa]
+            if check_v:
+                comparison_group.append(v)
+            if check_j:
+                comparison_group.append(j)
+            comparison_group = tuple(comparison_group)
+            if comparison_group not in nodes_by_comparison_group:
+                nodes_by_comparison_group[comparison_group] = []
             node = Node(node_id=index, 
                         seq_nt=cdr3nt, 
                         seq_aa=cdr3aa, 
@@ -482,14 +480,13 @@ class Clusters(list):
                         count=count)
             if igh:
                 node.additional_properties["c"] = row["c"]
-            nodes_by_len[len_cdr3aa].append(node)
+            nodes_by_comparison_group[comparison_group].append(node)
             list_of_all_nodes.append(node)
         if verbose:
             print("Nodes list created: {} nodes".format(len(list_of_all_nodes)))
         
         tasks = []
-        for aa_len in nodes_by_len:
-            nodes_list=nodes_by_len[aa_len]
+        for nodes_list in nodes_by_comparison_group.values():
             task = (nodes_list, mismatches, aa, check_v, check_j)
             tasks.append(task)
         

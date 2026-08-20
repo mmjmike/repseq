@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
+import pytest
 
+import repseq.clustering as clustering_module
 from repseq.clustering import Cluster, Clusters, Node
 
 
@@ -66,3 +68,58 @@ def test_to_count_table_sums_frequencies_when_requested():
     np.testing.assert_allclose(count_table["sample_1"], [0.3, 0])
     np.testing.assert_allclose(count_table["sample_2"], [0.4, 0.3])
     np.testing.assert_allclose(count_table["sample_3"], [0, 0])
+
+
+@pytest.mark.parametrize(
+    ("overlap_type", "expected_groups", "expected_edges"),
+    [
+        (
+            "aaV",
+            [
+                {("TRBV1", "TRBJ1"), ("TRBV1", "TRBJ2")},
+                {("TRBV2", "TRBJ1")},
+            ],
+            3,
+        ),
+        (
+            "aaVJ",
+            [
+                {("TRBV1", "TRBJ1")},
+                {("TRBV1", "TRBJ2")},
+                {("TRBV2", "TRBJ1")},
+            ],
+            1,
+        ),
+    ],
+)
+def test_find_nodes_and_edges_groups_by_required_segments(
+    monkeypatch, overlap_type, expected_groups, expected_edges
+):
+    clusters = Clusters()
+    clusters.clonotypes = pd.DataFrame(
+        {
+            "cdr3aa": ["CASS", "CATS", "CARS", "CAGS"],
+            "cdr3nt": ["TGTGCT", "TGTGCC", "TGTGCA", "TGTGCG"],
+            "v": ["TRBV1", "TRBV1", "TRBV1", "TRBV2"],
+            "j": ["TRBJ1", "TRBJ1", "TRBJ2", "TRBJ1"],
+            "sample_id": ["sample_1"] * 4,
+            "freq": [0.25] * 4,
+            "count": [1] * 4,
+        }
+    )
+    compared_groups = []
+
+    def capture_tasks(function, tasks, *args, **kwargs):
+        compared_groups.extend(
+            [{(node.v, node.j) for node in task[0]} for task in tasks]
+        )
+        return [function(task) for task in tasks]
+
+    monkeypatch.setattr(clustering_module, "run_parallel_calculation", capture_tasks)
+
+    _, edges = clusters.find_nodes_and_edges(
+        mismatches=1, overlap_type=overlap_type, cpu=1, verbose=False
+    )
+
+    assert compared_groups == expected_groups
+    assert len(edges) == expected_edges
