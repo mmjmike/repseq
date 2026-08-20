@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import re
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -23,6 +25,16 @@ _SEQUENCE_COLUMNS = {
     "FR4": "aaSeqFR4",
 }
 
+_MUTATION_REGIONS = [
+    ("FR1", 4, 5),
+    ("CDR1", 5, 6),
+    ("FR2", 6, 7),
+    ("CDR2", 7, 8),
+    ("FR3", 8, 9),
+    ("CDR3", 9, 18),
+    ("FR4", 18, 19),
+]
+
 
 def _first_existing(columns, candidates):
     return next((column for column in candidates if column in columns), None)
@@ -38,6 +50,86 @@ def _id_key(value):
     except (TypeError, ValueError):
         pass
     return str(value)
+
+
+def get_mutation_positions(mutations):
+    """Parse MiXCR substitution, deletion, and insertion positions."""
+    if not isinstance(mutations, str) or mutations == "":
+        return [], [[], [], []]
+    mutation_tokens = mutations.replace("D", "S").replace("I", "S").split("S")[1:]
+    substitution_motif = re.compile(r"^[ATGC](\d+)[ATGC]$")
+    deletion_motif = re.compile(r"^[ATGC](\d+)$")
+    insertion_motif = re.compile(r"^(\d+)[ATGC]$")
+
+    substitutions = []
+    deletions = []
+    insertions = []
+    for mutation in mutation_tokens:
+        substitution = substitution_motif.fullmatch(mutation)
+        deletion = deletion_motif.fullmatch(mutation)
+        insertion = insertion_motif.fullmatch(mutation)
+        if substitution is not None:
+            substitutions.append(int(substitution.group(1)))
+        elif deletion is not None:
+            deletions.append(int(deletion.group(1)))
+        elif insertion is not None:
+            insertions.append(int(insertion.group(1)))
+    positions = substitutions + deletions + insertions
+    return positions, [substitutions, deletions, insertions]
+
+
+def _absolute_mutation_positions(row, segment):
+    alignment = row.get(f"all{segment.upper()}Alignments")
+    if not isinstance(alignment, str) or alignment == "":
+        return []
+    alignment_fields = alignment.split(";", 1)[0].split("|")
+    if len(alignment_fields) < 6:
+        return []
+    try:
+        target_from = int(alignment_fields[0])
+        query_from = int(alignment_fields[3])
+    except (TypeError, ValueError):
+        return []
+    mutation_positions = get_mutation_positions(alignment_fields[5])[0]
+    segment_shift = query_from - target_from
+    return [position + segment_shift for position in mutation_positions]
+
+
+def _parse_refpoint_regions(ref_points):
+    if not isinstance(ref_points, str) or ref_points == "":
+        return None
+    required_indices = sorted(
+        {index for _, start, end in _MUTATION_REGIONS for index in (start, end)}
+    )
+    candidates = []
+    for target_ref_points in ref_points.split(","):
+        values = target_ref_points.split(":")
+        parsed = []
+        for value in values:
+            try:
+                parsed.append(int(value) if value != "" else None)
+            except ValueError:
+                parsed.append(None)
+        coverage = sum(
+            index < len(parsed) and parsed[index] is not None
+            for index in required_indices
+        )
+        candidates.append((coverage, parsed))
+    if not candidates:
+        return None
+    _, points = max(candidates, key=lambda candidate: candidate[0])
+    if any(index >= len(points) or points[index] is None for index in required_indices):
+        return None
+
+    fr1_begin = points[4]
+    regions = []
+    for region, start_index, end_index in _MUTATION_REGIONS:
+        start = points[start_index] - fr1_begin
+        end = points[end_index] - fr1_begin
+        if start < 0 or end <= start:
+            return None
+        regions.append((region, start, end))
+    return fr1_begin, regions
 
 
 def _observed_mask(data):
@@ -587,6 +679,131 @@ class TreeAnalyzer:
             raise
         list_of_clonotypes = [(sequence,) for sequence in sequences]
         return logo.get_logo_for_list_of_clonotypes(list_of_clonotypes, "prot")
+
+    def _get_mutation_rate_df(self, treeId):
+        if self.trees_df is None:
+            raise ValueError("Read a trees table before plotting mutation rates")
+        required_columns = {
+            "treeId",
+            "isObserved",
+            "allVAlignments",
+            "allDAlignments",
+            "allJAlignments",
+            "refPoints",
+        }
+        missing_columns = sorted(required_columns - set(self.trees_df.columns))
+        if missing_columns:
+            raise ValueError(
+                "trees table is missing required mutation columns: "
+                + ", ".join(missing_columns)
+            )
+
+        tree_id_key = _id_key(treeId)
+        tree_rows = self.trees_df.loc[
+            (self.trees_df["treeId"].map(_id_key) == tree_id_key)
+            & _observed_mask(self.trees_df)
+        ]
+        if tree_rows.empty:
+            raise ValueError(f"treeId {treeId!r} does not contain observed nodes")
+
+        parsed_rows = []
+        for _, row in tree_rows.iterrows():
+            parsed_ref_points = _parse_refpoint_regions(row["refPoints"])
+            if parsed_ref_points is None:
+                continue
+            fr1_begin, regions = parsed_ref_points
+            region_lengths = tuple(end - start for _, start, end in regions)
+            mutation_positions = set()
+            for segment in ["v", "d", "j"]:
+                mutation_positions.update(_absolute_mutation_positions(row, segment))
+            parsed_rows.append((fr1_begin, region_lengths, mutation_positions))
+
+        if not parsed_rows:
+            raise ValueError(
+                f"treeId {treeId!r} does not contain complete FR1-to-FR4 refPoints"
+            )
+
+        canonical_lengths = Counter(
+            region_lengths for _, region_lengths, _ in parsed_rows
+        ).most_common(1)[0][0]
+        regions = []
+        region_start = 0
+        for (region, _, _), length in zip(_MUTATION_REGIONS, canonical_lengths):
+            regions.append((region, region_start, region_start + length))
+            region_start += length
+        total_length = region_start
+
+        mutation_counts = np.zeros(total_length, dtype=float)
+        for fr1_begin, _, mutation_positions in parsed_rows:
+            relative_positions = {
+                position - fr1_begin
+                for position in mutation_positions
+                if 0 <= position - fr1_begin < total_length
+            }
+            for position in relative_positions:
+                mutation_counts[position] += 1
+
+        rates = mutation_counts / len(parsed_rows)
+        mutation_rate_df = pd.DataFrame(
+            {
+                "position": np.arange(total_length, dtype=int),
+                "rate": rates,
+            }
+        )
+        mutation_rate_df["region"] = ""
+        for region, start, end in regions:
+            mutation_rate_df.loc[
+                mutation_rate_df["position"].between(start, end - 1),
+                "region",
+            ] = region
+        return mutation_rate_df
+
+    def plot_mutations_rate(self, treeId, ax=None):
+        """Plot observed-node mutation frequencies across FR1 through FR4."""
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        from matplotlib.patches import Patch
+
+        mutation_rate_df = self._get_mutation_rate_df(treeId)
+        region_order = [region for region, _, _ in _MUTATION_REGIONS]
+        palette = dict(
+            zip(region_order, sns.color_palette("Set2", n_colors=len(region_order)))
+        )
+        if ax is None:
+            _, ax = plt.subplots(figsize=(12, 4))
+
+        colors = mutation_rate_df["region"].map(palette)
+        ax.bar(
+            mutation_rate_df["position"],
+            mutation_rate_df["rate"],
+            width=0.7,
+            color=colors,
+            edgecolor="none",
+        )
+        region_ends = (
+            mutation_rate_df.groupby("region", sort=False)["position"].max().tolist()
+        )
+        for border in region_ends[:-1]:
+            ax.axvline(border + 0.5, color="0.45", linestyle="--", linewidth=1)
+
+        handles = [
+            Patch(facecolor=palette[region], edgecolor="none", label=region)
+            for region in region_order
+            if region in set(mutation_rate_df["region"])
+        ]
+        ax.legend(
+            handles=handles,
+            frameon=False,
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.18),
+            ncol=len(handles),
+        )
+        ax.set_xlabel("Position")
+        ax.set_ylabel("Mutation frequency")
+        ax.set_title(f"Tree {treeId} mutation frequencies")
+        ax.set_ylim(0, 1)
+        ax.set_xlim(-0.7, mutation_rate_df["position"].max() + 0.7)
+        return ax
 
     def to_count_table(self):
         """Create a wide table of tree abundance by sample."""

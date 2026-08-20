@@ -75,6 +75,23 @@ def _write_tree_inputs(tmp_path):
     return trees_filename, newick_dir
 
 
+def _mutation_ref_points():
+    points = [""] * 22
+    positions = {
+        4: 0,
+        5: 2,
+        6: 4,
+        7: 6,
+        8: 8,
+        9: 10,
+        18: 13,
+        19: 15,
+    }
+    for index, position in positions.items():
+        points[index] = str(position)
+    return ":".join(points)
+
+
 def test_tree_analyzer_properties_are_enriched_sorted_and_cached(tmp_path, capsys):
     trees_filename, newick_dir = _write_tree_inputs(tmp_path)
     analyzer = bcr.TreeAnalyzer()
@@ -316,6 +333,46 @@ def test_get_logo_for_tree_passes_tree_cdr3_sequences(
         "clonotypes": [("AAA",), ("ABA",), ("ACA",)],
         "sequence_type": "prot",
     }
+
+
+def test_get_mutation_positions_parses_substitutions_deletions_and_insertions():
+    positions, mutation_types = bcr.get_mutation_positions("SA1GDC2I3T")
+
+    assert positions == [1, 2, 3]
+    assert mutation_types == [[1], [2], [3]]
+
+
+def test_plot_mutations_rate_uses_observed_nodes_and_region_boundaries(tmp_path):
+    trees_filename, _ = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    empty_alignment = "0|0|0|0|0||0"
+    analyzer.trees_df["refPoints"] = _mutation_ref_points()
+    analyzer.trees_df["allVAlignments"] = [
+        "0|15|15|0|15|SA1GSC2T|100;0|15|15|0|15|SA9G|90",
+        "0|15|15|0|15|SC2T|100",
+        "0|15|15|0|15|SA1G|100",
+        empty_alignment,
+    ]
+    analyzer.trees_df["allDAlignments"] = empty_alignment
+    analyzer.trees_df["allJAlignments"] = empty_alignment
+
+    mutation_rates = analyzer._get_mutation_rate_df("1")
+    axis = analyzer.plot_mutations_rate(1)
+
+    assert len(mutation_rates) == 15
+    assert mutation_rates.loc[mutation_rates["position"] == 1, "rate"].iloc[0] == 0.5
+    assert mutation_rates.loc[mutation_rates["position"] == 2, "rate"].iloc[0] == 1.0
+    assert mutation_rates.loc[mutation_rates["position"] == 9, "rate"].iloc[0] == 0
+    assert mutation_rates.loc[mutation_rates["position"] == 0, "region"].iloc[0] == "FR1"
+    assert mutation_rates.loc[mutation_rates["position"] == 2, "region"].iloc[0] == "CDR1"
+    assert mutation_rates.loc[mutation_rates["position"] == 10, "region"].iloc[0] == "CDR3"
+    assert mutation_rates.loc[mutation_rates["position"] == 13, "region"].iloc[0] == "FR4"
+    assert len(axis.patches) == 15
+    assert len(axis.lines) == 6
+    assert all(line.get_linestyle() == "--" for line in axis.lines)
+    assert axis.get_title() == "Tree 1 mutation frequencies"
+    assert axis.get_ylabel() == "Mutation frequency"
 
 
 def test_draw_tree_returns_axis(tmp_path):
