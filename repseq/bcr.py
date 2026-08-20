@@ -1213,7 +1213,7 @@ class TreeAnalyzer:
         by_freq=True,
         ax=None,
     ):
-        """Plot mean sample-level isotype abundance over time without error bars."""
+        """Plot mean sample-level isotype abundance as stacked timepoint bars."""
         import matplotlib.pyplot as plt
 
         feature = "timepoint" if timepoint_feature is None else timepoint_feature
@@ -1231,19 +1231,20 @@ class TreeAnalyzer:
         palette = rsplot._isotype_colors(isotype_order)
         timepoint_order = trajectory[feature].drop_duplicates().tolist()
         x_positions = np.arange(len(timepoint_order))
+        bottom = np.zeros(len(timepoint_order), dtype=float)
         for isotype in isotype_order:
             values = trajectory.loc[
                 trajectory["isotype"] == isotype, "mean"
             ].to_numpy(dtype=float)
-            ax.plot(
+            ax.bar(
                 x_positions,
                 values,
+                bottom=bottom,
+                width=0.8,
                 color=palette[isotype],
-                marker="o",
-                linewidth=1.8,
-                markersize=5,
                 label=isotype,
             )
+            bottom += values
 
         ax.set_xticks(x_positions)
         ax.set_xticklabels([_format_axis_value(value) for value in timepoint_order])

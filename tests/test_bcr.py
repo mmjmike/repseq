@@ -511,14 +511,29 @@ def test_timepoint_isotypes_averages_sample_values_and_zero_fills(tmp_path):
     assert values.loc[2, "IgD"] == pytest.approx(0.2)
     assert values.loc[2, "IgG"] == pytest.approx(0)
     assert values.loc[3].tolist() == pytest.approx([0, 0, 0])
-    assert [line.get_label() for line in axis.lines] == ["IgM", "IgD", "IgG"]
-    assert axis.lines[0].get_ydata().tolist() == pytest.approx([0.15, 0, 0])
-    assert axis.lines[1].get_ydata().tolist() == pytest.approx([0, 0.2, 0])
-    assert axis.lines[2].get_ydata().tolist() == pytest.approx([0.01, 0, 0])
-    assert np.allclose(to_rgba(axis.lines[0].get_color()), to_rgba("#E41A1C"))
-    assert np.allclose(to_rgba(axis.lines[1].get_color()), to_rgba("#FF7F00"))
-    assert np.allclose(to_rgba(axis.lines[2].get_color()), to_rgba("#4DAF4A"))
+    containers = {container.get_label(): container for container in axis.containers}
+    assert list(containers) == ["IgM", "IgD", "IgG"]
+    assert [patch.get_height() for patch in containers["IgM"].patches] == pytest.approx(
+        [0.15, 0, 0]
+    )
+    assert [patch.get_height() for patch in containers["IgD"].patches] == pytest.approx(
+        [0, 0.2, 0]
+    )
+    assert [patch.get_height() for patch in containers["IgG"].patches] == pytest.approx(
+        [0.01, 0, 0]
+    )
+    assert containers["IgG"].patches[0].get_y() == pytest.approx(0.15)
+    assert np.allclose(
+        containers["IgM"].patches[0].get_facecolor(), to_rgba("#E41A1C")
+    )
+    assert np.allclose(
+        containers["IgD"].patches[0].get_facecolor(), to_rgba("#FF7F00")
+    )
+    assert np.allclose(
+        containers["IgG"].patches[0].get_facecolor(), to_rgba("#4DAF4A")
+    )
     assert axis.get_ylabel() == "Mean isotype fraction by UMI count"
+    assert not axis.lines
     assert not axis.collections
 
 
