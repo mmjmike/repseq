@@ -892,6 +892,12 @@ def _column_by_name(columns, names):
     return matches[0] if matches else None
 
 
+def _is_missing_segment(gene):
+    if pd.isna(gene):
+        return True
+    return str(gene).strip().upper() in {".", "NA", "<NA>", "NAN", "NONE"}
+
+
 def _infer_segment_type(values):
     gene_types = {
         parsed["gene_type"].lower()
@@ -913,7 +919,7 @@ def _segment_chain(gene):
 
 
 def _segment_family(gene, segment_type):
-    if str(gene).strip() in {".", "NA"}:
+    if _is_missing_segment(gene):
         return "NA"
     parsed = parse_gene_name(gene)
     if parsed is None or parsed["gene_type"].casefold() != segment_type:
@@ -946,6 +952,8 @@ def _combine_segment_family_usage(data, segment_type):
 
 
 def _recode_isotype(gene, combine_families=False):
+    if _is_missing_segment(gene):
+        return "NA"
     gene = str(gene).strip().upper()
     gene = re.split(r"[,;|]", gene, maxsplit=1)[0]
     gene = gene.split("(", 1)[0].split("*", 1)[0]
@@ -1185,7 +1193,7 @@ def _normalize_segment_usage_table(segment_usage_df):
             for column in data.columns
             if column not in id_columns
             and (
-                str(column).strip() == "."
+                _is_missing_segment(column)
                 or parse_gene_name(str(column)) is not None
             )
         ]
@@ -1202,11 +1210,11 @@ def _normalize_segment_usage_table(segment_usage_df):
         )
 
     data["_value"] = pd.to_numeric(data["_value"], errors="coerce")
-    invalid_values = data["_value"].isna() | data["_segment"].isna()
+    invalid_values = data["_value"].isna()
     if invalid_values.any():
         warnings.warn(
             f"Dropped {int(invalid_values.sum())} segment-usage row(s) with "
-            "missing or non-numeric values.",
+            "missing or non-numeric usage values.",
             UserWarning,
             stacklevel=2,
         )
@@ -1214,7 +1222,9 @@ def _normalize_segment_usage_table(segment_usage_df):
     if data.empty:
         raise ValueError("No valid segment-usage values were found")
 
-    data["_segment"] = data["_segment"].astype(str).replace({".": "NA"})
+    data["_segment"] = data["_segment"].map(
+        lambda gene: "NA" if _is_missing_segment(gene) else str(gene)
+    )
     inferred_chains = data["_segment"].map(_segment_chain)
     if "chain" not in data.columns:
         data["chain"] = inferred_chains.fillna("Unknown")

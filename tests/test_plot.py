@@ -849,6 +849,29 @@ def test_segment_usage_combines_c_segments_by_isotype():
     )
 
 
+def test_segment_usage_keeps_missing_calls_as_na_family():
+    usage = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "IGH", "c": "IGHG1", "usage": 0.5},
+            {"sample_id": "sample1", "chain": "IGH", "c": pd.NA, "usage": 0.2},
+            {"sample_id": "sample1", "chain": "IGH", "c": "<NA>", "usage": 0.3},
+        ]
+    )
+
+    fig = rsplot.segment_usage(
+        usage,
+        plot_type="barplot",
+        combine_families=True,
+    )
+    ax = fig.axes[0]
+
+    assert [tick.get_text() for tick in ax.get_xticklabels()] == ["IGHG", "NA"]
+    np.testing.assert_allclose(
+        [patch.get_height() for patch in ax.patches],
+        [0.5, 0.5],
+    )
+
+
 def test_segment_usage_renames_dot_segment_in_wide_tables():
     usage = pd.DataFrame(
         [
@@ -902,6 +925,28 @@ def test_segment_usage_renames_dot_segment_in_wide_tables():
 )
 def test_recode_isotype_supports_all_mixcr_igh_constant_genes(gene, expected):
     assert rsplot._recode_isotype(gene) == expected
+
+
+def test_isotype_fraction_keeps_missing_calls_as_na_isotype():
+    usage = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "IGH", "c": "IGHM", "usage": 0.5},
+            {"sample_id": "sample1", "chain": "IGH", "c": pd.NA, "usage": 0.2},
+            {"sample_id": "sample1", "chain": "IGH", "c": "<NA>", "usage": 0.3},
+        ]
+    )
+
+    fig = rsplot.isotype_fraction(usage)
+    containers = {
+        container.get_label(): container for container in fig.axes[0].containers
+    }
+
+    assert [text.get_text() for text in fig.axes[0].get_legend().get_texts()] == [
+        "IgM",
+        "NA",
+    ]
+    assert containers["IgM"].patches[0].get_width() == pytest.approx(0.5)
+    assert containers["NA"].patches[0].get_width() == pytest.approx(0.5)
 
 
 def test_isotype_fraction_uses_requested_order_palette_and_right_to_left_stack():
