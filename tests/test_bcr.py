@@ -67,7 +67,8 @@ def _write_tree_inputs(tmp_path):
     (repertoires_dir / "mix.sample.one.clns").touch()
     pd.DataFrame(
         {"cloneId": [1, 2], "readCount": [5, 2], "readFraction": [0.7, 0.3],
-         "uniqueMoleculeCount": [10, 2], "uniqueMoleculeFraction": [0.1, 0.02]}
+         "uniqueMoleculeCount": [10, 2], "uniqueMoleculeFraction": [0.1, 0.02],
+         "customClonosetColumn": ["first", "second"]}
     ).to_csv(repertoires_dir / "mix.sample.one.clones_IGH.tsv", sep="\t", index=False)
     newick_dir = tmp_path / "newick"
     newick_dir.mkdir()
@@ -336,6 +337,43 @@ def test_get_logo_for_tree_passes_tree_cdr3_sequences(
         "clonotypes": [("AAA",), ("ABA",), ("ACA",)],
         "sequence_type": "prot",
     }
+
+
+def test_get_tree_clonotypes_returns_full_source_rows_and_selected_tree_data(tmp_path):
+    trees_filename, _ = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    analyzer.read_metadata(
+        pd.DataFrame(
+            {
+                "sample_id": ["sample.one", "two"],
+                "timepoint": [1, 2],
+                "donor_id": ["donor", "donor"],
+            }
+        )
+    )
+
+    clonotypes = analyzer.get_tree_clonotypes("1")
+
+    assert len(clonotypes) == 2
+    assert clonotypes.columns[:7].tolist() == [
+        "treeId",
+        "sample_id",
+        "cloneId",
+        "nMutationsRate",
+        "timepoint",
+        "donor_id",
+        "isotype",
+    ]
+    assert clonotypes["cloneId"].tolist() == [1, 2]
+    assert clonotypes["nMutationsRate"].tolist() == pytest.approx([0.1, 0.2])
+    assert clonotypes["timepoint"].tolist() == [1, 1]
+    assert clonotypes["donor_id"].tolist() == ["donor", "donor"]
+    assert clonotypes["isotype"].tolist() == ["IgM", "IgG"]
+    assert clonotypes["uniqueMoleculeCount"].tolist() == [10, 2]
+    assert clonotypes["customClonosetColumn"].tolist() == ["first", "second"]
+    assert "nodeId" not in clonotypes.columns
+    assert "aaSeqCDR3" not in clonotypes.columns
 
 
 def test_get_mutation_positions_parses_substitutions_deletions_and_insertions():

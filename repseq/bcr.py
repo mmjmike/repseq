@@ -693,6 +693,130 @@ class TreeAnalyzer:
         list_of_clonotypes = [(sequence,) for sequence in sequences]
         return logo.get_logo_for_list_of_clonotypes(list_of_clonotypes, "prot")
 
+    def get_tree_clonotypes(self, treeId):
+        """Return full clonoset rows for all observed clonotypes in one tree."""
+        if self.trees_df is None:
+            raise ValueError("Read a trees table before retrieving tree clonotypes")
+        required_columns = {"treeId", "isObserved", "fileName", "cloneId", "sample_id"}
+        missing_columns = sorted(required_columns - set(self.trees_df.columns))
+        if missing_columns:
+            raise ValueError(
+                f"trees table is missing required columns: {', '.join(missing_columns)}"
+            )
+
+        tree_id_key = _id_key(treeId)
+        tree_rows = self.trees_df.loc[
+            (self.trees_df["treeId"].map(_id_key) == tree_id_key)
+            & _observed_mask(self.trees_df)
+        ].copy()
+        if tree_rows.empty:
+            raise ValueError(f"treeId {treeId!r} does not contain observed clonotypes")
+
+        folders, resolved_filenames = self._source_folders_and_filenames(tree_rows)
+        if not folders:
+            raise ValueError(f"Unable to locate source clonoset folders for treeId {treeId!r}")
+        clonosets_df = clonosets.find_all_mixcr_clonosets(folders)
+        if clonosets_df.empty:
+            raise ValueError(f"No exported clonoset tables found for treeId {treeId!r}")
+
+        discovered_sample_ids = clonosets_df["sample_id"].dropna().astype(str).unique()
+        filename_to_sample = {
+            filename: self._matching_sample_id(resolved, discovered_sample_ids)
+            for filename, resolved in resolved_filenames.items()
+        }
+        filename_to_sample = {
+            filename: sample_id
+            for filename, sample_id in filename_to_sample.items()
+            if sample_id is not None
+        }
+        if filename_to_sample:
+            discovered_ids = tree_rows["fileName"].astype(str).map(filename_to_sample)
+            tree_rows.loc[discovered_ids.notna(), "sample_id"] = discovered_ids.dropna()
+
+        sample_ids = tree_rows["sample_id"].dropna().astype(str).unique()
+        clonosets_df = clonosets_df.loc[
+            clonosets_df["sample_id"].astype(str).isin(sample_ids)
+        ].reset_index(drop=True)
+        if clonosets_df.empty:
+            raise ValueError(f"No source clonosets matched treeId {treeId!r} samples")
+
+        pooled = clonosets.pool_clonotypes_from_clonosets_df(
+            clonosets_df,
+            cl_filter=Filter(convert=False),
+        )
+        if not {"sample_id", "cloneId"}.issubset(pooled.columns):
+            raise ValueError("Source clonosets must contain sample_id and cloneId columns")
+
+        mutation_column = _first_existing(
+            tree_rows.columns,
+            ["nMutationsRate", "nMutationRate", "mutationRate", "mutation_rate"],
+        )
+        tree_rows["nMutationsRate"] = (
+            pd.to_numeric(tree_rows[mutation_column], errors="coerce")
+            if mutation_column is not None else np.nan
+        )
+        if "isotype" not in tree_rows.columns:
+            tree_rows["isotype"] = pd.NA
+
+        metadata_columns = []
+        if self.metadata is not None:
+            metadata_columns = [
+                column
+                for column in self.metadata.columns
+                if column != "sample_id" and column in tree_rows.columns
+            ]
+        tree_columns = [
+            "treeId",
+            "sample_id",
+            "cloneId",
+            "nMutationsRate",
+            *metadata_columns,
+            "isotype",
+        ]
+        tree_info = tree_rows.loc[:, list(dict.fromkeys(tree_columns))].copy()
+        tree_info["sample_id"] = tree_info["sample_id"].astype(str)
+        tree_info["_clone_id"] = tree_info["cloneId"].map(_id_key)
+        pooled = pooled.copy()
+        pooled["sample_id"] = pooled["sample_id"].astype(str)
+        pooled["_clone_id"] = pooled["cloneId"].map(_id_key)
+
+        merged = tree_info.merge(
+            pooled,
+            on=["sample_id", "_clone_id"],
+            how="left",
+            suffixes=("_tree", ""),
+            sort=False,
+        )
+        if "cloneId" not in merged.columns or merged["cloneId"].isna().any():
+            missing = merged.loc[
+                merged.get("cloneId", pd.Series(index=merged.index, dtype="object")).isna(),
+                ["sample_id", "cloneId_tree"],
+            ]
+            raise ValueError(
+                "Unable to find source clonotypes for: "
+                + ", ".join(
+                    f"{row.sample_id}/cloneId={row.cloneId_tree}"
+                    for row in missing.itertuples(index=False)
+                )
+            )
+
+        output = pd.DataFrame(index=merged.index)
+        output["treeId"] = merged[
+            "treeId_tree" if "treeId_tree" in merged.columns else "treeId"
+        ]
+        output["sample_id"] = merged["sample_id"]
+        output["cloneId"] = merged["cloneId"]
+        requested_tree_columns = ["nMutationsRate", *metadata_columns, "isotype"]
+        for column in requested_tree_columns:
+            tree_column = f"{column}_tree" if f"{column}_tree" in merged.columns else column
+            output[column] = merged[tree_column]
+
+        reserved_columns = set(output.columns) | {"_clone_id"}
+        for column in pooled.columns:
+            if column not in reserved_columns:
+                output[column] = merged[column]
+        return output.reset_index(drop=True)
+
     def _get_mutation_rate_df(self, treeId):
         if self.trees_df is None:
             raise ValueError("Read a trees table before plotting mutation rates")
