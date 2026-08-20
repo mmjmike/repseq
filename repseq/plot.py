@@ -957,12 +957,16 @@ def _recode_isotype(gene, combine_families=False):
     gene = str(gene).strip().upper()
     gene = re.split(r"[,;|]", gene, maxsplit=1)[0]
     gene = gene.split("(", 1)[0].split("*", 1)[0]
-    if gene in {".", "NA", "IGHGP", "IGHEP1"}:
+    if gene in {"IGHGP", "IGHEP1"}:
         return "NA"
 
     match = re.fullmatch(r"IGH([MDGAE])(.*)", gene)
     if match is None:
-        raise ValueError(f"Unsupported IGH constant gene: {gene!r}")
+        match = re.fullmatch(r"IG([MDGAE])(.*)", gene)
+    if match is None:
+        match = re.fullmatch(r"([MDGAE])(.*)", gene)
+    if match is None:
+        raise ValueError(f"Unsupported IGH constant gene or isotype: {gene!r}")
     family, variant = match.groups()
     variant = re.sub(r"_HINGE$", "", variant)
     return f"Ig{family}" if combine_families else f"Ig{family}{variant}"
@@ -4704,17 +4708,34 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
     observed_counts = node_data.loc[observed_mask, "_plot_count"]
     max_count = max(float(observed_counts.max()) if not observed_counts.empty else 1, 1)
     x_positions, y_positions = _phylo_positions(tree)
+
+    group_column = group
+    if (
+        isinstance(group, str)
+        and group.casefold() == "isotype"
+        and group in node_data.columns
+    ):
+        group_column = "_plot_isotype"
+        node_data[group_column] = node_data[group].map(_recode_isotype)
+
+    color_values = (
+        node_data.loc[observed_mask, group_column]
+        if group_column is not None and group_column in node_data.columns else None
+    )
+    if color_values is None:
+        categories = []
+        palette = {}
+    elif group_column == "_plot_isotype":
+        categories = _isotype_order(color_values)
+        palette = _isotype_colors(categories)
+    else:
+        categories = sorted(color_values.dropna().astype(str).unique())
+        palette = dict(zip(categories, sns.color_palette(n_colors=len(categories))))
+
     node_groups = {
         node_id: rows
         for node_id, rows in node_data.groupby("_node_key", sort=False)
     }
-
-    color_values = (
-        node_data.loc[observed_mask, group]
-        if group is not None and group in node_data.columns else None
-    )
-    categories = [] if color_values is None else sorted(color_values.dropna().astype(str).unique())
-    palette = dict(zip(categories, sns.color_palette(n_colors=len(categories))))
 
     if ax is None:
         _, ax = plt.subplots(figsize=(10, max(4, len(tree.get_terminals()) * 0.35)))
@@ -4743,7 +4764,13 @@ def draw_tree(trees_df, treeId, metadata=None, group=None, label=None, ax=None):
             observed_rows = observed_rows.sort_values("_plot_count", ascending=False)
             label_count = len(observed_rows)
             for label_index, (_, row) in enumerate(observed_rows.iterrows()):
-                category = str(row[group]) if group is not None and group in row and pd.notna(row[group]) else None
+                category = (
+                    str(row[group_column])
+                    if group_column is not None
+                    and group_column in row
+                    and pd.notna(row[group_column])
+                    else None
+                )
                 color = palette.get(category, "0.45")
                 size = 30 + 270 * np.sqrt(float(row["_plot_count"]) / max_count)
                 ax.scatter(x, y, s=size, color=color, edgecolor="white", linewidth=0.6, zorder=3)

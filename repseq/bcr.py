@@ -1086,6 +1086,183 @@ class TreeAnalyzer:
         ax.grid(axis="y", color="0.9", linewidth=0.8)
         return ax
 
+    def _get_timepoint_isotypes_df(
+        self,
+        treeId,
+        timepoint_feature=None,
+        by_freq=True,
+    ):
+        feature = "timepoint" if timepoint_feature is None else timepoint_feature
+        if self.trees_df is None or self.metadata is None:
+            print(
+                "Cannot plot timepoint isotypes: first read the trees table and "
+                "run ta.read_metadata(metadata)"
+            )
+            return None
+        if feature not in self.trees_df.columns:
+            print(
+                f"Cannot plot timepoint isotypes: trees_df does not contain "
+                f"'{feature}'. Run ta.read_metadata(metadata) with this column, "
+                "or specify timepoint_feature='column_name'"
+            )
+            return None
+
+        value_column = "uniqueMoleculeFraction" if by_freq else "uniqueMoleculeCount"
+        data = self._ensure_umi_values()
+        if value_column not in data.columns:
+            print(
+                f"Cannot plot timepoint isotypes: trees_df does not contain "
+                f"'{value_column}'"
+            )
+            return None
+        if "isotype" not in data.columns:
+            print("Cannot plot timepoint isotypes: trees_df does not contain 'isotype'")
+            return None
+
+        observed = _observed_mask(data)
+        all_timepoints = data.loc[observed, feature].dropna()
+        if all_timepoints.empty:
+            print(f"Cannot plot timepoint isotypes: trees_df has no '{feature}' values")
+            return None
+        timepoint_values = all_timepoints.drop_duplicates().tolist()
+        if isinstance(all_timepoints.dtype, pd.CategoricalDtype):
+            present = set(timepoint_values)
+            timepoint_order = [
+                value for value in all_timepoints.cat.categories if value in present
+            ]
+        else:
+            try:
+                timepoint_order = sorted(timepoint_values)
+            except TypeError:
+                timepoint_order = sorted(timepoint_values, key=lambda value: str(value))
+
+        tree_id_key = _id_key(treeId)
+        tree_rows = data.loc[
+            (data["treeId"].map(_id_key) == tree_id_key) & observed
+        ].copy()
+        if tree_rows.empty:
+            raise ValueError(f"treeId {treeId!r} does not contain observed nodes")
+        tree_rows = tree_rows.dropna(subset=["sample_id", feature])
+        if tree_rows.empty:
+            raise ValueError(
+                f"treeId {treeId!r} has no observed nodes with sample and timepoint values"
+            )
+
+        tree_rows["_isotype"] = tree_rows["isotype"].map(rsplot._recode_isotype)
+        tree_rows[value_column] = pd.to_numeric(
+            tree_rows[value_column], errors="coerce"
+        )
+        isotype_order = rsplot._isotype_order(tree_rows["_isotype"])
+        sample_timepoints = tree_rows.loc[:, ["sample_id", feature]].drop_duplicates()
+        conflicting_samples = sample_timepoints["sample_id"].duplicated(keep=False)
+        if conflicting_samples.any():
+            samples = sample_timepoints.loc[
+                conflicting_samples, "sample_id"
+            ].drop_duplicates().tolist()
+            raise ValueError(f"Samples have multiple timepoint values: {samples}")
+
+        sample_values = (
+            tree_rows.groupby(
+                ["sample_id", "_isotype"], sort=False, dropna=False
+            )[value_column]
+            .sum(min_count=1)
+            .reset_index(name="value")
+        )
+        sample_grid = sample_timepoints.assign(_key=1).merge(
+            pd.DataFrame({"_isotype": isotype_order, "_key": 1}),
+            on="_key",
+            how="inner",
+        ).drop(columns="_key")
+        sample_grid = sample_grid.merge(
+            sample_values,
+            on=["sample_id", "_isotype"],
+            how="left",
+        )
+        sample_grid["value"] = sample_grid["value"].fillna(0)
+        means = (
+            sample_grid.groupby([feature, "_isotype"], sort=False, dropna=False)[
+                "value"
+            ]
+            .mean()
+            .reset_index(name="mean")
+        )
+
+        trajectory = pd.DataFrame({feature: timepoint_order}).assign(_key=1).merge(
+            pd.DataFrame({"_isotype": isotype_order, "_key": 1}),
+            on="_key",
+            how="inner",
+        ).drop(columns="_key")
+        trajectory = trajectory.merge(
+            means,
+            on=[feature, "_isotype"],
+            how="left",
+            sort=False,
+        )
+        trajectory["mean"] = trajectory["mean"].fillna(0)
+        trajectory["_isotype"] = pd.Categorical(
+            trajectory["_isotype"],
+            categories=isotype_order,
+            ordered=True,
+        )
+        return trajectory.rename(columns={"_isotype": "isotype"})
+
+    def timepoint_isotypes(
+        self,
+        treeId,
+        timepoint_feature=None,
+        by_freq=True,
+        ax=None,
+    ):
+        """Plot mean sample-level isotype abundance over time without error bars."""
+        import matplotlib.pyplot as plt
+
+        feature = "timepoint" if timepoint_feature is None else timepoint_feature
+        trajectory = self._get_timepoint_isotypes_df(
+            treeId,
+            timepoint_feature=timepoint_feature,
+            by_freq=by_freq,
+        )
+        if trajectory is None:
+            return None
+        if ax is None:
+            _, ax = plt.subplots(figsize=(7, 4))
+
+        isotype_order = list(trajectory["isotype"].cat.categories)
+        palette = rsplot._isotype_colors(isotype_order)
+        timepoint_order = trajectory[feature].drop_duplicates().tolist()
+        x_positions = np.arange(len(timepoint_order))
+        for isotype in isotype_order:
+            values = trajectory.loc[
+                trajectory["isotype"] == isotype, "mean"
+            ].to_numpy(dtype=float)
+            ax.plot(
+                x_positions,
+                values,
+                color=palette[isotype],
+                marker="o",
+                linewidth=1.8,
+                markersize=5,
+                label=isotype,
+            )
+
+        ax.set_xticks(x_positions)
+        ax.set_xticklabels([_format_axis_value(value) for value in timepoint_order])
+        ax.set_xlabel(feature)
+        ax.set_ylabel(
+            "Mean isotype fraction by UMI count"
+            if by_freq else "Mean isotype UMI count"
+        )
+        ax.set_title(f"Tree {treeId} isotypes by timepoint")
+        ax.grid(axis="y", color="0.9", linewidth=0.8)
+        ax.legend(
+            title="Isotype",
+            frameon=False,
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.18),
+            ncol=min(5, len(isotype_order)),
+        )
+        return ax
+
     def to_count_table(self):
         """Create a wide table of tree abundance by sample."""
         if self.trees_df is None:

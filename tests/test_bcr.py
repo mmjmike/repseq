@@ -6,6 +6,7 @@ import sys
 import types
 from pathlib import Path
 from matplotlib.collections import PathCollection
+from matplotlib.colors import to_rgba
 from io import StringIO
 from Bio import Phylo
 
@@ -495,6 +496,55 @@ def test_timepoint_trajectory_supports_counts_and_custom_feature(tmp_path):
     assert axis.get_ylabel() == "Lineage UMI count"
 
 
+def test_timepoint_isotypes_averages_sample_values_and_zero_fills(tmp_path):
+    analyzer = _trajectory_analyzer(tmp_path)
+
+    trajectory = analyzer._get_timepoint_isotypes_df(1)
+    axis = analyzer.timepoint_isotypes(1)
+    values = trajectory.pivot(index="timepoint", columns="isotype", values="mean")
+
+    assert list(trajectory["isotype"].cat.categories) == ["IgM", "IgD", "IgG"]
+    assert values.loc[1, "IgM"] == pytest.approx(0.15)
+    assert values.loc[1, "IgD"] == pytest.approx(0)
+    assert values.loc[1, "IgG"] == pytest.approx(0.01)
+    assert values.loc[2, "IgM"] == pytest.approx(0)
+    assert values.loc[2, "IgD"] == pytest.approx(0.2)
+    assert values.loc[2, "IgG"] == pytest.approx(0)
+    assert values.loc[3].tolist() == pytest.approx([0, 0, 0])
+    assert [line.get_label() for line in axis.lines] == ["IgM", "IgD", "IgG"]
+    assert axis.lines[0].get_ydata().tolist() == pytest.approx([0.15, 0, 0])
+    assert axis.lines[1].get_ydata().tolist() == pytest.approx([0, 0.2, 0])
+    assert axis.lines[2].get_ydata().tolist() == pytest.approx([0.01, 0, 0])
+    assert np.allclose(to_rgba(axis.lines[0].get_color()), to_rgba("#E41A1C"))
+    assert np.allclose(to_rgba(axis.lines[1].get_color()), to_rgba("#FF7F00"))
+    assert np.allclose(to_rgba(axis.lines[2].get_color()), to_rgba("#4DAF4A"))
+    assert axis.get_ylabel() == "Mean isotype fraction by UMI count"
+    assert not axis.collections
+
+
+def test_timepoint_isotypes_supports_counts(tmp_path):
+    analyzer = _trajectory_analyzer(tmp_path, timepoint_column="Timepoints")
+
+    trajectory = analyzer._get_timepoint_isotypes_df(
+        1,
+        timepoint_feature="Timepoints",
+        by_freq=False,
+    )
+    axis = analyzer.timepoint_isotypes(
+        1,
+        timepoint_feature="Timepoints",
+        by_freq=False,
+    )
+    values = trajectory.pivot(index="Timepoints", columns="isotype", values="mean")
+
+    assert values.loc[1, "IgM"] == pytest.approx(7)
+    assert values.loc[1, "IgG"] == pytest.approx(1)
+    assert values.loc[2, "IgD"] == pytest.approx(2)
+    assert values.loc[3].tolist() == pytest.approx([0, 0, 0])
+    assert axis.get_xlabel() == "Timepoints"
+    assert axis.get_ylabel() == "Mean isotype UMI count"
+
+
 def test_timepoint_trajectory_without_metadata_prints_instructions(tmp_path, capsys):
     trees_filename, _ = _write_tree_inputs(tmp_path)
     analyzer = bcr.TreeAnalyzer()
@@ -543,6 +593,31 @@ def test_draw_tree_returns_axis(tmp_path):
     assert reconstructed_x == pytest.approx(0)
     assert reconstructed_y == pytest.approx(1.5)
     assert axis.get_xlabel() == "Branch length"
+
+
+def test_draw_tree_uses_isotype_fraction_palette_and_order(tmp_path):
+    trees_filename, newick_dir = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    analyzer.read_trees_newick(newick_dir)
+
+    axis = analyzer.draw_tree(1, group="isotype", label=None)
+    observed = [
+        collection
+        for collection in axis.collections
+        if isinstance(collection, PathCollection) and collection.get_sizes()[0] > 22
+    ]
+    colors_by_x = {
+        float(collection.get_offsets()[0, 0]): collection.get_facecolors()[0]
+        for collection in observed
+    }
+
+    assert np.allclose(colors_by_x[0.1], to_rgba("#E41A1C"))
+    assert np.allclose(colors_by_x[0.2], to_rgba("#4DAF4A"))
+    assert [text.get_text() for text in axis.get_legend().get_texts()] == [
+        "IgM",
+        "IgG",
+    ]
 
 
 @pytest.mark.parametrize("requested_tree_id", [6388, "6388"])
