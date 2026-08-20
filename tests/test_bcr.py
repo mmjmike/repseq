@@ -2,6 +2,8 @@ import matplotlib
 import numpy as np
 import pandas as pd
 import pytest
+import sys
+import types
 from pathlib import Path
 from matplotlib.collections import PathCollection
 from io import StringIO
@@ -286,6 +288,34 @@ def test_to_count_table_after_full_properties_cache_uses_numeric_numpy_values(
 
     assert count_table.loc[count_table["treeId"] == 1, "sample.one"].iloc[0] == 12
     assert count_table.loc[count_table["treeId"] == 2, "two"].iloc[0] == 3
+
+
+@pytest.mark.parametrize("requested_tree_id", [1, "1", 1.0])
+def test_get_logo_for_tree_passes_tree_cdr3_sequences(
+    tmp_path, monkeypatch, requested_tree_id
+):
+    trees_filename, _ = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    captured = {}
+    logo_module = types.ModuleType("repseq.logo")
+
+    def fake_logo(list_of_clonotypes, sequence_type):
+        captured["clonotypes"] = list_of_clonotypes
+        captured["sequence_type"] = sequence_type
+        return "logo"
+
+    logo_module.get_logo_for_list_of_clonotypes = fake_logo
+    monkeypatch.setitem(sys.modules, "repseq.logo", logo_module)
+    monkeypatch.setattr(bcr, "logo", logo_module, raising=False)
+
+    result = analyzer.get_logo_for_tree(requested_tree_id)
+
+    assert result == "logo"
+    assert captured == {
+        "clonotypes": [("AAA",), ("ABA",), ("ACA",)],
+        "sequence_type": "prot",
+    }
 
 
 def test_draw_tree_returns_axis(tmp_path):

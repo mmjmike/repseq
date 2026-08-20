@@ -556,6 +556,38 @@ class TreeAnalyzer:
             label=label,
         )
 
+    def get_logo_for_tree(self, treeId):
+        """Plot an amino-acid CDR3 sequence logo for one tree."""
+        if self.trees_df is None:
+            raise ValueError("Read a trees table before plotting a tree logo")
+        if "treeId" not in self.trees_df.columns:
+            raise ValueError("trees table must contain a 'treeId' column")
+        if "aaSeqCDR3" not in self.trees_df.columns:
+            raise ValueError("trees table must contain an 'aaSeqCDR3' column")
+
+        tree_id_key = _id_key(treeId)
+        tree_rows = self.trees_df.loc[
+            self.trees_df["treeId"].map(_id_key) == tree_id_key
+        ]
+        if tree_rows.empty:
+            raise ValueError(f"treeId {treeId!r} is not present in trees_df")
+        sequences = tree_rows["aaSeqCDR3"].dropna().astype(str)
+        sequences = sequences.loc[sequences != ""]
+        if sequences.empty:
+            raise ValueError(f"treeId {treeId!r} does not contain aaSeqCDR3 sequences")
+
+        try:
+            from . import logo
+        except ModuleNotFoundError as error:
+            if error.name == "logomaker":
+                raise ImportError(
+                    "get_logo_for_tree requires logomaker. "
+                    "Install repseq with the clustering optional dependencies."
+                ) from error
+            raise
+        list_of_clonotypes = [(sequence,) for sequence in sequences]
+        return logo.get_logo_for_list_of_clonotypes(list_of_clonotypes, "prot")
+
     def to_count_table(self):
         """Create a wide table of tree abundance by sample."""
         if self.trees_df is None:
