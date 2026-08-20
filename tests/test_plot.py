@@ -874,6 +874,198 @@ def test_segment_usage_renames_dot_segment_in_wide_tables():
     )
 
 
+@pytest.mark.parametrize(
+    ("gene", "expected"),
+    [
+        ("IGHA", "IgA"),
+        ("IGHA1", "IgA1"),
+        ("IGHA2", "IgA2"),
+        ("IGHD", "IgD"),
+        ("IGHE", "IgE"),
+        ("IGHEP1", "NA"),
+        ("IGHG1", "IgG1"),
+        ("IGHG1A", "IgG1A"),
+        ("IGHG1B", "IgG1B"),
+        ("IGHG2", "IgG2"),
+        ("IGHG2B", "IgG2B"),
+        ("IGHG2B_hinge", "IgG2B"),
+        ("IGHG2C", "IgG2C"),
+        ("IGHG2C_hinge", "IgG2C"),
+        ("IGHG3", "IgG3"),
+        ("IGHG4", "IgG4"),
+        ("IGHGP", "NA"),
+        ("IGHM", "IgM"),
+        ("IGHM1", "IgM1"),
+        ("IGHM2", "IgM2"),
+        (".", "NA"),
+    ],
+)
+def test_recode_isotype_supports_all_mixcr_igh_constant_genes(gene, expected):
+    assert rsplot._recode_isotype(gene) == expected
+
+
+def test_isotype_fraction_uses_requested_order_palette_and_right_to_left_stack():
+    genes = [
+        "IGHM",
+        "IGHD",
+        "IGHG1",
+        "IGHG2",
+        "IGHG3",
+        "IGHG4",
+        "IGHA1",
+        "IGHA2",
+        "IGHE",
+        ".",
+    ]
+    usage = pd.DataFrame(
+        [
+            {"sample_id": "sample1", "chain": "IGH", "c": gene, "usage": 1}
+            for gene in genes
+        ]
+    )
+
+    fig = rsplot.isotype_fraction(usage)
+    ax = fig.axes[0]
+    expected_order = [
+        "IgM",
+        "IgD",
+        "IgG1",
+        "IgG2",
+        "IgG3",
+        "IgG4",
+        "IgA1",
+        "IgA2",
+        "IgE",
+        "NA",
+    ]
+    expected_colors = [
+        "#E41A1C",
+        "#FF7F00",
+        "#4DAF4A",
+        "#74C476",
+        "#A1D99B",
+        "#D9F0D3",
+        "#377EB8",
+        "#6BAED6",
+        "#984EA3",
+        "#999999",
+    ]
+
+    assert [text.get_text() for text in ax.get_legend().get_texts()] == expected_order
+    container_colors = {
+        container.get_label(): container.patches[0].get_facecolor()
+        for container in ax.containers
+    }
+    for isotype, color in zip(expected_order, expected_colors):
+        assert np.allclose(container_colors[isotype], to_rgba(color))
+    assert ax.containers[-1].get_label() == "IgM"
+    assert ax.containers[-1].patches[0].get_x() == pytest.approx(0.9)
+    assert ax.containers[-1].patches[0].get_width() == pytest.approx(0.1)
+    assert ax.get_xlabel() == "Fraction"
+    assert ax.get_ylabel() == "Sample ID"
+
+
+def test_isotype_fraction_keeps_canonical_color_when_variants_are_absent():
+    usage = pd.DataFrame(
+        [
+            {"sample_id": "s1", "chain": "IGH", "c": "IGHG4", "usage": 1},
+            {"sample_id": "s1", "chain": "IGH", "c": "IGHA2", "usage": 1},
+        ]
+    )
+
+    fig = rsplot.isotype_fraction(usage)
+    containers = {
+        container.get_label(): container for container in fig.axes[0].containers
+    }
+
+    assert np.allclose(
+        containers["IgG4"].patches[0].get_facecolor(), to_rgba("#D9F0D3")
+    )
+    assert np.allclose(
+        containers["IgA2"].patches[0].get_facecolor(), to_rgba("#6BAED6")
+    )
+
+
+def test_isotype_fraction_uses_unique_metadata_labels():
+    usage = pd.DataFrame(
+        [
+            {"sample_id": "s1", "chain": "IGH", "c": "IGHM", "usage": 1},
+            {"sample_id": "s2", "chain": "IGH", "c": "IGHA1", "usage": 1},
+        ]
+    )
+    metadata = pd.DataFrame(
+        {"sample_id": ["s1", "s2"], "display_name": ["Donor 1", "Donor 2"]}
+    )
+
+    fig = rsplot.isotype_fraction(
+        usage, metadata=metadata, label="display_name"
+    )
+
+    assert [tick.get_text() for tick in fig.axes[0].get_yticklabels()] == [
+        "Donor 1",
+        "Donor 2",
+    ]
+    assert fig.axes[0].get_ylabel() == "display_name"
+
+    metadata["display_name"] = "duplicate"
+    with pytest.raises(ValueError, match="label values must be unique"):
+        rsplot.isotype_fraction(
+            usage, metadata=metadata, label="display_name"
+        )
+
+
+def test_isotype_count_preserves_values_and_combines_families():
+    usage = pd.DataFrame(
+        [
+            {"sample_id": "s1", "chain": "IGH", "c": "IGHM1", "usage": 2},
+            {"sample_id": "s1", "chain": "IGH", "c": "IGHM2", "usage": 3},
+            {"sample_id": "s1", "chain": "IGH", "c": "IGHG1A", "usage": 5},
+            {"sample_id": "s1", "chain": "IGH", "c": "IGHG2B_hinge", "usage": 7},
+            {"sample_id": "s1", "chain": "IGH", "c": "IGHEP1", "usage": 11},
+        ]
+    )
+
+    fig = rsplot.isotype_count(usage, combine_families=True)
+    ax = fig.axes[0]
+    containers = {container.get_label(): container for container in ax.containers}
+
+    assert [text.get_text() for text in ax.get_legend().get_texts()] == [
+        "IgM",
+        "IgG",
+        "NA",
+    ]
+    assert containers["IgM"].patches[0].get_width() == pytest.approx(5)
+    assert containers["IgG"].patches[0].get_width() == pytest.approx(12)
+    assert containers["NA"].patches[0].get_width() == pytest.approx(11)
+    assert np.allclose(
+        containers["IgM"].patches[0].get_facecolor(), to_rgba("#E41A1C")
+    )
+    assert np.allclose(
+        containers["IgG"].patches[0].get_facecolor(), to_rgba("#4DAF4A")
+    )
+    assert ax.get_xlabel() == "Count"
+
+
+def test_isotype_fraction_accepts_wide_hinge_columns():
+    usage = pd.DataFrame(
+        [
+            {
+                "sample_id": "s1",
+                "chain": "IGH",
+                "IGHG2B_hinge": 0.75,
+                "IGHEP1": 0.25,
+            }
+        ]
+    )
+
+    fig = rsplot.isotype_fraction(usage)
+
+    assert [text.get_text() for text in fig.axes[0].get_legend().get_texts()] == [
+        "IgG2B",
+        "NA",
+    ]
+
+
 def test_segment_usage_combines_families_in_boxplots():
     usage = _v_usage_long()
     metadata = pd.DataFrame(

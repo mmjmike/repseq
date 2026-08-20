@@ -77,13 +77,39 @@ PHEATMAP_CMAP = LinearSegmentedColormap.from_list(
     N=100,
 )
 
+ISOTYPE_PALETTES = {
+    "M": ["#E41A1C", "#F06A6B"],
+    "D": ["#FF7F00"],
+    "G": ["#4DAF4A", "#74C476", "#A1D99B", "#D9F0D3"],
+    "A": ["#377EB8", "#6BAED6"],
+    "E": ["#984EA3"],
+    "NA": ["#999999"],
+}
+ISOTYPE_FAMILY_ORDER = ["M", "D", "G", "A", "E", "NA"]
+ISOTYPE_CANONICAL_COLOR_INDEX = {
+    "IgM": 0,
+    "IgM1": 0,
+    "IgM2": 1,
+    "IgD": 0,
+    "IgG": 0,
+    "IgG1": 0,
+    "IgG2": 1,
+    "IgG3": 2,
+    "IgG4": 3,
+    "IgA": 0,
+    "IgA1": 0,
+    "IgA2": 1,
+    "IgE": 0,
+    "NA": 0,
+}
+
 GENE_RE = re.compile(
     r"""
     ^
     (?P<system>TR|IG)
     (?P<chain>[ABGDHKL])
     (?P<head>[A-Z])
-    (?P<body>[A-Z0-9/-]*)
+    (?P<body>[A-Z0-9/_-]*)
     (?:\*(?P<allele>[^(),;|\s]+))?
     $
     """,
@@ -917,6 +943,191 @@ def _combine_segment_family_usage(data, segment_type):
         ]
         .sum()
     )
+
+
+def _recode_isotype(gene, combine_families=False):
+    gene = str(gene).strip().upper()
+    gene = re.split(r"[,;|]", gene, maxsplit=1)[0]
+    gene = gene.split("(", 1)[0].split("*", 1)[0]
+    if gene in {".", "NA", "IGHGP", "IGHEP1"}:
+        return "NA"
+
+    match = re.fullmatch(r"IGH([MDGAE])(.*)", gene)
+    if match is None:
+        raise ValueError(f"Unsupported IGH constant gene: {gene!r}")
+    family, variant = match.groups()
+    variant = re.sub(r"_HINGE$", "", variant)
+    return f"Ig{family}" if combine_families else f"Ig{family}{variant}"
+
+
+def _isotype_family(isotype):
+    if isotype == "NA":
+        return "NA"
+    match = re.fullmatch(r"Ig([MDGAE]).*", str(isotype))
+    if match is None:
+        raise ValueError(f"Unsupported isotype label: {isotype!r}")
+    return match.group(1)
+
+
+def _isotype_order(isotypes):
+    family_rank = {family: index for index, family in enumerate(ISOTYPE_FAMILY_ORDER)}
+    return sorted(
+        pd.unique(pd.Series(isotypes).dropna().astype(str)),
+        key=lambda isotype: (
+            family_rank[_isotype_family(isotype)],
+            _natural_sort_key(isotype),
+        ),
+    )
+
+
+def _isotype_colors(isotypes):
+    colors = {}
+    for family in ISOTYPE_FAMILY_ORDER:
+        family_isotypes = [
+            isotype for isotype in isotypes if _isotype_family(isotype) == family
+        ]
+        family_palette = ISOTYPE_PALETTES[family]
+        assigned_indexes = {}
+        for isotype in family_isotypes:
+            if isotype in ISOTYPE_CANONICAL_COLOR_INDEX:
+                assigned_indexes[isotype] = ISOTYPE_CANONICAL_COLOR_INDEX[isotype]
+
+        unused_indexes = [
+            index
+            for index in range(len(family_palette))
+            if index not in set(assigned_indexes.values())
+        ]
+        unknown_isotypes = [
+            isotype for isotype in family_isotypes if isotype not in assigned_indexes
+        ]
+        for index, isotype in enumerate(unknown_isotypes):
+            available_indexes = unused_indexes or list(range(len(family_palette)))
+            assigned_indexes[isotype] = available_indexes[index % len(available_indexes)]
+
+        colors.update(
+            {
+                isotype: family_palette[assigned_indexes[isotype]]
+                for isotype in family_isotypes
+            }
+        )
+    return colors
+
+
+def _prepare_isotype_data(segment_usage_df, metadata, label, combine_families):
+    data, segment_type = _normalize_segment_usage_table(segment_usage_df)
+    if segment_type != "c":
+        raise ValueError("isotype plots require C-segment usage data")
+    if (data["_value"] < 0).any():
+        raise ValueError("isotype usage values must be non-negative")
+
+    data["_isotype"] = data["_segment"].map(
+        lambda gene: _recode_isotype(gene, combine_families=combine_families)
+    )
+    sample_order = list(pd.unique(data["sample_id"]))
+    data = data.groupby(
+        ["sample_id", "_isotype"], as_index=False, sort=False
+    )["_value"].sum()
+
+    if label is None:
+        if metadata is not None:
+            raise ValueError("label is required when metadata is provided")
+        sample_labels = {sample_id: str(sample_id) for sample_id in sample_order}
+    else:
+        if metadata is None:
+            raise ValueError("metadata is required when label is provided")
+        if not isinstance(metadata, pd.DataFrame):
+            raise TypeError("metadata must be a pandas DataFrame")
+        missing_columns = [
+            column for column in ["sample_id", label] if column not in metadata.columns
+        ]
+        if missing_columns:
+            raise ValueError(f"metadata does not contain column(s): {missing_columns}")
+        if metadata["sample_id"].duplicated(keep=False).any():
+            raise ValueError("metadata must contain one row per sample_id")
+        label_table = metadata.set_index("sample_id")[label]
+        missing_samples = [sample for sample in sample_order if sample not in label_table.index]
+        if missing_samples:
+            raise ValueError(
+                f"metadata is missing plotted sample_id values: {missing_samples}"
+            )
+        selected_labels = label_table.loc[sample_order]
+        if selected_labels.isna().any():
+            raise ValueError("label values must not be missing")
+        selected_labels = selected_labels.astype(str)
+        if selected_labels.duplicated().any():
+            raise ValueError("label values must be unique for all plotted sample_id values")
+        sample_labels = selected_labels.to_dict()
+
+    return data, sample_order, sample_labels
+
+
+def _isotype_plot(
+    segment_usage_df,
+    metadata,
+    label,
+    combine_families,
+    normalize,
+    height,
+    width,
+):
+    data, sample_order, sample_labels = _prepare_isotype_data(
+        segment_usage_df,
+        metadata,
+        label,
+        combine_families,
+    )
+    if normalize:
+        totals = data.groupby("sample_id")["_value"].transform("sum")
+        zero_samples = list(pd.unique(data.loc[totals.eq(0), "sample_id"]))
+        if zero_samples:
+            raise ValueError(f"isotype totals must be positive for samples: {zero_samples}")
+        data["_value"] = data["_value"] / totals
+
+    isotype_order = _isotype_order(data["_isotype"])
+    colors = _isotype_colors(isotype_order)
+    values = (
+        data.pivot(index="sample_id", columns="_isotype", values="_value")
+        .reindex(index=sample_order, columns=isotype_order, fill_value=0)
+        .fillna(0)
+    )
+
+    fig_height = max(float(height), 0.45 * len(sample_order) + 1.5)
+    fig, ax = plt.subplots(figsize=(width, fig_height), constrained_layout=True)
+    left = np.zeros(len(sample_order), dtype=float)
+    handles = {}
+    for isotype in reversed(isotype_order):
+        bars = ax.barh(
+            np.arange(len(sample_order)),
+            values[isotype].to_numpy(),
+            left=left,
+            height=0.82,
+            color=colors[isotype],
+            label=isotype,
+        )
+        handles[isotype] = bars[0]
+        left += values[isotype].to_numpy()
+
+    ax.set_yticks(
+        np.arange(len(sample_order)),
+        labels=[sample_labels[sample_id] for sample_id in sample_order],
+    )
+    ax.invert_yaxis()
+    ax.set_ylabel(label if label is not None else "Sample ID")
+    ax.set_xlabel("Fraction" if normalize else "Count")
+    if normalize:
+        ax.set_xlim(0, 1)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.legend(
+        [handles[isotype] for isotype in isotype_order],
+        isotype_order,
+        title="Isotype",
+        frameon=False,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.12),
+        ncol=min(5, len(isotype_order)),
+    )
+    plt.close(fig)
+    return fig
 
 
 def _normalize_segment_usage_table(segment_usage_df):
@@ -1901,6 +2112,57 @@ def _combine_combination_family_usage(data, combination_type):
     return (
         data.groupby(group_columns, as_index=False, sort=False)["_value"]
         .sum()
+    )
+
+
+def isotype_fraction(
+    segment_usage_df,
+    metadata=None,
+    label=None,
+    combine_families=False,
+    height=3.2,
+    width=8,
+):
+    """Plot IGH constant-segment fractions as horizontal stacked bars.
+
+    ``segment_usage_df`` accepts long or wide C-segment output from
+    ``stats.calc_segment_usage``. Values are summed by recoded isotype and
+    normalized within each sample. Pass ``metadata`` and a unique ``label``
+    column to replace sample identifiers on the y-axis.
+    """
+    return _isotype_plot(
+        segment_usage_df,
+        metadata,
+        label,
+        combine_families,
+        normalize=True,
+        height=height,
+        width=width,
+    )
+
+
+def isotype_count(
+    segment_usage_df,
+    metadata=None,
+    label=None,
+    combine_families=False,
+    height=3.2,
+    width=8,
+):
+    """Plot raw IGH constant-segment values as horizontal stacked bars.
+
+    Use this with ``stats.calc_segment_usage(..., segment="c", by_count=True)``.
+    Isotype recoding, ordering, colors, and metadata labels match
+    :func:`isotype_fraction`.
+    """
+    return _isotype_plot(
+        segment_usage_df,
+        metadata,
+        label,
+        combine_families,
+        normalize=False,
+        height=height,
+        width=width,
     )
 
 
@@ -4524,6 +4786,8 @@ __all__ = [
     "parse_gene_name",
     "plot_stats",
     "segment_usage",
+    "isotype_fraction",
+    "isotype_count",
     "cdr3_length_distribution",
     "cdr3_length_distributions",
     "vj_usage",

@@ -687,6 +687,52 @@ sorting. This gives natural orders such as `TRBV2`, `TRBV7-3`, `TRBV7-8`,
 `TRBV12-3-1`, `TRBV12-3-2`. IGH constant isotypes and the `IGHD` constant-gene
 versus `IGHD3-10` D-segment ambiguity are handled explicitly.
 
+### Plotting isotype fractions and counts
+
+`rsplot.isotype_fraction` accepts long or wide C-segment output from
+`stats.calc_segment_usage(segment="c")` and draws one horizontal stacked bar
+per sample. Values are normalized within each sample. The y-axis uses
+`sample_id` by default; pass `metadata` and `label` to use a metadata column
+whose values are non-missing and unique across all plotted samples.
+
+```py
+c_usage = stats.calc_segment_usage(
+    clonosets,
+    segment="c",
+    cl_filter=func_filter,
+)
+
+rsplot.isotype_fraction(c_usage)
+rsplot.isotype_fraction(c_usage, metadata=metadata, label="display_name")
+```
+
+Isotypes are ordered from right to left as IgM, IgD, IgG variants, IgA
+variants, IgE, and NA. IgM uses red tones, IgD orange, IgG green, IgA blue,
+IgE purple, and NA grey. Undefined (`.`), `IGHGP`, and `IGHEP1` calls are
+shown as NA. MiXCR hinge records such as `IGHG2B_hinge` are combined with the
+corresponding constant gene.
+
+Set `combine_families=True` to combine organism-specific variants into IgM,
+IgD, IgG, IgA, IgE, and NA. Each family then uses its most saturated color.
+
+```py
+rsplot.isotype_fraction(c_usage, combine_families=True)
+```
+
+`rsplot.isotype_count` uses the same layout, labels, recoding, order, and
+palette without normalizing the values. Use it with C-segment usage calculated
+with `by_count=True`.
+
+```py
+c_counts = stats.calc_segment_usage(
+    clonosets,
+    segment="c",
+    cl_filter=func_filter,
+    by_count=True,
+)
+rsplot.isotype_count(c_counts)
+```
+
 ### Plotting V-J usage
 
 `rsplot.vj_usage` accepts long or wide output from
