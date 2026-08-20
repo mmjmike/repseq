@@ -123,3 +123,15 @@ def test_find_nodes_and_edges_groups_by_required_segments(
 
     assert compared_groups == expected_groups
     assert len(edges) == expected_edges
+
+
+def test_clusters_str_reports_cluster_node_and_singleton_counts():
+    clusters = _clusters_with_two_samples()
+    clusters.clonotypes = clusters.clonosets_df
+
+    summary = str(clusters)
+
+    assert (
+        "Clusters from 3 samples with 2 clusters and 4 nodes, "
+        "of which 1 is a single node."
+    ) in summary

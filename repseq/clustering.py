@@ -202,15 +202,23 @@ class Clusters(list):
 
     def __str__(self):
         total_clusters = len(self.clusters)
+        total_nodes = sum(len(cluster) for cluster in self.clusters)
+        multi_node_clusters = len(self.filter_one_node_clusters(inplace=False))
+        single_nodes = total_clusters - multi_node_clusters
         possible_params = ['cl_filter', 'is_pooled', 'overlap_type','mismatches', 'tcrdist_radius']
         params_used = {param: getattr(self, param, None)
                         for param in possible_params
                         if getattr(self, param, None) is not None}
         params_used = ''.join(f'{k}: {v}\n' for k, v in params_used.items())
-        single_nodes = len(self.filter_one_node_clusters(inplace=False))
         n_samples = len(self.clonotypes['sample_id'].unique()) if self.clonotypes is not None else 0
         sample_word = 'samples' if n_samples != 1 else 'sample'
-        return f'Clusters from {n_samples} {sample_word} with {total_clusters} nodes, of which {single_nodes} are single nodes.\nParameters:\n{params_used}'
+        cluster_word = 'clusters' if total_clusters != 1 else 'cluster'
+        node_word = 'nodes' if total_nodes != 1 else 'node'
+        if single_nodes == 1:
+            single_nodes_summary = '1 is a single node'
+        else:
+            single_nodes_summary = f'{single_nodes} are single nodes'
+        return f'Clusters from {n_samples} {sample_word} with {total_clusters} {cluster_word} and {total_nodes} {node_word}, of which {single_nodes_summary}.\nParameters:\n{params_used}'
     
 
     def __repr__(self):
