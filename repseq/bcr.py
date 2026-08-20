@@ -51,6 +51,14 @@ def _id_key(value):
     return str(value)
 
 
+def _format_axis_value(value):
+    if pd.isna(value):
+        return ""
+    if isinstance(value, (float, np.floating)) and np.isfinite(value) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
 def get_mutation_positions(mutations):
     """Parse MiXCR substitution, deletion, and insertion positions."""
     if not isinstance(mutations, str) or mutations == "":
@@ -359,14 +367,16 @@ class TreeAnalyzer:
         return max(matches, key=len) if matches else None
 
     def _add_umi_values(self, data):
-        if "uniqueMoleculeCount" not in data.columns:
-            data["uniqueMoleculeCount"] = np.nan
-        else:
-            data["uniqueMoleculeCount"] = pd.to_numeric(
-                data["uniqueMoleculeCount"], errors="coerce"
-            )
+        for column in ["uniqueMoleculeCount", "uniqueMoleculeFraction"]:
+            if column not in data.columns:
+                data[column] = np.nan
+            else:
+                data[column] = pd.to_numeric(data[column], errors="coerce")
         required = {"fileName", "cloneId"}
-        missing = _observed_mask(data) & data["uniqueMoleculeCount"].isna()
+        missing = _observed_mask(data) & (
+            data["uniqueMoleculeCount"].isna()
+            | data["uniqueMoleculeFraction"].isna()
+        )
         if not required.issubset(data.columns) or not missing.any():
             return data
 
@@ -405,15 +415,19 @@ class TreeAnalyzer:
             clonosets_df,
             cl_filter=Filter(convert=False),
         )
-        umi_columns = {"sample_id", "cloneId", "uniqueMoleculeCount"}
-        if not umi_columns.issubset(pooled.columns):
+        required_umi_columns = {"sample_id", "cloneId", "uniqueMoleculeCount"}
+        if not required_umi_columns.issubset(pooled.columns):
             return data
-        umi_df = pooled.loc[:, ["sample_id", "cloneId", "uniqueMoleculeCount"]].copy()
+        value_columns = [
+            column
+            for column in ["uniqueMoleculeCount", "uniqueMoleculeFraction"]
+            if column in pooled.columns
+        ]
+        umi_df = pooled.loc[:, ["sample_id", "cloneId", *value_columns]].copy()
         umi_df["sample_id"] = umi_df["sample_id"].astype(str)
         umi_df["_clone_id"] = umi_df["cloneId"].map(_id_key)
-        umi_df["uniqueMoleculeCount"] = pd.to_numeric(
-            umi_df["uniqueMoleculeCount"], errors="coerce"
-        )
+        for column in value_columns:
+            umi_df[column] = pd.to_numeric(umi_df[column], errors="coerce")
         umi_df = umi_df.drop(columns="cloneId").drop_duplicates(
             ["sample_id", "_clone_id"], keep="first"
         )
@@ -426,9 +440,9 @@ class TreeAnalyzer:
             suffixes=("", "_pooled"),
             sort=False,
         )
-        data["uniqueMoleculeCount"] = data["uniqueMoleculeCount"].fillna(
-            data.pop("uniqueMoleculeCount_pooled")
-        )
+        for column in value_columns:
+            pooled_column = f"{column}_pooled"
+            data[column] = data[column].fillna(data.pop(pooled_column))
         data = data.drop(columns="_clone_id")
         return data
 
@@ -802,6 +816,130 @@ class TreeAnalyzer:
         ax.set_title(f"Tree {treeId} mutation frequencies")
         ax.set_ylim(0, 1)
         ax.set_xlim(-0.7, mutation_rate_df["position"].max() + 0.7)
+        return ax
+
+    def _get_timepoint_trajectory_df(
+        self,
+        treeId,
+        timepoint_feature=None,
+        by_freq=True,
+    ):
+        feature = "timepoint" if timepoint_feature is None else timepoint_feature
+        if self.trees_df is None or self.metadata is None:
+            print(
+                "Cannot plot timepoint trajectory: first read the trees table and "
+                "run ta.read_metadata(metadata)"
+            )
+            return None
+        if feature not in self.trees_df.columns:
+            print(
+                f"Cannot plot timepoint trajectory: trees_df does not contain "
+                f"'{feature}'. Run ta.read_metadata(metadata) with this column, "
+                "or specify timepoint_feature='column_name'"
+            )
+            return None
+
+        value_column = "uniqueMoleculeFraction" if by_freq else "uniqueMoleculeCount"
+        data = self._ensure_umi_values()
+        if value_column not in data.columns:
+            print(
+                f"Cannot plot timepoint trajectory: trees_df does not contain "
+                f"'{value_column}'"
+            )
+            return None
+        tree_id_key = _id_key(treeId)
+        tree_rows = data.loc[
+            (data["treeId"].map(_id_key) == tree_id_key)
+            & _observed_mask(data)
+        ].copy()
+        if tree_rows.empty:
+            raise ValueError(f"treeId {treeId!r} does not contain observed nodes")
+
+        tree_rows[value_column] = pd.to_numeric(
+            tree_rows[value_column], errors="coerce"
+        )
+        sample_values = (
+            tree_rows.dropna(subset=["sample_id", feature])
+            .groupby(["sample_id", feature], sort=False, dropna=False)[value_column]
+            .sum(min_count=1)
+            .dropna()
+            .reset_index(name="value")
+        )
+        if sample_values.empty:
+            print(
+                f"Cannot plot timepoint trajectory: treeId {treeId!r} has no "
+                f"'{value_column}' values with '{feature}' metadata"
+            )
+            return None
+
+        timepoint_values = sample_values[feature].drop_duplicates().tolist()
+        if isinstance(sample_values[feature].dtype, pd.CategoricalDtype):
+            present = set(timepoint_values)
+            timepoint_order = [
+                value for value in sample_values[feature].cat.categories
+                if value in present
+            ]
+        else:
+            try:
+                timepoint_order = sorted(timepoint_values)
+            except TypeError:
+                timepoint_order = sorted(timepoint_values, key=lambda value: str(value))
+
+        trajectory = (
+            sample_values.groupby(feature, sort=False, dropna=False)["value"]
+            .agg(mean="mean", minimum="min", maximum="max", dispersion="std", samples="size")
+            .reset_index()
+        )
+        order = {value: index for index, value in enumerate(timepoint_order)}
+        trajectory["_order"] = trajectory[feature].map(order)
+        return trajectory.sort_values("_order").drop(columns="_order").reset_index(drop=True)
+
+    def timepoint_trajectory(
+        self,
+        treeId,
+        timepoint_feature=None,
+        by_freq=True,
+        ax=None,
+    ):
+        """Plot mean lineage abundance and sample dispersion over time."""
+        import matplotlib.pyplot as plt
+
+        feature = "timepoint" if timepoint_feature is None else timepoint_feature
+        trajectory = self._get_timepoint_trajectory_df(
+            treeId,
+            timepoint_feature=timepoint_feature,
+            by_freq=by_freq,
+        )
+        if trajectory is None:
+            return None
+        if ax is None:
+            _, ax = plt.subplots(figsize=(7, 4))
+
+        x_positions = np.arange(len(trajectory))
+        means = trajectory["mean"].to_numpy(dtype=float)
+        lower_errors = means - trajectory["minimum"].to_numpy(dtype=float)
+        upper_errors = trajectory["maximum"].to_numpy(dtype=float) - means
+        ax.plot(x_positions, means, color="#F05670", linewidth=1.5, zorder=2)
+        ax.scatter(x_positions, means, color="0.15", s=32, zorder=3)
+        ax.errorbar(
+            x_positions,
+            means,
+            yerr=np.vstack([lower_errors, upper_errors]),
+            fmt="none",
+            ecolor="0.25",
+            elinewidth=1,
+            capsize=3,
+            zorder=1,
+        )
+        ax.set_xticks(x_positions)
+        ax.set_xticklabels(trajectory[feature].map(_format_axis_value))
+        ax.set_xlabel(feature)
+        ax.set_ylabel(
+            "Lineage fraction in repertoire by UMI count"
+            if by_freq else "Lineage UMI count"
+        )
+        ax.set_title(f"Tree {treeId} timepoint trajectory")
+        ax.grid(axis="y", color="0.9", linewidth=0.8)
         return ax
 
     def to_count_table(self):

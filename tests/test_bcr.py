@@ -44,6 +44,7 @@ def _write_tree_inputs(tmp_path):
             "treeId": 2, "nodeId": 4, "isObserved": True,
             "fileName": "sample.two.clns", "cloneId": 4,
             "readCount": 20, "uniqueMoleculeCount": 3, "isotype": "IgD",
+            "uniqueMoleculeFraction": 0.3,
             "bestVHit": "IGHV3", "bestJHit": "IGHJ3", "mutationRate": 0.05,
             "DistanceFromGermline": 1,
         },
@@ -66,7 +67,7 @@ def _write_tree_inputs(tmp_path):
     (repertoires_dir / "mix.sample.one.clns").touch()
     pd.DataFrame(
         {"cloneId": [1, 2], "readCount": [5, 2], "readFraction": [0.7, 0.3],
-         "uniqueMoleculeCount": [10, 2]}
+         "uniqueMoleculeCount": [10, 2], "uniqueMoleculeFraction": [0.1, 0.02]}
     ).to_csv(repertoires_dir / "mix.sample.one.clones_IGH.tsv", sep="\t", index=False)
     newick_dir = tmp_path / "newick"
     newick_dir.mkdir()
@@ -99,6 +100,9 @@ def test_tree_analyzer_properties_are_enriched_sorted_and_cached(tmp_path, capsy
     assert analyzer.trees_df.loc[
         analyzer.trees_df["nodeId"] == 1, "uniqueMoleculeCount"
     ].iloc[0] == 10
+    assert analyzer.trees_df.loc[
+        analyzer.trees_df["nodeId"] == 1, "uniqueMoleculeFraction"
+    ].iloc[0] == pytest.approx(0.1)
     assert analyzer.read_trees_newick(newick_dir) is None
     assert "Read 2 Newick tree filenames" in capsys.readouterr().out
     assert analyzer.read_metadata(
@@ -372,6 +376,90 @@ def test_plot_mutations_rate_uses_observed_nodes_and_region_boundaries(tmp_path)
     assert all(line.get_linestyle() == "--" for line in axis.lines)
     assert axis.get_title() == "Tree 1 mutation frequencies"
     assert axis.get_ylabel() == "Mutation frequency"
+
+
+def _trajectory_analyzer(tmp_path, timepoint_column="timepoint"):
+    trees_filename, _ = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    analyzer.trees_df.loc[analyzer.trees_df["nodeId"] == 4, "treeId"] = 1
+
+    early_replicate = analyzer.trees_df.loc[analyzer.trees_df["nodeId"] == 1].copy()
+    early_replicate["fileName"] = "mix.early.rep.clns"
+    early_replicate["sample_id"] = "early.rep"
+    early_replicate["cloneId"] = 101
+    early_replicate["uniqueMoleculeCount"] = 4
+    early_replicate["uniqueMoleculeFraction"] = 0.2
+
+    late_replicate = analyzer.trees_df.loc[analyzer.trees_df["nodeId"] == 4].copy()
+    late_replicate["fileName"] = "mix.late.rep.clns"
+    late_replicate["sample_id"] = "late.rep"
+    late_replicate["cloneId"] = 102
+    late_replicate["uniqueMoleculeCount"] = 1
+    late_replicate["uniqueMoleculeFraction"] = 0.1
+    analyzer.trees_df = pd.concat(
+        [analyzer.trees_df, early_replicate, late_replicate],
+        ignore_index=True,
+    )
+
+    metadata = pd.DataFrame(
+        {
+            "sample_id": ["sample.one", "early.rep", "two", "late.rep"],
+            timepoint_column: [1, 1, 2, 2],
+        }
+    )
+    analyzer.read_metadata(metadata)
+    return analyzer
+
+
+def test_timepoint_trajectory_summarizes_fraction_and_dispersion(tmp_path):
+    analyzer = _trajectory_analyzer(tmp_path)
+
+    trajectory = analyzer._get_timepoint_trajectory_df(1)
+    axis = analyzer.timepoint_trajectory(1)
+
+    assert trajectory["timepoint"].tolist() == [1, 2]
+    assert trajectory["mean"].tolist() == pytest.approx([0.16, 0.2])
+    assert trajectory["minimum"].tolist() == pytest.approx([0.12, 0.1])
+    assert trajectory["maximum"].tolist() == pytest.approx([0.2, 0.3])
+    assert trajectory["samples"].tolist() == [2, 2]
+    assert axis.lines[0].get_ydata().tolist() == pytest.approx([0.16, 0.2])
+    assert [tick.get_text() for tick in axis.get_xticklabels()] == ["1", "2"]
+    assert axis.get_ylabel() == "Lineage fraction in repertoire by UMI count"
+
+
+def test_timepoint_trajectory_supports_counts_and_custom_feature(tmp_path):
+    analyzer = _trajectory_analyzer(tmp_path, timepoint_column="Timepoints")
+
+    trajectory = analyzer._get_timepoint_trajectory_df(
+        1,
+        timepoint_feature="Timepoints",
+        by_freq=False,
+    )
+    axis = analyzer.timepoint_trajectory(
+        1,
+        timepoint_feature="Timepoints",
+        by_freq=False,
+    )
+
+    assert trajectory["Timepoints"].tolist() == [1, 2]
+    assert trajectory["mean"].tolist() == pytest.approx([8, 2])
+    assert trajectory["minimum"].tolist() == pytest.approx([4, 1])
+    assert trajectory["maximum"].tolist() == pytest.approx([12, 3])
+    assert axis.get_xlabel() == "Timepoints"
+    assert axis.get_ylabel() == "Lineage UMI count"
+
+
+def test_timepoint_trajectory_without_metadata_prints_instructions(tmp_path, capsys):
+    trees_filename, _ = _write_tree_inputs(tmp_path)
+    analyzer = bcr.TreeAnalyzer()
+    analyzer.read_trees_table(trees_filename)
+    capsys.readouterr()
+
+    result = analyzer.timepoint_trajectory(1)
+
+    assert result is None
+    assert "run ta.read_metadata(metadata)" in capsys.readouterr().out
 
 
 def test_draw_tree_returns_axis(tmp_path):
