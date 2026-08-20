@@ -32,6 +32,32 @@ clusters[:3]
 
 <br>
 
+## Plotting cluster networks
+
+Use `Clusters.plot_cluster` to plot one cluster or a list of up to 50 cluster
+indices as facets. Node size uses a log2 transformation of `count`, and the
+default spring layout can be replaced with `kamada_kawai`, `circular`, `shell`,
+or `spectral`.
+
+```py
+fig = clusters.plot_cluster(0, label="seq_aa")
+
+fig = clusters.plot_cluster(
+    [0, 1, 2, 3],
+    layout="kamada_kawai",
+    color="sample_id",
+    palette={"sample_1": "#4C78A8", "sample_2": "#F58518"},
+    label="id",
+    shape="group",
+)
+```
+
+`color`, `label`, and `shape` may name built-in node attributes such as `id`,
+`sample_id`, `v`, or `j`, or values previously added to
+`node.additional_properties`. Shape grouping supports five levels, displayed as
+circle, triangle, rhombus, hexagon, and square. Color and shape legends are
+placed below the faceted panel.
+
 ## Clusters from a pooled DataFrame
 
 Alternatively, one can create clusters from a dataframe with clonotypes. Mandatory columns are [`freq`, `count`, `v`, `j`, `cdr3aa`, `cdr3nt`, `sample_id`].

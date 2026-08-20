@@ -1,6 +1,12 @@
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
+from matplotlib.collections import PathCollection
 
 import repseq.clustering as clustering_module
 from repseq.clustering import Cluster, Clusters, Node
@@ -135,3 +141,113 @@ def test_clusters_str_reports_cluster_node_and_singleton_counts():
         "Clusters from 3 samples with 2 clusters and 4 nodes, "
         "of which 1 is a single node."
     ) in summary
+
+
+def test_plot_cluster_facets_style_nodes_and_add_legends():
+    clusters = _clusters_with_two_samples()
+    color_groups = ["control", "control", "case", "case"]
+    shape_groups = ["alpha", "beta", "alpha", "beta"]
+    for node, color_group, shape_group in zip(
+        [node for cluster in clusters for node in cluster],
+        color_groups,
+        shape_groups,
+    ):
+        node.additional_properties["color_group"] = color_group
+        node.additional_properties["shape_group"] = shape_group
+
+    figure = clusters.plot_cluster(
+        [0, 1],
+        layout="circular",
+        color="color_group",
+        palette={"control": "#112233", "case": "#AABBCC"},
+        label="id",
+        shape="shape_group",
+        ncols=2,
+        min_node_size=100,
+        node_size_scale=10,
+    )
+
+    assert [axis.get_title() for axis in figure.axes] == ["Cluster 0", "Cluster 1"]
+    assert [legend.get_title().get_text() for legend in figure.legends] == [
+        "color_group",
+        "shape_group",
+    ]
+    assert [text.get_text() for text in figure.axes[0].texts] == ["0", "1", "2"]
+    assert [text.get_text() for text in figure.axes[1].texts] == ["3"]
+
+    plotted_sizes = []
+    for axis in figure.axes:
+        for collection in axis.collections:
+            if isinstance(collection, PathCollection):
+                plotted_sizes.extend(collection.get_sizes())
+    expected_sizes = [100 + 10 * np.log2(count + 1) for count in [3, 7, 5, 11]]
+    np.testing.assert_allclose(sorted(plotted_sizes), sorted(expected_sizes))
+    plt.close(figure)
+
+
+@pytest.mark.parametrize(
+    "layout", ["spring", "kamada_kawai", "circular", "shell", "spectral"]
+)
+def test_plot_cluster_supports_common_layouts(layout):
+    figure = _clusters_with_two_samples().plot_cluster(0, layout=layout)
+
+    assert figure.axes[0].get_title() == "Cluster 0"
+    plt.close(figure)
+
+
+def test_plot_cluster_rejects_more_than_fifty_facets():
+    with pytest.raises(ValueError, match="At most 50 clusters"):
+        _clusters_with_two_samples().plot_cluster(list(range(51)))
+
+
+def test_plot_cluster_reads_style_only_from_known_node_properties():
+    with pytest.raises(ValueError, match="Node property 'unknown'"):
+        _clusters_with_two_samples().plot_cluster(0, color="unknown")
+
+
+def test_plot_cluster_uses_five_default_shape_levels():
+    clusters = Clusters()
+    cluster = Cluster()
+    shape_levels = ["circle", "triangle", "rhombus", "hexagon", "square"]
+    for index, shape_level in enumerate(shape_levels):
+        node = Node(
+            index,
+            "TGTGCT",
+            "CASS",
+            "TRBV1",
+            "TRBJ1",
+            "sample_1",
+            0.2,
+            index + 1,
+        )
+        node.additional_properties["shape_group"] = shape_level
+        cluster.add_node(node)
+    clusters.clusters = [cluster]
+
+    figure = clusters.plot_cluster(0, shape="shape_group")
+
+    markers = [handle.get_marker() for handle in figure.legends[0].legend_handles]
+    assert markers == ["o", "^", "D", "h", "s"]
+    plt.close(figure)
+
+
+def test_plot_cluster_rejects_more_than_five_shape_levels():
+    clusters = Clusters()
+    cluster = Cluster()
+    for index in range(6):
+        node = Node(
+            index,
+            "TGTGCT",
+            "CASS",
+            "TRBV1",
+            "TRBJ1",
+            "sample_1",
+            1 / 6,
+            1,
+        )
+        node.additional_properties["shape_group"] = index
+        cluster.add_node(node)
+    clusters.clusters = [cluster]
+
+    with pytest.raises(ValueError, match="shape supports at most five levels"):
+        clusters.plot_cluster(0, shape="shape_group")

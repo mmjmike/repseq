@@ -13,6 +13,12 @@ from scipy.sparse import csr_matrix
 import os
 import json
 import functools
+import math
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib.colors import to_rgba
+from matplotlib.lines import Line2D
 
 
 # ? add freq, count
@@ -243,6 +249,320 @@ class Clusters(list):
         for cluster in self.clusters:
             for node in cluster:
                 node.add_properties(metadata_dict)
+
+
+    @staticmethod
+    def _plot_node_property(node, property_name):
+        if hasattr(node, property_name):
+            value = getattr(node, property_name)
+        elif property_name in node.additional_properties:
+            value = node.additional_properties[property_name]
+        else:
+            raise ValueError(
+                f"Node property '{property_name}' was not found in node attributes "
+                "or additional_properties."
+            )
+
+        if value is None:
+            return "NA"
+        missing = pd.isna(value)
+        if isinstance(missing, (bool, np.bool_)) and missing:
+            return "NA"
+        try:
+            hash(value)
+        except TypeError:
+            return str(value)
+        return value
+
+
+    @staticmethod
+    def _plot_color_map(levels, palette):
+        if isinstance(palette, dict):
+            missing_levels = [level for level in levels if level not in palette]
+            if missing_levels:
+                missing_text = ", ".join(str(level) for level in missing_levels)
+                raise ValueError(
+                    f"Palette does not define colors for: {missing_text}"
+                )
+            color_map = {level: palette[level] for level in levels}
+        else:
+            if palette is None:
+                palette = "tab10" if len(levels) <= 10 else "husl"
+            if isinstance(palette, str):
+                colors = sns.color_palette(palette, n_colors=len(levels))
+            else:
+                colors = list(palette)
+                if len(colors) < len(levels):
+                    raise ValueError(
+                        "Palette must contain at least as many colors as color levels."
+                    )
+            color_map = dict(zip(levels, colors))
+
+        for color_value in color_map.values():
+            to_rgba(color_value)
+        return color_map
+
+
+    @staticmethod
+    def _plot_cluster_layout(cluster, layout, seed):
+        layout_name = layout.lower().replace("-", "_")
+        if layout_name in {"spring", "fruchterman_reingold"}:
+            return nx.spring_layout(cluster, seed=seed)
+        if layout_name in {"kamada_kawai", "kk"}:
+            return nx.kamada_kawai_layout(cluster)
+        if layout_name == "circular":
+            return nx.circular_layout(cluster)
+        if layout_name == "shell":
+            return nx.shell_layout(cluster)
+        if layout_name == "spectral":
+            return nx.spectral_layout(cluster)
+        raise ValueError(
+            "Unknown layout. Possible values: spring, kamada_kawai, circular, "
+            "shell, spectral."
+        )
+
+
+    def plot_cluster(
+        self,
+        cluster_no,
+        layout="spring",
+        color=None,
+        palette=None,
+        label=None,
+        shape=None,
+        ncols=None,
+        figsize=None,
+        seed=1,
+        min_node_size=300,
+        node_size_scale=250,
+    ):
+        """Plot one cluster or up to 50 clusters as network facets.
+
+        Node area is scaled as ``min_node_size + node_size_scale *
+        log2(count + 1)``. Color, label, and shape values can be read from a
+        regular :class:`Node` attribute or from ``node.additional_properties``.
+
+        Args:
+            cluster_no (int | list[int]): Cluster index or cluster indices.
+            layout (str): ``spring`` (default), ``kamada_kawai``, ``circular``,
+                ``shell``, or ``spectral``.
+            color (str | None): Node property used for color grouping.
+            palette (dict | list | str | None): Custom level-to-color mapping,
+                color sequence, or seaborn palette name.
+            label (str | None): Node property displayed in the node center.
+            shape (str | None): Node property used for shape grouping. At most
+                five levels are supported.
+            ncols (int | None): Number of facet columns.
+            figsize (tuple | None): Matplotlib figure size.
+            seed (int): Seed used by the spring layout.
+            min_node_size (float): Base matplotlib node area.
+            node_size_scale (float): Multiplier for log2-scaled counts.
+
+        Returns:
+            matplotlib.figure.Figure: The generated figure.
+        """
+        if isinstance(cluster_no, (int, np.integer)) and not isinstance(cluster_no, bool):
+            cluster_numbers = [int(cluster_no)]
+        elif isinstance(cluster_no, (list, tuple, np.ndarray, pd.Index)):
+            cluster_numbers = list(cluster_no)
+        else:
+            raise TypeError("cluster_no must be an integer or a list of integers.")
+
+        if not cluster_numbers:
+            raise ValueError("At least one cluster_no must be provided.")
+        if len(cluster_numbers) > 50:
+            raise ValueError("At most 50 clusters can be plotted at once.")
+        if any(
+            not isinstance(number, (int, np.integer)) or isinstance(number, bool)
+            for number in cluster_numbers
+        ):
+            raise TypeError("Every cluster_no must be an integer.")
+        cluster_numbers = [int(number) for number in cluster_numbers]
+        if len(set(cluster_numbers)) != len(cluster_numbers):
+            raise ValueError("cluster_no values must be unique.")
+        invalid_numbers = [
+            number
+            for number in cluster_numbers
+            if number < 0 or number >= len(self.clusters)
+        ]
+        if invalid_numbers:
+            invalid_text = ", ".join(str(number) for number in invalid_numbers)
+            raise IndexError(f"Cluster index out of range: {invalid_text}")
+        if palette is not None and color is None:
+            raise ValueError("palette requires a color property.")
+        if ncols is not None and (not isinstance(ncols, int) or ncols < 1):
+            raise ValueError("ncols must be a positive integer.")
+        if min_node_size < 0 or node_size_scale < 0:
+            raise ValueError("Node size parameters must be non-negative.")
+
+        selected_clusters = [self.clusters[number] for number in cluster_numbers]
+        selected_nodes = [
+            node for cluster in selected_clusters for node in cluster.nodes
+        ]
+
+        color_values = {}
+        color_levels = []
+        if color is not None:
+            for node in selected_nodes:
+                value = self._plot_node_property(node, color)
+                color_values[node] = value
+                if value not in color_levels:
+                    color_levels.append(value)
+            color_map = self._plot_color_map(color_levels, palette)
+        else:
+            color_map = {None: "#4C78A8"}
+
+        shape_markers = ["o", "^", "D", "h", "s"]
+        shape_values = {}
+        shape_levels = []
+        if shape is not None:
+            for node in selected_nodes:
+                value = self._plot_node_property(node, shape)
+                shape_values[node] = value
+                if value not in shape_levels:
+                    shape_levels.append(value)
+            if len(shape_levels) > len(shape_markers):
+                raise ValueError(
+                    "shape supports at most five levels: circle, triangle, "
+                    "rhombus, hexagon, and square."
+                )
+            shape_map = dict(zip(shape_levels, shape_markers))
+        else:
+            shape_map = {None: shape_markers[0]}
+
+        node_sizes = {}
+        for node in selected_nodes:
+            try:
+                count_value = float(node.count)
+            except (TypeError, ValueError) as error:
+                raise ValueError(
+                    f"Node '{node.id}' has a non-numeric count value."
+                ) from error
+            if not np.isfinite(count_value) or count_value < 0:
+                raise ValueError(
+                    f"Node '{node.id}' count must be finite and non-negative."
+                )
+            node_sizes[node] = (
+                min_node_size + node_size_scale * np.log2(count_value + 1)
+            )
+
+        facet_count = len(selected_clusters)
+        if ncols is None:
+            ncols = min(5, math.ceil(math.sqrt(facet_count)))
+        ncols = min(ncols, facet_count)
+        nrows = math.ceil(facet_count / ncols)
+        if figsize is None:
+            figsize = (4 * ncols, 4 * nrows)
+        figure, axes = plt.subplots(
+            nrows, ncols, figsize=figsize, squeeze=False
+        )
+        axes_flat = axes.ravel()
+
+        for axis, number, cluster in zip(
+            axes_flat, cluster_numbers, selected_clusters
+        ):
+            positions = self._plot_cluster_layout(cluster, layout, seed)
+            nx.draw_networkx_edges(
+                cluster,
+                positions,
+                ax=axis,
+                edge_color="#A9A9A9",
+                width=0.6,
+                alpha=0.75,
+            )
+            levels_to_draw = shape_levels if shape is not None else [None]
+            for shape_level in levels_to_draw:
+                nodes_for_shape = [
+                    node
+                    for node in cluster.nodes
+                    if shape is None or shape_values[node] == shape_level
+                ]
+                node_colors = [
+                    color_map[color_values[node]] if color is not None
+                    else color_map[None]
+                    for node in nodes_for_shape
+                ]
+                nx.draw_networkx_nodes(
+                    cluster,
+                    positions,
+                    nodelist=nodes_for_shape,
+                    node_size=[node_sizes[node] for node in nodes_for_shape],
+                    node_color=node_colors,
+                    node_shape=shape_map[shape_level],
+                    edgecolors="white",
+                    linewidths=0.8,
+                    ax=axis,
+                )
+            if label is not None:
+                for node, position in positions.items():
+                    label_value = self._plot_node_property(node, label)
+                    axis.text(
+                        position[0],
+                        position[1],
+                        str(label_value),
+                        ha="center",
+                        va="center",
+                        fontsize=8,
+                        zorder=4,
+                    )
+            axis.set_title(f"Cluster {number}")
+            axis.set_axis_off()
+
+        for axis in axes_flat[facet_count:]:
+            axis.set_visible(False)
+
+        legend_rows = 0
+        if color is not None:
+            color_handles = [
+                Line2D(
+                    [],
+                    [],
+                    marker="o",
+                    linestyle="",
+                    markerfacecolor=color_map[level],
+                    markeredgecolor="white",
+                    label=str(level),
+                    markersize=8,
+                )
+                for level in color_levels
+            ]
+            figure.legend(
+                handles=color_handles,
+                title=color,
+                loc="lower center",
+                bbox_to_anchor=(0.5, 0.01),
+                ncol=min(8, len(color_handles)),
+                frameon=False,
+            )
+            legend_rows += 1
+        if shape is not None:
+            shape_handles = [
+                Line2D(
+                    [],
+                    [],
+                    marker=shape_map[level],
+                    linestyle="",
+                    markerfacecolor="#808080",
+                    markeredgecolor="white",
+                    label=str(level),
+                    markersize=8,
+                )
+                for level in shape_levels
+            ]
+            shape_y = 0.08 if color is not None else 0.01
+            figure.legend(
+                handles=shape_handles,
+                title=shape,
+                loc="lower center",
+                bbox_to_anchor=(0.5, shape_y),
+                ncol=min(5, len(shape_handles)),
+                frameon=False,
+            )
+            legend_rows += 1
+
+        bottom_margin = 0.04 + 0.08 * legend_rows
+        figure.tight_layout(rect=(0, bottom_margin, 1, 1))
+        return figure
 
 
     # ! functools - cache
