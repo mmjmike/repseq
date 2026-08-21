@@ -67,6 +67,19 @@ stored as the `isotype` node property with labels such as `IgM`, `IgG1`, and
 `IgA2`. Coloring by `isotype` uses the same ordering and palette as
 `rsplot.isotype_fraction`.
 
+## Plotting cluster sequence logos
+
+Use `Clusters.plot_logo` to create a protein or DNA sequence logo for one
+cluster. Logo weights may come from `count`, `freq`, `nodes`, or any custom
+non-negative numeric node property. `nodes` assigns equal weight to every node.
+Set `plot=False` to return the normalized motif dataframe instead of drawing.
+
+```py
+clusters.plot_logo(0)
+clusters.plot_logo(0, seq_type="dna", weight="freq")
+motif = clusters.plot_logo(0, weight="custom_weight", plot=False)
+```
+
 ## Filtering clusters and calculating custom properties
 
 Cluster expressions provide a compact interface for filtering without manually

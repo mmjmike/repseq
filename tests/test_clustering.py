@@ -496,3 +496,75 @@ def test_cluster_boolean_expressions_short_circuit():
     )
 
     assert list(selected) == list(clusters)
+
+
+def test_properties_includes_total_count_between_edges_and_diameter():
+    properties = _clusters_with_two_samples().properties
+
+    assert properties.columns.tolist()[:7] == [
+        "cluster_no",
+        "cluster_id",
+        "nodes",
+        "edges",
+        "total_count",
+        "diameter",
+        "density",
+    ]
+    assert properties["total_count"].tolist() == [15, 11]
+
+
+@pytest.mark.parametrize(
+    ("weight", "expected_weights"),
+    [
+        ("count", [3, 7, 5]),
+        ("freq", [0.1, 0.2, 0.4]),
+        ("nodes", [1, 1, 1]),
+        ("custom_weight", [2.0, 3.0, 5.0]),
+    ],
+)
+def test_plot_logo_supports_builtin_and_custom_weights(
+    monkeypatch, weight, expected_weights
+):
+    clusters = _clusters_with_filter_properties()
+    calls = []
+
+    def fake_logo(clonotypes, seq_type, plot=True):
+        calls.append((clonotypes, seq_type, plot))
+        return "logo_result"
+
+    monkeypatch.setattr(
+        clustering_module, "get_logo_for_list_of_clonotypes", fake_logo
+    )
+
+    result = clusters.plot_logo(0, weight=weight, plot=False)
+
+    assert result == "logo_result"
+    assert calls[0][1:] == ("prot", False)
+    assert [sequence for sequence, _ in calls[0][0]] == ["CASS"] * 3
+    np.testing.assert_allclose(
+        [node_weight for _, node_weight in calls[0][0]], expected_weights
+    )
+
+
+def test_plot_logo_supports_dna_sequences(monkeypatch):
+    clusters = _clusters_with_two_samples()
+    captured = {}
+
+    def fake_logo(clonotypes, seq_type, plot=True):
+        captured["clonotypes"] = clonotypes
+        captured["seq_type"] = seq_type
+        captured["plot"] = plot
+        return "dna_logo"
+
+    monkeypatch.setattr(
+        clustering_module, "get_logo_for_list_of_clonotypes", fake_logo
+    )
+
+    result = clusters.plot_logo(1, seq_type="dna", weight="nodes")
+
+    assert result == "dna_logo"
+    assert captured == {
+        "clonotypes": [("TGTGCC", 1)],
+        "seq_type": "dna",
+        "plot": True,
+    }

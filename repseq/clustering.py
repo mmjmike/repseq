@@ -691,6 +691,55 @@ class Clusters(list):
         )
 
 
+    def plot_logo(
+        self,
+        cluster_no,
+        seq_type="prot",
+        weight="count",
+        plot=True,
+    ):
+        """Create a weighted sequence logo for one cluster.
+
+        Args:
+            cluster_no (int): Cluster index in this collection.
+            seq_type (str): ``prot`` for amino-acid sequences or ``dna`` for
+                nucleotide sequences.
+            weight (str): ``count``, ``freq``, ``nodes``, or another numeric
+                node property.
+            plot (bool): Draw the logo when ``True``. When ``False``, return
+                the normalized motif dataframe.
+
+        Returns:
+            Result returned by ``get_logo_for_list_of_clonotypes``.
+        """
+        if (
+            not isinstance(cluster_no, (int, np.integer))
+            or isinstance(cluster_no, bool)
+        ):
+            raise TypeError("cluster_no must be an integer.")
+        cluster_no = int(cluster_no)
+        if cluster_no < 0 or cluster_no >= len(self.clusters):
+            raise IndexError(f"Cluster index out of range: {cluster_no}")
+        if seq_type not in {"prot", "dna"}:
+            raise ValueError("seq_type must be either 'prot' or 'dna'.")
+        if not isinstance(weight, str) or not weight:
+            raise TypeError("weight must be a non-empty node property name.")
+        if not isinstance(plot, (bool, np.bool_)):
+            raise TypeError("plot must be a boolean.")
+
+        clonotypes = []
+        for node in self.clusters[cluster_no]:
+            sequence = node.seq_aa if seq_type == "prot" else node.seq_nt
+            if seq_type == "dna" and sequence == "-":
+                raise ValueError(
+                    f"Node '{node.id}' does not have a cdr3nt sequence."
+                )
+            clonotypes.append((sequence, _node_weight(node, weight)))
+        return get_logo_for_list_of_clonotypes(
+            clonotypes, seq_type, plot=bool(plot)
+        )
+
+
     def plot_cluster(
         self,
         cluster_no,
@@ -962,7 +1011,7 @@ class Clusters(list):
     # ! total count for each cluster
     @property
     def properties(self, weigh_by=None):
-        properties_list = ["cluster_no", "cluster_id", "nodes", "edges", "diameter", "density", "eccentricity",
+        properties_list = ["cluster_no", "cluster_id", "nodes", "edges", "total_count", "diameter", "density", "eccentricity",
                        "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j"]
         results = []
         for cluster in self.clusters:
@@ -979,6 +1028,7 @@ class Clusters(list):
                     cluster_id,
                     len(cluster), 
                     nx.number_of_edges(cluster), 
+                    sum(node.count for node in cluster),
                     nx.diameter(cluster),
                     nx.density(cluster), 
                     average_eccentricity,
