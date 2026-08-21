@@ -67,6 +67,93 @@ stored as the `isotype` node property with labels such as `IgM`, `IgG1`, and
 `IgA2`. Coloring by `isotype` uses the same ordering and palette as
 `rsplot.isotype_fraction`.
 
+## Filtering clusters and calculating custom properties
+
+Cluster expressions provide a compact interface for filtering without manually
+iterating over every graph. Import the standard metrics and node predicates:
+
+```py
+from repseq.clustering import (
+    all_nodes,
+    any_nodes,
+    cluster_size,
+    proportion,
+    total_count,
+)
+```
+
+Metrics can be compared directly. `cluster_size` is the number of nodes and
+`total_count` is the sum of node `count` values. Filtering returns a new
+`Clusters` collection and preserves the original cluster numbers.
+
+```py
+large_clusters = clusters.filter(cluster_size >= 10)
+high_count_clusters = clusters.filter(total_count >= 10)
+```
+
+Use `&`, `|`, and `~` to combine conditions. Parenthesize every comparison
+because Python's bitwise operators have different precedence from comparisons.
+
+```py
+selected = clusters.filter(
+    (cluster_size >= 5)
+    & (
+        proportion(
+            "group_property_name",
+            ["group_1", "group_2"],
+            weight="count",
+        )
+        > 0.25
+    )
+    & (
+        total_count(
+            "group_property_name",
+            "control",
+            weight="freq",
+        )
+        == 0
+    )
+)
+```
+
+`all_nodes` requires every node to have one of the selected values, while
+`any_nodes` requires at least one matching node. Properties may be built-in
+node attributes or values from `node.additional_properties`. The aliases
+`cdr3aa` and `cdr3nt` refer to `node.seq_aa` and `node.seq_nt`; these aliases
+are also accepted by `plot_cluster`.
+
+```py
+naive_clusters = clusters.filter(all_nodes("isotype", ["IgM", "IgD"]))
+specific_clusters = clusters.filter(any_nodes("specificity", "specific"))
+ighv1_3_clusters = clusters.filter(any_nodes("v", "IGHV1-3"))
+sequence_clusters = clusters.filter(
+    any_nodes("cdr3aa", "CARSRKDCSGGSCYSGGFDYW")
+)
+```
+
+`weight` may be `count`, `freq`, `nodes`, or any non-negative numeric node
+property. `nodes` gives every matching node a weight of one. `proportion`
+divides the matching weight by the total weight in the cluster. Callable
+`total_count(...)` sums the selected nodes using the requested weight.
+
+Use `custom_properties` to evaluate metrics for every cluster. The result always
+starts with `cluster_no` and `cluster_id`. Generated aggregate names are
+dataframe-friendly; use `.alias(...)` when a shorter name is preferred.
+
+```py
+group_1_proportion = proportion(
+    "group_property_name",
+    "group_1",
+    weight="count",
+)
+
+cluster_table = clusters.custom_properties([
+    cluster_size,
+    total_count,
+    group_1_proportion.alias("group_1_count_proportion"),
+])
+```
+
 ## Clusters from a pooled DataFrame
 
 Alternatively, one can create clusters from a dataframe with clonotypes. Mandatory columns are [`freq`, `count`, `v`, `j`, `cdr3aa`, `cdr3nt`, `sample_id`].

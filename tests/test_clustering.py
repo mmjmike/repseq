@@ -11,7 +11,16 @@ from matplotlib.colors import to_rgba
 
 import repseq.clustering as clustering_module
 import repseq.plot as rsplot
-from repseq.clustering import Cluster, Clusters, Node
+from repseq.clustering import (
+    Cluster,
+    Clusters,
+    Node,
+    all_nodes,
+    any_nodes,
+    cluster_size,
+    proportion,
+    total_count,
+)
 
 
 def _clusters_with_two_samples():
@@ -337,3 +346,153 @@ def test_plot_cluster_uses_isotype_fraction_order_and_colors():
     assert labels == expected_order
     for isotype, plotted_color in zip(expected_order, plotted_colors):
         assert np.allclose(plotted_color, to_rgba(expected_colors[isotype]))
+
+
+def _clusters_with_filter_properties():
+    clusters = _clusters_with_two_samples()
+    nodes = [node for cluster in clusters for node in cluster]
+    groups = ["group_1", "group_2", "other", "control"]
+    isotypes = ["IgM", "IgD", "IgM", "IgG1"]
+    specificities = ["other", "other", "other", "specific"]
+    custom_weights = [2.0, 3.0, 5.0, 7.0]
+    for node, group, isotype, specificity, custom_weight in zip(
+        nodes, groups, isotypes, specificities, custom_weights
+    ):
+        node.additional_properties.update(
+            {
+                "group_property_name": group,
+                "isotype": isotype,
+                "specificity": specificity,
+                "custom_weight": custom_weight,
+            }
+        )
+    return clusters
+
+
+def test_clusters_filter_supports_metrics_and_weighted_proportions():
+    clusters = _clusters_with_filter_properties()
+
+    filtered = clusters.filter(
+        (cluster_size >= 3)
+        & (
+            proportion(
+                "group_property_name",
+                ["group_1", "group_2"],
+                weight="count",
+            )
+            > 0.25
+        )
+        & (
+            total_count(
+                "group_property_name", "control", weight="freq"
+            )
+            == 0
+        )
+    )
+
+    assert list(filtered) == [clusters[0]]
+    assert filtered[0].id is clusters[0].id
+    assert len(clusters) == 2
+
+
+def test_clusters_filter_supports_all_any_or_and_not():
+    clusters = _clusters_with_filter_properties()
+
+    all_igm_or_igd = clusters.filter(all_nodes("isotype", ["IgM", "IgD"]))
+    specific_or_large = clusters.filter(
+        any_nodes("specificity", "specific") | (cluster_size >= 3)
+    )
+    without_trbv2 = clusters.filter(~any_nodes("v", "TRBV2"))
+
+    assert list(all_igm_or_igd) == [clusters[0]]
+    assert list(specific_or_large) == [clusters[0], clusters[1]]
+    assert list(without_trbv2) == [clusters[0]]
+
+
+def test_cluster_filter_uses_cdr3_sequence_aliases():
+    clusters = _clusters_with_filter_properties()
+
+    aa_match = clusters.filter(any_nodes("cdr3aa", "CATS"))
+    nt_match = clusters.filter(any_nodes("cdr3nt", "TGTGCC"))
+
+    assert list(aa_match) == [clusters[1]]
+    assert clusters[1] in list(nt_match)
+
+
+def test_cluster_aggregates_support_nodes_and_custom_numeric_weights():
+    clusters = _clusters_with_filter_properties()
+
+    by_nodes = total_count(
+        "group_property_name", ["group_1", "group_2"], weight="nodes"
+    )
+    by_custom_weight = proportion(
+        "group_property_name", "group_1", weight="custom_weight"
+    )
+    properties = clusters.custom_properties(
+        [by_nodes.alias("selected_nodes"), by_custom_weight]
+    )
+
+    assert properties["selected_nodes"].tolist() == [2, 0]
+    np.testing.assert_allclose(
+        properties[by_custom_weight.name],
+        [2 / 10, 0],
+    )
+
+
+def test_custom_properties_returns_identifiers_and_requested_metrics():
+    clusters = _clusters_with_filter_properties()
+    group_1_proportion = proportion(
+        "group_property_name", "group_1", weight="count"
+    )
+
+    properties = clusters.custom_properties(
+        [cluster_size, total_count, group_1_proportion]
+    )
+
+    assert properties.columns.tolist() == [
+        "cluster_no",
+        "cluster_id",
+        "cluster_size",
+        "total_count",
+        group_1_proportion.name,
+    ]
+    assert properties["cluster_no"].tolist() == [0, 1]
+    assert properties["cluster_id"].tolist() == ["cluster_0", "cluster_1"]
+    assert properties["cluster_size"].tolist() == [3, 1]
+    assert properties["total_count"].tolist() == [15, 11]
+    np.testing.assert_allclose(properties[group_1_proportion.name], [3 / 15, 0])
+
+
+def test_plot_cluster_understands_cdr3aa_and_cdr3nt_aliases():
+    clusters = _clusters_with_two_samples()
+
+    aa_figure = clusters.plot_cluster(1, label="cdr3aa", size=None)
+    nt_figure = clusters.plot_cluster(1, label="cdr3nt", size=None)
+
+    assert [text.get_text() for text in aa_figure.axes[0].texts] == ["CATS"]
+    assert [text.get_text() for text in nt_figure.axes[0].texts] == ["TGTGCC"]
+
+
+def test_cluster_filter_requires_boolean_expression():
+    with pytest.raises(TypeError, match="boolean cluster expression"):
+        _clusters_with_filter_properties().filter(cluster_size)
+
+
+def test_filtered_custom_properties_preserve_original_cluster_number():
+    clusters = _clusters_with_filter_properties()
+    filtered = clusters.filter(any_nodes("cdr3aa", "CATS"))
+
+    properties = filtered.custom_properties([cluster_size])
+
+    assert properties["cluster_no"].tolist() == [1]
+    assert properties["cluster_id"].tolist() == ["cluster_1"]
+
+
+def test_cluster_boolean_expressions_short_circuit():
+    clusters = _clusters_with_filter_properties()
+
+    selected = clusters.filter(
+        (cluster_size >= 1) | any_nodes("unknown_property", "value")
+    )
+
+    assert list(selected) == list(clusters)

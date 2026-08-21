@@ -15,11 +15,285 @@ import os
 import json
 import functools
 import math
+import operator
+import re
+from collections.abc import Iterable
+from numbers import Real
 
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.colors import to_rgba
 from matplotlib.lines import Line2D
+
+
+_NODE_PROPERTY_ALIASES = {
+    "cdr3aa": "seq_aa",
+    "cdr3nt": "seq_nt",
+}
+
+
+def _node_property_value(node, property_name):
+    if not isinstance(property_name, str) or not property_name:
+        raise TypeError("Node property names must be non-empty strings.")
+    attribute_name = _NODE_PROPERTY_ALIASES.get(property_name, property_name)
+    if hasattr(node, attribute_name):
+        return getattr(node, attribute_name)
+    if property_name in node.additional_properties:
+        return node.additional_properties[property_name]
+    if attribute_name in node.additional_properties:
+        return node.additional_properties[attribute_name]
+    raise ValueError(
+        f"Node property '{property_name}' was not found in node attributes "
+        "or additional_properties."
+    )
+
+
+def _normalize_match_values(values):
+    if isinstance(values, (str, bytes)) or not isinstance(values, Iterable):
+        return (values,)
+    if isinstance(values, (set, frozenset)):
+        return tuple(sorted(values, key=str))
+    return tuple(values)
+
+
+def _node_matches(node, property_name, values):
+    return _node_property_value(node, property_name) in values
+
+
+def _node_weight(node, weight):
+    if weight == "nodes":
+        return 1
+    value = _node_property_value(node, weight)
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, Real):
+        raise ValueError(
+            f"Node property '{weight}' must contain numeric values to be used "
+            "as a weight."
+        )
+    if not np.isfinite(value) or value < 0:
+        raise ValueError(
+            f"Node property '{weight}' weights must be finite and non-negative."
+        )
+    return value
+
+
+def _expression_name_part(value):
+    text = re.sub(r"[^0-9A-Za-z]+", "_", str(value)).strip("_")
+    return text or "value"
+
+
+def _selection_expression_name(prefix, property_name, values, weight=None):
+    value_name = "_or_".join(_expression_name_part(value) for value in values)
+    name = f"{prefix}_{_expression_name_part(property_name)}_{value_name}"
+    if weight is not None:
+        name += f"_by_{_expression_name_part(weight)}"
+    return name
+
+
+class ClusterExpression:
+    """Lazy cluster-level value used for filtering and property calculation."""
+
+    is_boolean = False
+
+    def __init__(self, name):
+        self.name = name
+
+    def evaluate(self, cluster):
+        raise NotImplementedError
+
+    def alias(self, name):
+        if not isinstance(name, str) or not name:
+            raise TypeError("Expression aliases must be non-empty strings.")
+        return _AliasedClusterExpression(self, name)
+
+    def _compare(self, other, comparison, symbol):
+        return _ComparisonExpression(self, other, comparison, symbol)
+
+    def __lt__(self, other):
+        return self._compare(other, operator.lt, "<")
+
+    def __le__(self, other):
+        return self._compare(other, operator.le, "<=")
+
+    def __eq__(self, other):
+        return self._compare(other, operator.eq, "==")
+
+    def __ne__(self, other):
+        return self._compare(other, operator.ne, "!=")
+
+    def __ge__(self, other):
+        return self._compare(other, operator.ge, ">=")
+
+    def __gt__(self, other):
+        return self._compare(other, operator.gt, ">")
+
+    def __and__(self, other):
+        return _LogicalExpression(self, other, operator.and_, "&")
+
+    def __or__(self, other):
+        return _LogicalExpression(self, other, operator.or_, "|")
+
+    def __invert__(self):
+        return _NotExpression(self)
+
+    def __bool__(self):
+        raise TypeError(
+            "Cluster expressions cannot be converted to bool directly. Use "
+            "comparison operators and combine predicates with &, |, and ~."
+        )
+
+    def __repr__(self):
+        return self.name
+
+
+class _AliasedClusterExpression(ClusterExpression):
+    def __init__(self, expression, name):
+        super().__init__(name)
+        self.expression = expression
+        self.is_boolean = expression.is_boolean
+
+    def evaluate(self, cluster):
+        return self.expression.evaluate(cluster)
+
+
+class _FunctionClusterExpression(ClusterExpression):
+    def __init__(self, name, evaluator, is_boolean=False):
+        super().__init__(name)
+        self.evaluator = evaluator
+        self.is_boolean = is_boolean
+
+    def evaluate(self, cluster):
+        return self.evaluator(cluster)
+
+
+class _ComparisonExpression(ClusterExpression):
+    is_boolean = True
+
+    def __init__(self, left, right, comparison, symbol):
+        if not isinstance(left, ClusterExpression):
+            raise TypeError("The left comparison value must be a cluster expression.")
+        right_name = right.name if isinstance(right, ClusterExpression) else repr(right)
+        super().__init__(f"({left.name} {symbol} {right_name})")
+        self.left = left
+        self.right = right
+        self.comparison = comparison
+
+    def evaluate(self, cluster):
+        left_value = self.left.evaluate(cluster)
+        right_value = (
+            self.right.evaluate(cluster)
+            if isinstance(self.right, ClusterExpression)
+            else self.right
+        )
+        return bool(self.comparison(left_value, right_value))
+
+
+class _LogicalExpression(ClusterExpression):
+    is_boolean = True
+
+    def __init__(self, left, right, logical_operator, symbol):
+        if not isinstance(left, ClusterExpression) or not left.is_boolean:
+            raise TypeError(f"The left operand of {symbol} must be a predicate.")
+        if not isinstance(right, ClusterExpression) or not right.is_boolean:
+            raise TypeError(f"The right operand of {symbol} must be a predicate.")
+        super().__init__(f"({left.name} {symbol} {right.name})")
+        self.left = left
+        self.right = right
+        self.logical_operator = logical_operator
+
+    def evaluate(self, cluster):
+        left_value = bool(self.left.evaluate(cluster))
+        if self.logical_operator is operator.and_:
+            return left_value and bool(self.right.evaluate(cluster))
+        return left_value or bool(self.right.evaluate(cluster))
+
+
+class _NotExpression(ClusterExpression):
+    is_boolean = True
+
+    def __init__(self, expression):
+        if not isinstance(expression, ClusterExpression) or not expression.is_boolean:
+            raise TypeError("The operand of ~ must be a predicate.")
+        super().__init__(f"~({expression.name})")
+        self.expression = expression
+
+    def evaluate(self, cluster):
+        return not bool(self.expression.evaluate(cluster))
+
+
+class _TotalCountExpression(ClusterExpression):
+    def __init__(self, property_name=None, values=None, weight="count"):
+        if property_name is None:
+            name = "total_count" if weight == "count" else f"total_{weight}"
+            normalized_values = None
+        else:
+            normalized_values = _normalize_match_values(values)
+            name = _selection_expression_name(
+                "total_count", property_name, normalized_values, weight
+            )
+        super().__init__(name)
+        self.property_name = property_name
+        self.values = normalized_values
+        self.weight = weight
+
+    def __call__(self, property_name, values, weight="count"):
+        return _TotalCountExpression(property_name, values, weight=weight)
+
+    def evaluate(self, cluster):
+        return sum(
+            _node_weight(node, self.weight)
+            for node in cluster
+            if self.property_name is None
+            or _node_matches(node, self.property_name, self.values)
+        )
+
+
+cluster_size = _FunctionClusterExpression("cluster_size", len)
+total_count = _TotalCountExpression()
+
+
+def proportion(property_name, values, weight="nodes"):
+    normalized_values = _normalize_match_values(values)
+    name = _selection_expression_name(
+        "proportion", property_name, normalized_values, weight
+    )
+
+    def evaluate(cluster):
+        denominator = sum(_node_weight(node, weight) for node in cluster)
+        if denominator == 0:
+            return 0.0
+        numerator = sum(
+            _node_weight(node, weight)
+            for node in cluster
+            if _node_matches(node, property_name, normalized_values)
+        )
+        return numerator / denominator
+
+    return _FunctionClusterExpression(name, evaluate)
+
+
+def all_nodes(property_name, values):
+    normalized_values = _normalize_match_values(values)
+    name = _selection_expression_name("all_nodes", property_name, normalized_values)
+
+    def evaluate(cluster):
+        nodes = list(cluster)
+        return bool(nodes) and all(
+            _node_matches(node, property_name, normalized_values) for node in nodes
+        )
+
+    return _FunctionClusterExpression(name, evaluate, is_boolean=True)
+
+
+def any_nodes(property_name, values):
+    normalized_values = _normalize_match_values(values)
+    name = _selection_expression_name("any_nodes", property_name, normalized_values)
+
+    def evaluate(cluster):
+        return any(
+            _node_matches(node, property_name, normalized_values) for node in cluster
+        )
+
+    return _FunctionClusterExpression(name, evaluate, is_boolean=True)
 
 
 # ? add freq, count
@@ -253,16 +527,110 @@ class Clusters(list):
 
 
     @staticmethod
-    def _plot_node_property(node, property_name):
-        if hasattr(node, property_name):
-            value = getattr(node, property_name)
-        elif property_name in node.additional_properties:
-            value = node.additional_properties[property_name]
+    def _cluster_number(cluster, fallback):
+        if cluster.id is not None:
+            return cluster.id
+        for node in cluster:
+            if "cluster_no" in node.additional_properties:
+                return node.additional_properties["cluster_no"]
+            if "cluster_no" in cluster.nodes[node]:
+                return cluster.nodes[node]["cluster_no"]
+            break
+        return fallback
+
+
+    def _copy_with_clusters(self, selected_clusters):
+        result = Clusters()
+        for attribute_name, value in self.__dict__.items():
+            if attribute_name != "clusters":
+                setattr(result, attribute_name, value)
+        result.clusters = list(selected_clusters)
+        return result
+
+
+    def filter(self, condition, inplace=False):
+        """Select clusters satisfying a composable cluster predicate.
+
+        Args:
+            condition (ClusterExpression): Boolean expression created with
+                comparisons, ``all_nodes``, ``any_nodes``, and ``&``, ``|``,
+                or ``~`` operators.
+            inplace (bool): Replace this collection when ``True``.
+
+        Returns:
+            Clusters: Filtered collection. Original cluster identifiers are
+            preserved.
+        """
+        if not isinstance(condition, ClusterExpression) or not condition.is_boolean:
+            raise TypeError("condition must be a boolean cluster expression.")
+        if not isinstance(inplace, (bool, np.bool_)):
+            raise TypeError("inplace must be a boolean.")
+        selected_clusters = [
+            cluster for cluster in self.clusters if condition.evaluate(cluster)
+        ]
+        if inplace:
+            self.clusters = selected_clusters
+            return self
+        return self._copy_with_clusters(selected_clusters)
+
+
+    def custom_properties(self, expressions):
+        """Calculate custom cluster-level expressions as a dataframe.
+
+        ``cluster_no`` and ``cluster_id`` are always included before the
+        requested expression columns. Use ``expression.alias(name)`` to set a
+        custom output column name.
+        """
+        if isinstance(expressions, ClusterExpression):
+            expressions = [expressions]
         else:
+            try:
+                expressions = list(expressions)
+            except TypeError as error:
+                raise TypeError(
+                    "expressions must be a cluster expression or iterable of "
+                    "cluster expressions."
+                ) from error
+        if not expressions:
+            raise ValueError("At least one cluster expression must be provided.")
+        if any(
+            not isinstance(expression, ClusterExpression)
+            for expression in expressions
+        ):
+            raise TypeError("Every custom property must be a cluster expression.")
+
+        expression_names = [expression.name for expression in expressions]
+        reserved_names = {"cluster_no", "cluster_id"}
+        duplicate_names = {
+            name for name in expression_names if expression_names.count(name) > 1
+        }
+        invalid_names = reserved_names.intersection(expression_names)
+        if duplicate_names or invalid_names:
+            names = sorted(duplicate_names.union(invalid_names))
             raise ValueError(
-                f"Node property '{property_name}' was not found in node attributes "
-                "or additional_properties."
+                "Custom property names must be unique and cannot use reserved "
+                f"columns: {', '.join(names)}"
             )
+
+        rows = []
+        for fallback_number, cluster in enumerate(self.clusters):
+            cluster_no = self._cluster_number(cluster, fallback_number)
+            row = {
+                "cluster_no": cluster_no,
+                "cluster_id": f"cluster_{cluster_no}",
+            }
+            for expression in expressions:
+                row[expression.name] = expression.evaluate(cluster)
+            rows.append(row)
+        return pd.DataFrame(
+            rows,
+            columns=["cluster_no", "cluster_id", *expression_names],
+        )
+
+
+    @staticmethod
+    def _plot_node_property(node, property_name):
+        value = _node_property_value(node, property_name)
 
         if value is None:
             return "NA"
