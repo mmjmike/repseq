@@ -34,15 +34,20 @@ clusters[:3]
 
 ## Plotting cluster networks
 
-Use `Clusters.plot_cluster` to plot one cluster or a list of up to 50 cluster
-indices as facets. By default, node size uses the `count` property with
-`min_size + log2(count + 1) ** log_power`. Set `size` to another numeric node
-property, use `size=None` for uniform nodes, or set `log_scaled=False` for
-`min_size + value * linear_scale`. The default spring layout can be replaced
-with `kamada_kawai`, `circular`, `shell`, or `spectral`.
+Use `Clusters.plot_cluster` to plot one cluster, a list of up to 50 cluster
+indices, or every cluster as facets. Pass `cluster_no=None` to select every
+cluster. This automatic mode defaults to `max_clusters=50`; if the object has
+more clusters, no figure is created until you either increase `max_clusters`
+or pass a smaller explicit selection. By default, node size uses the `count`
+property with `min_size + log2(count + 1) ** log_power`. Set `size` to another
+numeric node property, use `size=None` for uniform nodes, or set
+`log_scaled=False` for `min_size + value * linear_scale`. The default spring
+layout can be replaced with `kamada_kawai`, `circular`, `shell`, or `spectral`.
 
 ```py
 fig = clusters.plot_cluster(0, label="seq_aa")
+
+fig = clusters.plot_cluster(None)
 
 fig = clusters.plot_cluster(
     [0, 1, 2, 3],

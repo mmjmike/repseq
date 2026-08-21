@@ -756,8 +756,9 @@ class Clusters(list):
         log_scaled=True,
         log_power=2,
         linear_scale=1,
+        max_clusters=50,
     ):
-        """Plot one cluster or up to 50 clusters as network facets.
+        """Plot one, selected, or all clusters as network facets.
 
         Node area is uniform when ``size=None``. Otherwise, ``size`` names a
         numeric :class:`Node` attribute or ``node.additional_properties`` value.
@@ -765,7 +766,8 @@ class Clusters(list):
         scaling uses ``min_size + value * linear_scale``.
 
         Args:
-            cluster_no (int | list[int]): Cluster index or cluster indices.
+            cluster_no (int | list[int] | None): Cluster index, cluster indices,
+                or ``None`` to plot every cluster in the object.
             layout (str): ``spring`` (default), ``kamada_kawai``, ``circular``,
                 ``shell``, or ``spectral``.
             color (str | None): Node property used for color grouping.
@@ -783,20 +785,49 @@ class Clusters(list):
             log_scaled (bool): Apply logarithmic scaling when ``True``.
             log_power (float): Exponent applied to log2-transformed values.
             linear_scale (float): Multiplier used for linear scaling.
+            max_clusters (int): Maximum number of clusters automatically plotted
+                when ``cluster_no=None``. Ignored for explicit cluster indices.
 
         Returns:
             matplotlib.figure.Figure: The generated figure.
         """
-        if isinstance(cluster_no, (int, np.integer)) and not isinstance(cluster_no, bool):
+        plot_all_clusters = cluster_no is None
+        if plot_all_clusters:
+            if (
+                not isinstance(max_clusters, (int, np.integer))
+                or isinstance(max_clusters, bool)
+                or max_clusters < 1
+            ):
+                raise ValueError(
+                    "max_clusters must be a positive integer when "
+                    "cluster_no=None."
+                )
+            cluster_count = len(self.clusters)
+            if cluster_count > max_clusters:
+                raise ValueError(
+                    f"plot_cluster(cluster_no=None) would plot all "
+                    f"{cluster_count} clusters, which exceeds "
+                    f"max_clusters={max_clusters}. No plot was created. "
+                    "Increase max_clusters if plotting every cluster is "
+                    "intentional, or pass an integer or list of cluster "
+                    "indices to plot a smaller selection."
+                )
+            cluster_numbers = list(range(cluster_count))
+        elif (
+            isinstance(cluster_no, (int, np.integer))
+            and not isinstance(cluster_no, bool)
+        ):
             cluster_numbers = [int(cluster_no)]
         elif isinstance(cluster_no, (list, tuple, np.ndarray, pd.Index)):
             cluster_numbers = list(cluster_no)
         else:
-            raise TypeError("cluster_no must be an integer or a list of integers.")
+            raise TypeError(
+                "cluster_no must be None, an integer, or a list of integers."
+            )
 
         if not cluster_numbers:
             raise ValueError("At least one cluster_no must be provided.")
-        if len(cluster_numbers) > 50:
+        if not plot_all_clusters and len(cluster_numbers) > 50:
             raise ValueError("At most 50 clusters can be plotted at once.")
         if any(
             not isinstance(number, (int, np.integer)) or isinstance(number, bool)

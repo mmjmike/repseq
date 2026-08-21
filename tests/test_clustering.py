@@ -209,6 +209,69 @@ def test_plot_cluster_supports_common_layouts(layout):
     plt.close(figure)
 
 
+def test_plot_cluster_none_plots_all_clusters():
+    figure = _clusters_with_two_samples().plot_cluster(None)
+
+    assert [axis.get_title() for axis in figure.axes] == [
+        "Cluster 0",
+        "Cluster 1",
+    ]
+    plt.close(figure)
+
+
+def test_plot_cluster_none_respects_max_clusters_without_plotting():
+    clusters = _clusters_with_two_samples()
+    open_figures = plt.get_fignums()
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            r"would plot all 2 clusters.*max_clusters=1.*No plot was created.*"
+            r"Increase max_clusters.*smaller selection"
+        ),
+    ):
+        clusters.plot_cluster(None, max_clusters=1)
+
+    assert plt.get_fignums() == open_figures
+
+
+def test_plot_cluster_ignores_max_clusters_for_explicit_selection():
+    figure = _clusters_with_two_samples().plot_cluster([0, 1], max_clusters=1)
+
+    assert [axis.get_title() for axis in figure.axes] == [
+        "Cluster 0",
+        "Cluster 1",
+    ]
+    plt.close(figure)
+
+
+def test_plot_cluster_none_can_raise_max_clusters_above_default():
+    clusters = _clusters_with_two_samples()
+    clusters.clusters = clusters.clusters * 26
+
+    figure = clusters.plot_cluster(
+        None,
+        max_clusters=52,
+        layout="circular",
+        ncols=10,
+        figsize=(10, 6),
+        size=None,
+    )
+
+    assert len(figure.axes) == 60
+    assert figure.axes[51].get_title() == "Cluster 51"
+    assert all(not axis.get_visible() for axis in figure.axes[52:])
+    plt.close(figure)
+
+
+@pytest.mark.parametrize("max_clusters", [0, -1, 1.5, True, None])
+def test_plot_cluster_none_requires_positive_integer_max_clusters(max_clusters):
+    with pytest.raises(
+        ValueError, match="max_clusters must be a positive integer"
+    ):
+        _clusters_with_two_samples().plot_cluster(None, max_clusters=max_clusters)
+
+
 def test_plot_cluster_rejects_more_than_fifty_facets():
     with pytest.raises(ValueError, match="At most 50 clusters"):
         _clusters_with_two_samples().plot_cluster(list(range(51)))
