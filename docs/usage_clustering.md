@@ -35,9 +35,11 @@ clusters[:3]
 ## Plotting cluster networks
 
 Use `Clusters.plot_cluster` to plot one cluster or a list of up to 50 cluster
-indices as facets. Node size uses a log2 transformation of `count`, and the
-default spring layout can be replaced with `kamada_kawai`, `circular`, `shell`,
-or `spectral`.
+indices as facets. By default, node size uses the `count` property with
+`min_size + log2(count + 1) ** log_power`. Set `size` to another numeric node
+property, use `size=None` for uniform nodes, or set `log_scaled=False` for
+`min_size + value * linear_scale`. The default spring layout can be replaced
+with `kamada_kawai`, `circular`, `shell`, or `spectral`.
 
 ```py
 fig = clusters.plot_cluster(0, label="seq_aa")
@@ -49,6 +51,10 @@ fig = clusters.plot_cluster(
     palette={"sample_1": "#4C78A8", "sample_2": "#F58518"},
     label="id",
     shape="group",
+    size="count",
+    min_size=100,
+    log_scaled=True,
+    log_power=2,
 )
 ```
 
@@ -56,7 +62,10 @@ fig = clusters.plot_cluster(
 `sample_id`, `v`, or `j`, or values previously added to
 `node.additional_properties`. Shape grouping supports five levels, displayed as
 circle, triangle, rhombus, hexagon, and square. Color and shape legends are
-placed below the faceted panel.
+placed below the faceted panel. For IGH clusters, constant-gene calls are
+stored as the `isotype` node property with labels such as `IgM`, `IgG1`, and
+`IgA2`. Coloring by `isotype` uses the same ordering and palette as
+`rsplot.isotype_fraction`.
 
 ## Clusters from a pooled DataFrame
 

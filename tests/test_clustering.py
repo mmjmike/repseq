@@ -7,8 +7,10 @@ import numpy as np
 import pandas as pd
 import pytest
 from matplotlib.collections import PathCollection
+from matplotlib.colors import to_rgba
 
 import repseq.clustering as clustering_module
+import repseq.plot as rsplot
 from repseq.clustering import Cluster, Clusters, Node
 
 
@@ -163,8 +165,9 @@ def test_plot_cluster_facets_style_nodes_and_add_legends():
         label="id",
         shape="shape_group",
         ncols=2,
-        min_node_size=100,
-        node_size_scale=10,
+        size="count",
+        min_size=100,
+        log_power=2,
     )
 
     assert [axis.get_title() for axis in figure.axes] == ["Cluster 0", "Cluster 1"]
@@ -180,9 +183,11 @@ def test_plot_cluster_facets_style_nodes_and_add_legends():
         for collection in axis.collections:
             if isinstance(collection, PathCollection):
                 plotted_sizes.extend(collection.get_sizes())
-    expected_sizes = [100 + 10 * np.log2(count + 1) for count in [3, 7, 5, 11]]
+    expected_sizes = [
+        100 + np.log2(count + 1) ** 2 for count in [3, 7, 5, 11]
+    ]
     np.testing.assert_allclose(sorted(plotted_sizes), sorted(expected_sizes))
-    plt.close(figure)
+    assert figure.number not in plt.get_fignums()
 
 
 @pytest.mark.parametrize(
@@ -251,3 +256,84 @@ def test_plot_cluster_rejects_more_than_five_shape_levels():
 
     with pytest.raises(ValueError, match="shape supports at most five levels"):
         clusters.plot_cluster(0, shape="shape_group")
+
+
+def _plotted_node_sizes(figure):
+    sizes = []
+    for axis in figure.axes:
+        for collection in axis.collections:
+            if isinstance(collection, PathCollection):
+                sizes.extend(collection.get_sizes())
+    return sizes
+
+
+def test_plot_cluster_supports_linear_and_uniform_node_sizes():
+    clusters = _clusters_with_two_samples()
+
+    linear_figure = clusters.plot_cluster(
+        0,
+        size="freq",
+        min_size=20,
+        log_scaled=False,
+        linear_scale=100,
+    )
+    uniform_figure = clusters.plot_cluster(0, size=None, min_size=45)
+
+    np.testing.assert_allclose(
+        sorted(_plotted_node_sizes(linear_figure)),
+        sorted([30, 40, 60]),
+    )
+    np.testing.assert_allclose(_plotted_node_sizes(uniform_figure), [45, 45, 45])
+    assert linear_figure.number not in plt.get_fignums()
+    assert uniform_figure.number not in plt.get_fignums()
+
+
+def test_find_nodes_and_edges_recodes_igh_c_as_isotype():
+    clusters = Clusters()
+    clusters.clonotypes = pd.DataFrame(
+        {
+            "cdr3aa": ["CASS", "CATS"],
+            "cdr3nt": ["TGTGCT", "TGTGCC"],
+            "v": ["IGHV1", "IGHV1"],
+            "j": ["IGHJ1", "IGHJ1"],
+            "c": ["IGHG1*01", "IGHM*02"],
+            "sample_id": ["sample_1", "sample_2"],
+            "freq": [0.4, 0.6],
+            "count": [4, 6],
+        }
+    )
+
+    single_nodes, edges = clusters.find_nodes_and_edges(
+        mismatches=1, overlap_type="aaVJ", cpu=1, verbose=False
+    )
+    nodes = set(single_nodes)
+    for node_1, node_2, _ in edges:
+        nodes.update([node_1, node_2])
+
+    assert sorted(node.additional_properties["isotype"] for node in nodes) == [
+        "IgG1",
+        "IgM",
+    ]
+    assert all("c" not in node.additional_properties for node in nodes)
+
+
+def test_plot_cluster_uses_isotype_fraction_order_and_colors():
+    clusters = _clusters_with_two_samples()
+    isotypes = ["IgG2", "IgM", "IgA1", "IgG1"]
+    for node, isotype in zip(
+        [node for cluster in clusters for node in cluster], isotypes
+    ):
+        node.additional_properties["isotype"] = isotype
+
+    figure = clusters.plot_cluster([0, 1], color="isotype", size=None)
+
+    legend = figure.legends[0]
+    labels = [text.get_text() for text in legend.get_texts()]
+    expected_order = rsplot._isotype_order(isotypes)
+    expected_colors = rsplot._isotype_colors(expected_order)
+    plotted_colors = [
+        to_rgba(handle.get_markerfacecolor()) for handle in legend.legend_handles
+    ]
+    assert labels == expected_order
+    for isotype, plotted_color in zip(expected_order, plotted_colors):
+        assert np.allclose(plotted_color, to_rgba(expected_colors[isotype]))

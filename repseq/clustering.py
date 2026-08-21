@@ -3,6 +3,7 @@ from .common_functions import run_parallel_calculation, print_progress_bar
 from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_dict, get_logo_for_list_of_clonotypes
 from .clone_filter import Filter
 from .io import read_clonoset
+from .plot import _isotype_colors, _isotype_order, _recode_isotype
 from scipy.stats import poisson
 from statsmodels.stats.multitest import multipletests
 from .common_functions import overlap_type_to_flags
@@ -333,14 +334,18 @@ class Clusters(list):
         ncols=None,
         figsize=None,
         seed=1,
-        min_node_size=300,
-        node_size_scale=250,
+        size="count",
+        min_size=100,
+        log_scaled=True,
+        log_power=2,
+        linear_scale=1,
     ):
         """Plot one cluster or up to 50 clusters as network facets.
 
-        Node area is scaled as ``min_node_size + node_size_scale *
-        log2(count + 1)``. Color, label, and shape values can be read from a
-        regular :class:`Node` attribute or from ``node.additional_properties``.
+        Node area is uniform when ``size=None``. Otherwise, ``size`` names a
+        numeric :class:`Node` attribute or ``node.additional_properties`` value.
+        Log scaling uses ``min_size + log2(value + 1) ** log_power``; linear
+        scaling uses ``min_size + value * linear_scale``.
 
         Args:
             cluster_no (int | list[int]): Cluster index or cluster indices.
@@ -355,8 +360,12 @@ class Clusters(list):
             ncols (int | None): Number of facet columns.
             figsize (tuple | None): Matplotlib figure size.
             seed (int): Seed used by the spring layout.
-            min_node_size (float): Base matplotlib node area.
-            node_size_scale (float): Multiplier for log2-scaled counts.
+            size (str | None): Numeric node property used for node area. Use
+                ``None`` for uniform node sizes.
+            min_size (float): Minimum matplotlib node area.
+            log_scaled (bool): Apply logarithmic scaling when ``True``.
+            log_power (float): Exponent applied to log2-transformed values.
+            linear_scale (float): Multiplier used for linear scaling.
 
         Returns:
             matplotlib.figure.Figure: The generated figure.
@@ -392,8 +401,10 @@ class Clusters(list):
             raise ValueError("palette requires a color property.")
         if ncols is not None and (not isinstance(ncols, int) or ncols < 1):
             raise ValueError("ncols must be a positive integer.")
-        if min_node_size < 0 or node_size_scale < 0:
+        if min_size < 0 or log_power < 0 or linear_scale < 0:
             raise ValueError("Node size parameters must be non-negative.")
+        if not isinstance(log_scaled, (bool, np.bool_)):
+            raise TypeError("log_scaled must be a boolean.")
 
         selected_clusters = [self.clusters[number] for number in cluster_numbers]
         selected_nodes = [
@@ -408,6 +419,10 @@ class Clusters(list):
                 color_values[node] = value
                 if value not in color_levels:
                     color_levels.append(value)
+            if color == "isotype":
+                color_levels = _isotype_order(color_levels)
+                if palette is None:
+                    palette = _isotype_colors(color_levels)
             color_map = self._plot_color_map(color_levels, palette)
         else:
             color_map = {None: "#4C78A8"}
@@ -432,19 +447,27 @@ class Clusters(list):
 
         node_sizes = {}
         for node in selected_nodes:
+            if size is None:
+                node_sizes[node] = min_size
+                continue
+            size_value = self._plot_node_property(node, size)
             try:
-                count_value = float(node.count)
+                size_value = float(size_value)
             except (TypeError, ValueError) as error:
                 raise ValueError(
-                    f"Node '{node.id}' has a non-numeric count value."
+                    f"Node '{node.id}' property '{size}' must be numeric."
                 ) from error
-            if not np.isfinite(count_value) or count_value < 0:
+            if not np.isfinite(size_value) or size_value < 0:
                 raise ValueError(
-                    f"Node '{node.id}' count must be finite and non-negative."
+                    f"Node '{node.id}' property '{size}' must be finite and "
+                    "non-negative."
                 )
-            node_sizes[node] = (
-                min_node_size + node_size_scale * np.log2(count_value + 1)
-            )
+            if log_scaled:
+                node_sizes[node] = (
+                    min_size + np.log2(size_value + 1) ** log_power
+                )
+            else:
+                node_sizes[node] = min_size + size_value * linear_scale
 
         facet_count = len(selected_clusters)
         if ncols is None:
@@ -562,6 +585,7 @@ class Clusters(list):
 
         bottom_margin = 0.04 + 0.08 * legend_rows
         figure.tight_layout(rect=(0, bottom_margin, 1, 1))
+        plt.close(figure)
         return figure
 
 
@@ -738,14 +762,6 @@ class Clusters(list):
         self.clonotypes = pooled_clonoset
 
 
-    @staticmethod
-    def _split_c(c_segm):
-        try:
-            return c_segm.split("*")[0]
-        except AttributeError:
-            return "None"
-                
-
     def find_nodes_and_edges(self, mismatches, overlap_type, cpu=None, verbose=True):
         """
         Builds nodes from clonotypes and finds edges between similar sequences. 
@@ -767,7 +783,7 @@ class Clusters(list):
         is_freq = "freq" in clonoset.columns
         is_count = "count" in clonoset.columns
         if igh:
-            clonoset["c"] = clonoset["c"].apply(lambda x: self._split_c(x).split("(")[0])
+            clonoset["isotype"] = clonoset["c"].apply(_recode_isotype)
         # if is_count:
         #     clonoset["count"] = 1
 
@@ -807,7 +823,7 @@ class Clusters(list):
                         freq=freq,
                         count=count)
             if igh:
-                node.additional_properties["c"] = row["c"]
+                node.additional_properties["isotype"] = row["isotype"]
             nodes_by_comparison_group[comparison_group].append(node)
             list_of_all_nodes.append(node)
         if verbose:
@@ -901,12 +917,7 @@ class Clusters(list):
         igh = "c" in clonoset.columns 
 
         if igh:
-            def _split_c(c_segm):
-                try:
-                    return c_segm.split("*")[0]
-                except AttributeError:
-                    return "None"
-            clonoset["c"] = clonoset["c"].apply(lambda x: _split_c(x))
+            clonoset["isotype"] = clonoset["c"].apply(_recode_isotype)
 
 
         nodes_by_len = {}
@@ -939,7 +950,7 @@ class Clusters(list):
                 nodes_by_len[len_cdr3aa] = []
             node = Node(index, cdr3nt, cdr3aa, v, j, sample_id, freq=freq, count=count)
             if igh:
-                node.additional_properties["c"] = row["c"]
+                node.additional_properties["isotype"] = row["isotype"]
             nodes_by_len[len_cdr3aa].append(node)
             list_of_all_nodes.append(node)
         if verbose:
