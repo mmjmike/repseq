@@ -127,7 +127,33 @@ from repseq.clustering import (
     cluster_size,
     proportion,
     total_count,
+    top_clusters,
 )
+```
+
+Select known clusters directly with `Clusters.select`. Integers are interpreted
+as `cluster_no`, while strings such as `"cluster_235"` are interpreted as
+`cluster_id`. Ranges, dataframe/Series columns, and mixed identifier lists are
+accepted. Requested order is preserved and duplicate identifiers are returned
+only once.
+
+```py
+selected = clusters.select(["cluster_24", 25])
+selected = clusters.select(range(10, 20))
+selected = clusters.select(
+    cluster_table.loc[cluster_table["cluster_size"] >= 5, "cluster_id"]
+)
+```
+
+Use `top_clusters(N)` inside `filter` to rank the collection by node count
+(descending), total node `count` (descending), and amino-acid consensus
+(alphabetically), then retain the first `N` clusters. The returned collection is
+in ranking order. `clusters.top_clusters(N)` is an equivalent convenience
+method.
+
+```py
+largest = clusters.filter(top_clusters(100))
+largest = clusters.top_clusters(100)
 ```
 
 Metrics can be compared directly. `cluster_size` is the number of nodes and

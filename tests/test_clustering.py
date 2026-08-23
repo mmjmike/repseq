@@ -22,6 +22,7 @@ from repseq.clustering import (
     cluster_size,
     proportion,
     total_count,
+    top_clusters,
 )
 from repseq.clone_filter import Filter
 
@@ -857,3 +858,79 @@ def test_plot_cluster_log_scaling_supports_zero_values():
     )
 
     assert min(_plotted_node_sizes(figure)) == 50
+
+
+def test_select_accepts_mixed_numbers_ids_ranges_and_dataframe_columns():
+    clusters = _clusters_with_two_samples()
+
+    mixed = clusters.select(["cluster_1", 0, "cluster_1"])
+    by_range = clusters.select(range(2))
+    properties = clusters.custom_properties([cluster_size])
+    by_dataframe_ids = clusters.select(
+        properties.loc[properties["cluster_no"] == 1, "cluster_id"]
+    )
+
+    assert list(mixed) == [clusters[1], clusters[0]]
+    assert list(by_range) == [clusters[0], clusters[1]]
+    assert list(by_dataframe_ids) == [clusters[1]]
+    assert mixed.custom_properties([cluster_size])["cluster_no"].tolist() == [1, 0]
+
+
+def test_select_rejects_unknown_or_malformed_identifiers():
+    clusters = _clusters_with_two_samples()
+
+    with pytest.raises(KeyError, match="cluster_25"):
+        clusters.select(["cluster_0", 25])
+    with pytest.raises(KeyError, match="bad_id"):
+        clusters.select(["bad_id"])
+
+
+def _clusters_for_top_ranking():
+    clusters = Clusters()
+    specifications = [
+        (0, 2, 2, "BBB"),
+        (1, 1, 100, "ZZZ"),
+        (2, 2, 5, "CCC"),
+        (3, 2, 5, "AAA"),
+    ]
+    for cluster_no, node_count, total_node_count, sequence in specifications:
+        cluster = Cluster()
+        counts = [1] * node_count
+        counts[0] += total_node_count - node_count
+        for node_index, count in enumerate(counts):
+            node = Node(
+                f"{cluster_no}_{node_index}",
+                "TGT",
+                sequence,
+                "TRBV1",
+                "TRBJ1",
+                "sample_1",
+                1 / node_count,
+                count,
+            )
+            node.additional_properties["cluster_no"] = cluster_no
+            cluster.add_node(node)
+        cluster.id = cluster_no
+        clusters.clusters.append(cluster)
+    return clusters
+
+
+def test_filter_top_clusters_uses_size_count_and_consensus_ranking():
+    clusters = _clusters_for_top_ranking()
+
+    selected = clusters.filter(top_clusters(3))
+    convenient = clusters.top_clusters(2)
+
+    assert [cluster.id for cluster in selected] == [3, 2, 0]
+    assert [cluster.id for cluster in convenient] == [3, 2]
+    assert clusters.custom_properties([cluster_size])["cluster_no"].tolist() == [
+        0,
+        1,
+        2,
+        3,
+    ]
+
+
+def test_top_clusters_validates_requested_number():
+    with pytest.raises(ValueError, match="non-negative integer"):
+        top_clusters(-1)

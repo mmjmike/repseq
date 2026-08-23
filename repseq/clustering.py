@@ -297,6 +297,47 @@ def any_nodes(property_name, values):
     return _FunctionClusterExpression(name, evaluate, is_boolean=True)
 
 
+class ClusterCollectionSelector:
+    """Collection-level selector accepted by :meth:`Clusters.filter`."""
+
+    def select(self, clusters):
+        raise NotImplementedError
+
+
+class _TopClustersSelector(ClusterCollectionSelector):
+    def __init__(self, number_of_clusters):
+        if (
+            not isinstance(number_of_clusters, (int, np.integer))
+            or isinstance(number_of_clusters, bool)
+            or number_of_clusters < 0
+        ):
+            raise ValueError("number_of_clusters must be a non-negative integer.")
+        self.number_of_clusters = int(number_of_clusters)
+
+    def select(self, clusters):
+        ranked_clusters = sorted(
+            clusters.clusters,
+            key=lambda cluster: (
+                -len(cluster),
+                -sum(node.count for node in cluster),
+                str(
+                    cluster.calc_cluster_consensus(
+                        seq_type="prot", weigh_by=None
+                    )
+                ),
+            ),
+        )
+        return ranked_clusters[: self.number_of_clusters]
+
+    def __repr__(self):
+        return f"top_clusters({self.number_of_clusters})"
+
+
+def top_clusters(number_of_clusters):
+    """Select the largest clusters using size, count, and AA consensus order."""
+    return _TopClustersSelector(number_of_clusters)
+
+
 # ? add freq, count
 class Node:
     def __init__(self, node_id, seq_nt, seq_aa, v, j, sample_id, freq, count):
@@ -810,13 +851,81 @@ class Clusters(list):
         return result
 
 
+    def select(self, cluster_identifiers):
+        """Select clusters by integer cluster numbers or ``cluster_N`` IDs.
+
+        Input order is preserved and duplicate identifiers are returned once.
+        Scalars, ranges, pandas Series, and other iterables are accepted.
+        """
+        self._require_clusters("select clusters")
+        if isinstance(cluster_identifiers, (str, int, np.integer)) and not isinstance(
+            cluster_identifiers, bool
+        ):
+            identifiers = [cluster_identifiers]
+        else:
+            try:
+                identifiers = list(cluster_identifiers)
+            except TypeError as error:
+                raise TypeError(
+                    "cluster_identifiers must be an identifier or iterable of "
+                    "identifiers."
+                ) from error
+        if not identifiers:
+            return self._copy_with_clusters([])
+
+        clusters_by_number = {}
+        for fallback_number, cluster in enumerate(self.clusters):
+            cluster_no = self._cluster_number(cluster, fallback_number)
+            if cluster_no in clusters_by_number:
+                raise RuntimeError(f"Duplicate cluster_no found: {cluster_no}")
+            clusters_by_number[cluster_no] = cluster
+
+        requested_numbers = []
+        invalid_identifiers = []
+        for identifier in identifiers:
+            if isinstance(identifier, (int, np.integer)) and not isinstance(
+                identifier, bool
+            ):
+                cluster_no = int(identifier)
+            elif isinstance(identifier, str):
+                match = re.fullmatch(r"cluster_(\d+)", identifier)
+                if match is None:
+                    invalid_identifiers.append(identifier)
+                    continue
+                cluster_no = int(match.group(1))
+            else:
+                invalid_identifiers.append(identifier)
+                continue
+            if cluster_no not in requested_numbers:
+                requested_numbers.append(cluster_no)
+
+        missing_numbers = [
+            cluster_no
+            for cluster_no in requested_numbers
+            if cluster_no not in clusters_by_number
+        ]
+        if invalid_identifiers or missing_numbers:
+            missing = [repr(value) for value in invalid_identifiers]
+            missing.extend(f"cluster_{number}" for number in missing_numbers)
+            raise KeyError("Unknown cluster identifiers: " + ", ".join(missing))
+        return self._copy_with_clusters(
+            [clusters_by_number[number] for number in requested_numbers]
+        )
+
+
+    def top_clusters(self, number_of_clusters):
+        """Return the top-ranked clusters as a new collection."""
+        return self.filter(top_clusters(number_of_clusters))
+
+
     def filter(self, condition, inplace=False):
         """Select clusters satisfying a composable cluster predicate.
 
         Args:
-            condition (ClusterExpression): Boolean expression created with
-                comparisons, ``all_nodes``, ``any_nodes``, and ``&``, ``|``,
-                or ``~`` operators.
+            condition (ClusterExpression | ClusterCollectionSelector):
+                Boolean expression created with comparisons, ``all_nodes``,
+                ``any_nodes``, and ``&``, ``|``, or ``~`` operators, or a
+                collection selector such as ``top_clusters``.
             inplace (bool): Replace this collection when ``True``.
 
         Returns:
@@ -824,13 +933,22 @@ class Clusters(list):
             preserved.
         """
         self._require_clusters("filter clusters")
-        if not isinstance(condition, ClusterExpression) or not condition.is_boolean:
-            raise TypeError("condition must be a boolean cluster expression.")
         if not isinstance(inplace, (bool, np.bool_)):
             raise TypeError("inplace must be a boolean.")
-        selected_clusters = [
-            cluster for cluster in self.clusters if condition.evaluate(cluster)
-        ]
+        if isinstance(condition, ClusterCollectionSelector):
+            selected_clusters = condition.select(self)
+        else:
+            if (
+                not isinstance(condition, ClusterExpression)
+                or not condition.is_boolean
+            ):
+                raise TypeError(
+                    "condition must be a boolean cluster expression or "
+                    "collection selector."
+                )
+            selected_clusters = [
+                cluster for cluster in self.clusters if condition.evaluate(cluster)
+            ]
         if inplace:
             self.clusters = selected_clusters
             self._cluster_cache_signature = None
