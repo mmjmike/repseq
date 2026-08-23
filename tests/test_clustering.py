@@ -2,6 +2,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
@@ -684,9 +685,11 @@ def test_empty_state_and_prerequisite_messages():
 
 
 def test_pooled_read_tracks_source_counts_and_state():
-    clusters = Clusters().read_from_pooled_clonoset(
+    clusters = Clusters()
+    result = clusters.read_from_pooled_clonoset(
         _pooled_clonotypes_for_state_tests()
     )
+    assert result is None
 
     assert clusters.state["clonotypes_read"]
     assert not clusters.state["clusters_created"]
@@ -711,9 +714,11 @@ def test_clonosets_df_read_tracks_filter_parameters(monkeypatch):
         {"sample_id": ["sample_1"], "filename": ["sample.tsv"]}
     )
     cl_filter = Filter(count_threshold=2)
-    clusters = Clusters().read_from_clonosets_df(
+    clusters = Clusters()
+    result = clusters.read_from_clonosets_df(
         clonosets_df, cl_filter=cl_filter, verbose=False
     )
+    assert result is None
 
     parameters = clusters.state_parameters["clonotypes_read"]
     assert parameters["source"] == "clonosets_df"
@@ -723,7 +728,8 @@ def test_clonosets_df_read_tracks_filter_parameters(monkeypatch):
 
 
 def test_metadata_can_be_added_before_clustering_and_is_applied_later():
-    clusters = Clusters().read_from_pooled_clonoset(
+    clusters = Clusters()
+    clusters.read_from_pooled_clonoset(
         _pooled_clonotypes_for_state_tests()
     )
     clusters.add_metadata(
@@ -757,7 +763,8 @@ def test_metadata_can_be_added_before_clustering_and_is_applied_later():
 def test_create_clusters_tracks_parameters_and_reuses_identical_result(
     monkeypatch, capsys
 ):
-    clusters = Clusters().read_from_pooled_clonoset(
+    clusters = Clusters()
+    clusters.read_from_pooled_clonoset(
         _pooled_clonotypes_for_state_tests()
     )
     clusters.create_clusters(
@@ -773,7 +780,7 @@ def test_create_clusters_tracks_parameters_and_reuses_identical_result(
         overlap_type="aaVJ", mismatches=1, cpu=1, verbose=False
     )
 
-    assert result is clusters
+    assert result is None
     assert clusters.clusters is original_clusters
     assert clusters.state_parameters["clusters_created"] == {
         "method": "mismatches",
@@ -934,3 +941,76 @@ def test_filter_top_clusters_uses_size_count_and_consensus_ranking():
 def test_top_clusters_validates_requested_number():
     with pytest.raises(ValueError, match="non-negative integer"):
         top_clusters(-1)
+
+
+def test_create_clusters_keeps_one_original_node_per_clonotype_after_parallel_copy(
+    monkeypatch,
+):
+    pooled = pd.DataFrame(
+        {
+            "cdr3aa": ["CASS", "CASS", "CATS", "CARS"],
+            "cdr3nt": ["TGTGCT", "TGTGCT", "TGTGCC", "TGTGCA"],
+            "v": ["TRBV1", "TRBV1", "TRBV1", "TRBV2"],
+            "j": ["TRBJ1", "TRBJ1", "TRBJ1", "TRBJ1"],
+            "sample_id": ["sample_1"] * 4,
+            "freq": [0.25] * 4,
+            "count": [1, 2, 3, 4],
+        },
+        index=[9, 9, 9, 9],
+    )
+    clusters = Clusters()
+    clusters.read_from_pooled_clonoset(pooled)
+
+    def copied_parallel_results(function, tasks, *args, **kwargs):
+        return copy.deepcopy([function(task) for task in tasks])
+
+    monkeypatch.setattr(
+        clustering_module,
+        "run_parallel_calculation",
+        copied_parallel_results,
+    )
+
+    clusters.create_clusters(
+        overlap_type="aaVJ", mismatches=1, cpu=2, verbose=False
+    )
+
+    plotted_nodes = [node for cluster in clusters for node in cluster]
+    assert len(plotted_nodes) == len(pooled)
+    assert sorted(node.id for node in plotted_nodes) == [0, 1, 2, 3]
+    assert len({node.id for node in plotted_nodes}) == len(plotted_nodes)
+    assert len({id(node) for node in plotted_nodes}) == len(plotted_nodes)
+    assert sorted(len(cluster) for cluster in clusters) == [1, 3]
+
+    trbv1_cluster_ids = {
+        cluster.id
+        for cluster in clusters
+        for node in cluster
+        if node.v == "TRBV1"
+    }
+    identical_cass_cluster_ids = {
+        cluster.id
+        for cluster in clusters
+        for node in cluster
+        if node.seq_aa == "CASS" and node.v == "TRBV1" and node.j == "TRBJ1"
+    }
+    assert len(trbv1_cluster_ids) == 1
+    assert len(identical_cass_cluster_ids) == 1
+
+
+def test_mutating_cluster_workflow_methods_do_not_return_self():
+    clusters = Clusters()
+    assert clusters.read_from_pooled_clonoset(
+        _pooled_clonotypes_for_state_tests()
+    ) is None
+    assert clusters.add_metadata(
+        pd.DataFrame(
+            {
+                "sample_id": ["sample_1", "sample_2"],
+                "group": ["control", "case"],
+            }
+        )
+    ) is None
+    assert clusters.create_clusters(
+        overlap_type="aaVJ", mismatches=1, cpu=1, verbose=False
+    ) is None
+    assert clusters.filter(cluster_size >= 1, inplace=True) is None

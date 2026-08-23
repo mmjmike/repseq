@@ -813,7 +813,6 @@ class Clusters(list):
                 columns.append(column)
         self.state["metadata_added"] = True
         self.state["empty"] = False
-        return self
 
 
     @staticmethod
@@ -954,7 +953,7 @@ class Clusters(list):
             self._cluster_cache_signature = None
             self._invalidate_properties_cache()
             self._invalidate_cluster_dependent_analysis()
-            return self
+            return None
         return self._copy_with_clusters(selected_clusters)
 
 
@@ -1608,7 +1607,6 @@ class Clusters(list):
                 f"Pooled {len(self.clonotypes)} clonotypes from "
                 f"{len(clonosets_df)} samples"
             )
-        return self
 
 
     def read_from_pooled_clonoset(self, pooled_clonoset: "pd.DataFrame"):
@@ -1652,7 +1650,30 @@ class Clusters(list):
         self._mark_clonotypes_read(
             "pooled_clonoset", {"converted": converted}
         )
-        return self
+
+
+    @staticmethod
+    def _canonicalize_edge_nodes(edges, nodes):
+        """Replace deserialized edge nodes with the original node instances."""
+        nodes_by_id = {}
+        for node in nodes:
+            if node.id in nodes_by_id:
+                raise RuntimeError(f"Duplicate node_id generated: {node.id}")
+            nodes_by_id[node.id] = node
+
+        canonical_edges = []
+        for node_1, node_2, edge_value in edges:
+            try:
+                canonical_node_1 = nodes_by_id[node_1.id]
+                canonical_node_2 = nodes_by_id[node_2.id]
+            except KeyError as error:
+                raise RuntimeError(
+                    f"Edge references unknown node_id: {error.args[0]}"
+                ) from error
+            canonical_edges.append(
+                (canonical_node_1, canonical_node_2, edge_value)
+            )
+        return canonical_edges
 
 
     def find_nodes_and_edges(self, mismatches, overlap_type, cpu=None, verbose=True):
@@ -1684,7 +1705,7 @@ class Clusters(list):
         list_of_all_nodes = []
 
         
-        for index, row in clonoset.iterrows():
+        for node_id, (_, row) in enumerate(clonoset.iterrows()):
             v = row["v"]
             j = row["j"]
             cdr3aa = row["cdr3aa"]
@@ -1707,7 +1728,7 @@ class Clusters(list):
             comparison_group = tuple(comparison_group)
             if comparison_group not in nodes_by_comparison_group:
                 nodes_by_comparison_group[comparison_group] = []
-            node = Node(node_id=index, 
+            node = Node(node_id=node_id,
                         seq_nt=cdr3nt, 
                         seq_aa=cdr3aa, 
                         v=v, 
@@ -1735,7 +1756,8 @@ class Clusters(list):
             verbose=verbose,
             cpu=cpu,
         )
-        edges=[j for i in result_list for j in i]
+        edges = [edge for result in result_list for edge in result]
+        edges = self._canonicalize_edge_nodes(edges, list_of_all_nodes)
         if verbose:
             print("found {} edges".format(len(edges)))
         nodes_set = set(list_of_all_nodes)
@@ -1821,7 +1843,7 @@ class Clusters(list):
         if not is_count:
             clonoset["count"] = 1
 
-        for index, row in clonoset.iterrows():
+        for node_id, (_, row) in enumerate(clonoset.iterrows()):
             v = row["v"]
             if v not in TCRDIST_V_DIST:
                 print(f"Warning! {v} gene was not recognized in reference db no cdr seq could be inferred. The clone was skipped")
@@ -1841,7 +1863,7 @@ class Clusters(list):
             len_cdr3aa = len(cdr3aa)
             if len_cdr3aa not in nodes_by_len:
                 nodes_by_len[len_cdr3aa] = []
-            node = Node(index, cdr3nt, cdr3aa, v, j, sample_id, freq=freq, count=count)
+            node = Node(node_id, cdr3nt, cdr3aa, v, j, sample_id, freq=freq, count=count)
             if igh:
                 node.additional_properties["isotype"] = row["isotype"]
             nodes_by_len[len_cdr3aa].append(node)
@@ -1863,7 +1885,8 @@ class Clusters(list):
             verbose=verbose,
             cpu=cpu,
         )
-        edges=[j for i in result_list for j in i]
+        edges = [edge for result in result_list for edge in result]
+        edges = self._canonicalize_edge_nodes(edges, list_of_all_nodes)
         if verbose:
             print("found {} edges".format(len(edges)))
         nodes_set = set(list_of_all_nodes)
@@ -1986,7 +2009,7 @@ class Clusters(list):
                 f"and {summary['single_node_clusters']} single nodes. Total: "
                 f"{summary['total_clusters']}"
             )
-            return self
+            return None
 
         if tcr_dist:
             self.tcrdist_radius = tcrdist_radius
@@ -1998,11 +2021,17 @@ class Clusters(list):
                 mismatches, overlap_type, cpu=cpu, verbose=verbose
             )
         
+        graph_nodes_by_id = {}
+        for node in [*nodes, *(node for edge in edges for node in edge[:2])]:
+            existing_node = graph_nodes_by_id.get(node.id)
+            if existing_node is not None and existing_node is not node:
+                raise RuntimeError(
+                    f"Multiple Node objects were produced for node_id {node.id}."
+                )
+            graph_nodes_by_id[node.id] = node
+
         main_graph = Cluster()
-        main_graph.add_nodes_from(nodes)
-        main_graph.add_nodes_from(
-            node for edge in edges for node in edge[:2]
-        )
+        main_graph.add_nodes_from(graph_nodes_by_id.values())
         if verbose:
             print("-----------------------------\nNexworkX graph created")
 
@@ -2050,7 +2079,6 @@ class Clusters(list):
         self.state_parameters["clusters_created"] = cluster_parameters
         self.state_parameters["node_pgen_calculated"] = None
         self.state_parameters["alice_calculated"] = None
-        return self
 
 
 # !!! add check_progress
@@ -2373,7 +2401,6 @@ class Clusters(list):
             node.additional_properties['p_value'] = row['p_value']
             node.additional_properties['p_value_adj'] = row['p_value_adj']
             node.additional_properties['is_alice_hit'] = row['is_alice_hit']
-        return self
 
 
     # def export_clusters_to_gae(self):
