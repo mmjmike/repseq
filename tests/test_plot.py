@@ -2475,3 +2475,35 @@ def test_clonotype_coverage_aliases_and_keeps_figure_open():
     grid = rsplot.clonotype_coverage(_clonotypes_coverage_df())
 
     assert plt.fignum_exists(grid.fig.number)
+
+
+def test_cluster_properties_plot_uses_default_metrics(monkeypatch):
+    captured = {}
+    stats_df = pd.DataFrame(
+        [
+            {
+                "sample_id": "sample1",
+                "mean_cluster_size": 2.5,
+                "diversity": 10,
+                "norm_shannon_wiener": 0.8,
+            }
+        ]
+    )
+
+    def fake_plot_stats(data, **kwargs):
+        captured["data"] = data
+        captured["kwargs"] = kwargs
+        return "cluster_plot"
+
+    monkeypatch.setattr(rsplot, "plot_stats", fake_plot_stats)
+
+    result = rsplot.cluster_properties(stats_df)
+
+    assert result == "cluster_plot"
+    assert captured["data"] is stats_df
+    assert captured["kwargs"]["properties"] == [
+        "mean_cluster_size",
+        "diversity",
+        "norm_shannon_wiener",
+    ]
+    assert captured["kwargs"]["zero_bottom"] is True

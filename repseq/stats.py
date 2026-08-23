@@ -367,6 +367,98 @@ def calc_diversity_stats(clonosets_df, cl_filter=None, iterations=3, seed=None,
 
 
 
+def cluster_properties(
+    clonosets_df,
+    cl_filter=None,
+    overlap_type="aaVJ",
+    mismatches=1,
+    min_cluster_size=2,
+    cpu=None,
+    verbose=True,
+):
+    """Calculate per-sample statistics of clonotype cluster sizes.
+
+    Each filtered clonoset is clustered independently. Clusters smaller than
+    ``min_cluster_size`` nodes are removed before calculating the mean cluster
+    size and standard diversity metrics over retained cluster sizes.
+
+    Args:
+        clonosets_df (pd.DataFrame): Sample table containing ``sample_id`` and
+            ``filename``; ``chain`` is retained when present.
+        cl_filter (Filter | None): Optional clonotype filter.
+        overlap_type (str): Clonotype comparison definition used for clustering.
+        mismatches (int): Maximum sequence mismatches between neighbours.
+        min_cluster_size (int): Minimum retained cluster node count.
+        cpu (int | None): Worker count used across samples.
+        verbose (bool): Show calculation progress.
+
+    Returns:
+        pd.DataFrame: One row per clonoset with ``mean_cluster_size`` and the
+        standard diversity metrics calculated from retained cluster sizes.
+    """
+    if (
+        not isinstance(min_cluster_size, (int, np.integer))
+        or isinstance(min_cluster_size, bool)
+        or min_cluster_size < 1
+    ):
+        raise ValueError("min_cluster_size must be a positive integer.")
+    return generic_calculation(
+        clonosets_df,
+        calculate_cluster_properties_cl,
+        clonoset_filter=cl_filter,
+        program_name="ClusterProperties",
+        overlap_type=overlap_type,
+        mismatches=mismatches,
+        min_cluster_size=int(min_cluster_size),
+        cpu=cpu,
+        verbose=verbose,
+    )
+
+
+def calculate_cluster_properties_cl(
+    clonoset_in,
+    colnames=None,
+    overlap_type="aaVJ",
+    mismatches=1,
+    min_cluster_size=2,
+):
+    """Calculate cluster-size statistics for one already-filtered clonoset."""
+    from .clustering import Clusters, cluster_size
+
+    if (
+        not isinstance(min_cluster_size, (int, np.integer))
+        or isinstance(min_cluster_size, bool)
+        or min_cluster_size < 1
+    ):
+        raise ValueError("min_cluster_size must be a positive integer.")
+    clonoset = clonoset_in.copy()
+    if clonoset.empty:
+        result = {"mean_cluster_size": np.nan}
+        result.update(diversity_metrics([]))
+        return result
+    clonoset["sample_id"] = "sample"
+    clusters = Clusters()
+    clusters.read_from_pooled_clonoset(clonoset, verbosity=False)
+    clusters.create_clusters(
+        overlap_type=overlap_type,
+        mismatches=mismatches,
+        cpu=1,
+        verbosity=False,
+    )
+    retained = clusters.filter(cluster_size >= min_cluster_size)
+    cluster_sizes = retained.custom_properties([cluster_size])[
+        "cluster_size"
+    ].to_numpy()
+
+    result = {
+        "mean_cluster_size": (
+            float(np.mean(cluster_sizes)) if len(cluster_sizes) else np.nan
+        )
+    }
+    result.update(diversity_metrics(cluster_sizes))
+    return result
+
+
 def calc_rarefaction_points(sample_df, cl_filter=None, iterations=3, seed=0,
                             drop_small_samples=False, cpu=None, verbose=True):
     """Calculate observed-diversity points for rarefaction curves.

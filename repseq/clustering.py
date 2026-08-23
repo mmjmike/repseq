@@ -1569,10 +1569,27 @@ class Clusters(list):
     def set_pooled(self, pooled: bool):
         self.is_pooled = pooled
 
+
+    @staticmethod
+    def _resolve_verbosity(verbose=True, verbosity=None):
+        if verbosity is not None:
+            if not isinstance(verbosity, (bool, np.bool_)):
+                raise TypeError("verbosity must be a boolean.")
+            return bool(verbosity)
+        if not isinstance(verbose, (bool, np.bool_)):
+            raise TypeError("verbose must be a boolean.")
+        return bool(verbose)
+
+
     def read_from_clonosets_df(
-        self, clonosets_df: "pd.DataFrame", cl_filter=Filter(), verbose=True
+        self,
+        clonosets_df: "pd.DataFrame",
+        cl_filter=Filter(),
+        verbose=True,
+        verbosity=None,
     ):
         """Read and pool clonotypes described by a sample/file dataframe."""
+        verbose = self._resolve_verbosity(verbose, verbosity)
         if not isinstance(clonosets_df, pd.DataFrame):
             raise TypeError("clonosets_df must be a pandas DataFrame.")
         required_columns = {"sample_id", "filename"}
@@ -1609,8 +1626,11 @@ class Clusters(list):
             )
 
 
-    def read_from_pooled_clonoset(self, pooled_clonoset: "pd.DataFrame"):
+    def read_from_pooled_clonoset(
+        self, pooled_clonoset: "pd.DataFrame", verbose=True, verbosity=None
+    ):
         """Read clonotypes from an already pooled dataframe."""
+        verbose = self._resolve_verbosity(verbose, verbosity)
         if not isinstance(pooled_clonoset, pd.DataFrame):
             raise TypeError("pooled_clonoset must be a pandas DataFrame.")
         compulsory_columns = [
@@ -1629,7 +1649,8 @@ class Clusters(list):
         if self.check_compulsory_columns(pooled_clonoset, compulsory_columns):
             self.clonotypes = pooled_clonoset.copy()
         else:
-            print("Trying to convert pooled clonoset...")
+            if verbose:
+                print("Trying to convert pooled clonoset...")
             pooled_df = Filter(
                 by_umi=True, convert=False, recount_fractions=False
             ).apply(pooled_clonoset)
@@ -1846,7 +1867,12 @@ class Clusters(list):
         for node_id, (_, row) in enumerate(clonoset.iterrows()):
             v = row["v"]
             if v not in TCRDIST_V_DIST:
-                print(f"Warning! {v} gene was not recognized in reference db no cdr seq could be inferred. The clone was skipped")
+                if verbose:
+                    print(
+                        f"Warning! {v} gene was not recognized in reference "
+                        "db; no CDR sequence could be inferred. The clone was "
+                        "skipped"
+                    )
                 continue
             j = row["j"]
             cdr3aa = row["cdr3aa"]
@@ -1941,7 +1967,8 @@ class Clusters(list):
                         mismatches=1,
                         tcrdist_radius=None,
                         cpu=None,
-                        verbose=True):
+                        verbose=True,
+                        verbosity=None):
         """
         Creates clusters of clonotypes using either mismatch-based or distance-based methods.
 
@@ -1958,6 +1985,7 @@ class Clusters(list):
         Returns:
             list: List of clusters (nx.Graph objects).
         """
+        verbose = self._resolve_verbosity(verbose, verbosity)
         self._require_clonotypes("create clusters")
         possible_overlap_types = ["aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ", "VJ", "VJlen"]
         compulsory_columns = ["freq", "count", "v", "j", "cdr3aa", "cdr3nt", "sample_id"]
@@ -1999,16 +2027,17 @@ class Clusters(list):
             self._cluster_cache_signature == cache_signature
             and self.state["clusters_created"]
         ):
-            summary = self._cluster_summary()
-            print(
-                "Clusters were already created from the same clonotypes with "
-                "the same parameters. "
-                f"Graph: {summary['total_nodes']} nodes and "
-                f"{summary['total_edges']} edges. "
-                f"{summary['multi_node_clusters']} clusters (2 or more nodes) "
-                f"and {summary['single_node_clusters']} single nodes. Total: "
-                f"{summary['total_clusters']}"
-            )
+            if verbose:
+                summary = self._cluster_summary()
+                print(
+                    "Clusters were already created from the same clonotypes with "
+                    "the same parameters. "
+                    f"Graph: {summary['total_nodes']} nodes and "
+                    f"{summary['total_edges']} edges. "
+                    f"{summary['multi_node_clusters']} clusters (2 or more nodes) "
+                    f"and {summary['single_node_clusters']} single nodes. Total: "
+                    f"{summary['total_clusters']}"
+                )
             return None
 
         if tcr_dist:

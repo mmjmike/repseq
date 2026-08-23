@@ -48,7 +48,10 @@ clusters.state_parameters
 ```
 
 The expected order is to read clonotypes, create clusters, and then optionally
-run ALICE. Metadata may be supplied any time after clonotypes are read; metadata
+run ALICE. Clonotype-reading methods and `create_clusters` accept
+`verbosity=False` to suppress progress messages; the older `verbose=False`
+keyword remains supported. Metadata may be supplied any time after clonotypes
+are read; metadata
 added before clustering is retained and applied when nodes are created. Methods
 that require clusters raise an actionable error if clustering has not yet been
 run.

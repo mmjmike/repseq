@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -613,4 +614,114 @@ def test_clonotypes_coverage_cl_rejects_negative_counts():
         stats.clonotypes_coverage_cl(
             clonoset,
             colnames={"count_column": "count"},
+        )
+
+
+def _cluster_properties_clonoset():
+    return pd.DataFrame(
+        {
+            "cdr3aa": ["CASS", "CATS", "CARS", "GGGG", "GGGA", "TTTT"],
+            "cdr3nt": ["AAA", "AAT", "AAC", "GGG", "GGA", "TTT"],
+            "v": ["V1", "V1", "V1", "V2", "V2", "V3"],
+            "j": ["J1", "J1", "J1", "J2", "J2", "J3"],
+            "count": [5, 4, 3, 2, 2, 1],
+            "freq": [5 / 17, 4 / 17, 3 / 17, 2 / 17, 2 / 17, 1 / 17],
+        }
+    )
+
+
+def test_calculate_cluster_properties_cl_filters_small_clusters(capsys):
+    result = stats.calculate_cluster_properties_cl(
+        _cluster_properties_clonoset(),
+        overlap_type="aaVJ",
+        mismatches=1,
+        min_cluster_size=2,
+    )
+
+    assert capsys.readouterr().out == ""
+    assert result["mean_cluster_size"] == pytest.approx(2.5)
+    assert result["diversity"] == 2
+    assert result["richness"] == 2
+    expected_normalized_shannon = -(
+        (3 / 5) * np.log(3 / 5) + (2 / 5) * np.log(2 / 5)
+    ) / np.log(2)
+    assert result["norm_shannon_wiener"] == pytest.approx(
+        expected_normalized_shannon
+    )
+
+
+def test_calculate_cluster_properties_cl_respects_minimum_size():
+    result = stats.calculate_cluster_properties_cl(
+        _cluster_properties_clonoset(),
+        min_cluster_size=3,
+    )
+
+    assert result["mean_cluster_size"] == 3
+    assert result["diversity"] == 1
+    assert result["norm_shannon_wiener"] == 0
+
+
+def test_cluster_properties_forwards_batch_parameters(monkeypatch):
+    captured = {}
+    expected = pd.DataFrame(
+        [{"sample_id": "sample_1", "mean_cluster_size": 2.5}]
+    )
+
+    def fake_generic_calculation(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return expected
+
+    monkeypatch.setattr(stats, "generic_calculation", fake_generic_calculation)
+    samples = pd.DataFrame(
+        [{"sample_id": "sample_1", "filename": "sample.tsv"}]
+    )
+    cl_filter = Filter(top=100)
+
+    result = stats.cluster_properties(
+        samples,
+        cl_filter=cl_filter,
+        overlap_type="aaV",
+        mismatches=2,
+        min_cluster_size=4,
+        cpu=3,
+        verbose=False,
+    )
+
+    assert result is expected
+    assert captured["args"][:2] == (
+        samples,
+        stats.calculate_cluster_properties_cl,
+    )
+    assert captured["kwargs"]["clonoset_filter"] is cl_filter
+    assert captured["kwargs"]["overlap_type"] == "aaV"
+    assert captured["kwargs"]["mismatches"] == 2
+    assert captured["kwargs"]["min_cluster_size"] == 4
+    assert captured["kwargs"]["cpu"] == 3
+    assert captured["kwargs"]["verbose"] is False
+
+
+def test_cluster_properties_validates_minimum_cluster_size():
+    samples = pd.DataFrame(
+        [{"sample_id": "sample_1", "filename": "sample.tsv"}]
+    )
+    with pytest.raises(ValueError, match="positive integer"):
+        stats.cluster_properties(samples, min_cluster_size=0)
+
+
+def test_calculate_cluster_properties_cl_handles_empty_input():
+    result = stats.calculate_cluster_properties_cl(
+        _cluster_properties_clonoset().iloc[0:0],
+        min_cluster_size=2,
+    )
+
+    assert np.isnan(result["mean_cluster_size"])
+    assert result["diversity"] == 0
+    assert np.isnan(result["norm_shannon_wiener"])
+
+
+def test_calculate_cluster_properties_cl_validates_minimum_size():
+    with pytest.raises(ValueError, match="positive integer"):
+        stats.calculate_cluster_properties_cl(
+            _cluster_properties_clonoset(), min_cluster_size=0
         )

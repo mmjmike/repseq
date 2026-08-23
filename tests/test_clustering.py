@@ -777,7 +777,7 @@ def test_create_clusters_tracks_parameters_and_reuses_identical_result(
 
     monkeypatch.setattr(clusters, "find_nodes_and_edges", fail_if_recalculated)
     result = clusters.create_clusters(
-        overlap_type="aaVJ", mismatches=1, cpu=1, verbose=False
+        overlap_type="aaVJ", mismatches=1, cpu=1, verbosity=True
     )
 
     assert result is None
@@ -1014,3 +1014,44 @@ def test_mutating_cluster_workflow_methods_do_not_return_self():
         overlap_type="aaVJ", mismatches=1, cpu=1, verbose=False
     ) is None
     assert clusters.filter(cluster_size >= 1, inplace=True) is None
+
+
+def test_verbosity_false_suppresses_read_and_cached_clustering_output(capsys):
+    clusters = Clusters()
+    clusters.read_from_pooled_clonoset(
+        _pooled_clonotypes_for_state_tests(), verbosity=False
+    )
+    clusters.create_clusters(
+        overlap_type="aaVJ",
+        mismatches=1,
+        cpu=1,
+        verbosity=False,
+    )
+    capsys.readouterr()
+
+    clusters.create_clusters(
+        overlap_type="aaVJ",
+        mismatches=1,
+        cpu=1,
+        verbosity=False,
+    )
+
+    assert capsys.readouterr().out == ""
+
+
+def test_verbosity_overrides_legacy_verbose_keyword(capsys):
+    clusters = Clusters()
+    clusters.read_from_pooled_clonoset(
+        _pooled_clonotypes_for_state_tests(),
+        verbose=True,
+        verbosity=False,
+    )
+    clusters.create_clusters(
+        overlap_type="aaVJ",
+        mismatches=1,
+        cpu=1,
+        verbose=True,
+        verbosity=False,
+    )
+
+    assert capsys.readouterr().out == ""

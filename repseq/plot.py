@@ -32,6 +32,12 @@ CDR3AA_STATS_PROPERTIES = [
     "cdr3_5_strength",
 ]
 
+CLUSTER_PROPERTIES = [
+    "mean_cluster_size",
+    "diversity",
+    "norm_shannon_wiener",
+]
+
 DIVERSITY_STATS_PROPERTIES = [
     "diversity",
     "norm_shannon_wiener",
@@ -4550,6 +4556,30 @@ def diversity_stats(
         stats_df,
         metadata=metadata,
         properties=DIVERSITY_STATS_PROPERTIES if properties is None else properties,
+        group=group,
+        split=split,
+        palette=palette,
+        height=height,
+        aspect=aspect,
+        zero_bottom=True,
+    )
+
+
+def cluster_properties(
+    stats_df,
+    metadata=None,
+    properties=None,
+    group=None,
+    split=None,
+    palette=None,
+    height=3.2,
+    aspect=1.2,
+):
+    """Plot per-sample cluster-size statistics."""
+    return plot_stats(
+        stats_df,
+        metadata=metadata,
+        properties=CLUSTER_PROPERTIES if properties is None else properties,
         group=group,
         split=split,
         palette=palette,

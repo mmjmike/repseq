@@ -281,6 +281,45 @@ Here `n_i` is a clonotype count, `p_i = n_i / N`, `N = sum(n_i)`,
 `f2` is the number of doubletons.
 
 
+## Cluster properties by sample
+
+`stats.cluster_properties` clusters every clonoset independently and summarizes
+the distribution of cluster sizes. The optional `cl_filter` is applied before
+clustering. `min_cluster_size` removes smaller clusters before calculating the
+mean and diversity metrics; its default value of 2 excludes single-node
+clusters.
+
+```py
+cluster_stats = stats.cluster_properties(
+    clonosets,
+    cl_filter=func_filter,
+    overlap_type="aaVJ",
+    mismatches=1,
+    min_cluster_size=2,
+)
+```
+
+The result contains `mean_cluster_size` and the same diversity columns returned
+by `stats.calc_diversity_stats`. Here the diversity input values are retained
+cluster sizes in nodes rather than clonotype counts. For example, clusters with
+3, 3, 2, and 2 nodes have `mean_cluster_size=2.5` and `diversity=4`. Samples
+without any cluster reaching `min_cluster_size` have a missing mean, zero
+diversity, and the standard empty-input diversity values.
+
+Plot the table with `rsplot.cluster_properties`. Its default panels are
+`mean_cluster_size`, `diversity`, and `norm_shannon_wiener`; metadata grouping,
+splitting, palettes, and custom `properties` use the standard statistics plot
+interface.
+
+```py
+rsplot.cluster_properties(cluster_stats)
+rsplot.cluster_properties(
+    cluster_stats,
+    metadata=metadata,
+    group="experimental_group",
+)
+```
+
 ## Rarefaction curves
 
 `stats.calc_rarefaction_points` calculates observed clonotype diversity after
