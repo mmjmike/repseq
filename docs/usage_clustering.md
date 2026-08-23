@@ -66,11 +66,13 @@ Use `Clusters.plot_cluster` to plot one cluster, a list of up to 50 cluster
 indices, or every cluster as facets. Pass `cluster_no=None` to select every
 cluster. This automatic mode defaults to `max_clusters=50`; if the object has
 more clusters, no figure is created until you either increase `max_clusters`
-or pass a smaller explicit selection. By default, node size uses the `count`
-property with `min_size + log2(count + 1) ** log_power`. Set `size` to another
-numeric node property, use `size=None` for uniform nodes, or set
-`log_scaled=False` for `min_size + value * linear_scale`. The default spring
-layout can be replaced with `kamada_kawai`, `circular`, `shell`, or `spectral`.
+or pass a smaller explicit selection. By default, node size uses linear `count`
+scaling with `min_size + linear_scale * count`, `min_size=50`, and
+`linear_scale=1`. Set `size` to another numeric node property, use `size=None`
+for uniform nodes, or set `log_scaled=True` for
+`min_size + linear_scale * log2(value + 1)`. The
+default spring layout can be replaced with `kamada_kawai`, `circular`, `shell`,
+or `spectral`.
 
 ```py
 fig = clusters.plot_cluster(0, label="seq_aa")
@@ -85,9 +87,9 @@ fig = clusters.plot_cluster(
     label="id",
     shape="group",
     size="count",
-    min_size=100,
-    log_scaled=True,
-    log_power=2,
+    min_size=50,
+    log_scaled=False,
+    linear_scale=1,
 )
 ```
 

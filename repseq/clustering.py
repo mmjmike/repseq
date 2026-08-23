@@ -1020,9 +1020,8 @@ class Clusters(list):
         figsize=None,
         seed=1,
         size="count",
-        min_size=100,
-        log_scaled=True,
-        log_power=2,
+        min_size=50,
+        log_scaled=False,
         linear_scale=1,
         max_clusters=50,
     ):
@@ -1030,8 +1029,8 @@ class Clusters(list):
 
         Node area is uniform when ``size=None``. Otherwise, ``size`` names a
         numeric :class:`Node` attribute or ``node.additional_properties`` value.
-        Log scaling uses ``min_size + log2(value + 1) ** log_power``; linear
-        scaling uses ``min_size + value * linear_scale``.
+        Log scaling uses ``min_size + linear_scale * log2(value + 1)``; linear
+        scaling uses ``min_size + linear_scale * value``.
 
         Args:
             cluster_no (int | list[int] | None): Cluster index, cluster indices,
@@ -1051,8 +1050,8 @@ class Clusters(list):
                 ``None`` for uniform node sizes.
             min_size (float): Minimum matplotlib node area.
             log_scaled (bool): Apply logarithmic scaling when ``True``.
-            log_power (float): Exponent applied to log2-transformed values.
-            linear_scale (float): Multiplier used for linear scaling.
+            linear_scale (float): Multiplier for linear or log2-transformed
+                values.
             max_clusters (int): Maximum number of clusters automatically plotted
                 when ``cluster_no=None``. Ignored for explicit cluster indices.
 
@@ -1118,7 +1117,7 @@ class Clusters(list):
             raise ValueError("palette requires a color property.")
         if ncols is not None and (not isinstance(ncols, int) or ncols < 1):
             raise ValueError("ncols must be a positive integer.")
-        if min_size < 0 or log_power < 0 or linear_scale < 0:
+        if min_size < 0 or linear_scale < 0:
             raise ValueError("Node size parameters must be non-negative.")
         if not isinstance(log_scaled, (bool, np.bool_)):
             raise TypeError("log_scaled must be a boolean.")
@@ -1181,10 +1180,10 @@ class Clusters(list):
                 )
             if log_scaled:
                 node_sizes[node] = (
-                    min_size + np.log2(size_value + 1) ** log_power
+                    min_size + linear_scale * np.log2(size_value + 1)
                 )
             else:
-                node_sizes[node] = min_size + size_value * linear_scale
+                node_sizes[node] = min_size + linear_scale * size_value
 
         facet_count = len(selected_clusters)
         if ncols is None:

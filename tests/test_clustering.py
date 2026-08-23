@@ -184,7 +184,8 @@ def test_plot_cluster_facets_style_nodes_and_add_legends():
         ncols=2,
         size="count",
         min_size=100,
-        log_power=2,
+        log_scaled=True,
+        linear_scale=10,
     )
 
     assert [axis.get_title() for axis in figure.axes] == ["Cluster 0", "Cluster 1"]
@@ -201,7 +202,7 @@ def test_plot_cluster_facets_style_nodes_and_add_legends():
             if isinstance(collection, PathCollection):
                 plotted_sizes.extend(collection.get_sizes())
     expected_sizes = [
-        100 + np.log2(count + 1) ** 2 for count in [3, 7, 5, 11]
+        100 + 10 * np.log2(count + 1) for count in [3, 7, 5, 11]
     ]
     np.testing.assert_allclose(sorted(plotted_sizes), sorted(expected_sizes))
     assert figure.number not in plt.get_fignums()
@@ -836,3 +837,23 @@ def test_alice_tracks_pgen_and_parameters(monkeypatch):
     )
     assert "Node Pgen: calculated" in str(clusters)
     assert "ALICE: calculated" in str(clusters)
+
+
+def test_plot_cluster_defaults_to_linear_count_sizes():
+    figure = _clusters_with_two_samples().plot_cluster(0)
+
+    np.testing.assert_allclose(
+        sorted(_plotted_node_sizes(figure)),
+        sorted([53, 57, 55]),
+    )
+
+
+def test_plot_cluster_log_scaling_supports_zero_values():
+    clusters = _clusters_with_two_samples()
+    next(iter(clusters[0])).count = 0
+
+    figure = clusters.plot_cluster(
+        0, log_scaled=True, min_size=50, linear_scale=10
+    )
+
+    assert min(_plotted_node_sizes(figure)) == 50
