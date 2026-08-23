@@ -4,6 +4,8 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
+import types
 import pandas as pd
 import pytest
 from matplotlib.collections import PathCollection
@@ -21,6 +23,7 @@ from repseq.clustering import (
     proportion,
     total_count,
 )
+from repseq.clone_filter import Filter
 
 
 def _clusters_with_two_samples():
@@ -142,16 +145,21 @@ def test_find_nodes_and_edges_groups_by_required_segments(
     assert len(edges) == expected_edges
 
 
-def test_clusters_str_reports_cluster_node_and_singleton_counts():
+def test_clusters_str_reports_state_graph_and_cluster_counts():
     clusters = _clusters_with_two_samples()
     clusters.clonotypes = clusters.clonosets_df
 
     summary = str(clusters)
 
+    assert "Completed: clonotypes read, clusters created" in summary
+    assert "Graph: 4 nodes and 2 edges" in summary
     assert (
-        "Clusters from 3 samples with 2 clusters and 4 nodes, "
-        "of which 1 is a single node."
-    ) in summary
+        "Clusters: 1 cluster (2 or more nodes) and 1 single node. Total: 2"
+        in summary
+    )
+    assert "Metadata: not added" in summary
+    assert "Node Pgen: not calculated" in summary
+    assert "ALICE: not calculated" in summary
 
 
 def test_plot_cluster_facets_style_nodes_and_add_legends():
@@ -631,3 +639,200 @@ def test_plot_logo_supports_dna_sequences(monkeypatch):
         "seq_type": "dna",
         "plot": True,
     }
+
+
+def _pooled_clonotypes_for_state_tests():
+    return pd.DataFrame(
+        {
+            "cdr3aa": ["CASS", "CATS"],
+            "cdr3nt": ["TGTGCT", "TGTGCC"],
+            "v": ["TRBV1", "TRBV1"],
+            "j": ["TRBJ1", "TRBJ1"],
+            "sample_id": ["sample_1", "sample_2"],
+            "freq": [0.4, 0.6],
+            "count": [4, 6],
+        }
+    )
+
+
+def test_empty_state_and_prerequisite_messages():
+    clusters = Clusters()
+
+    summary = str(clusters)
+
+    assert "State: empty" in summary
+    assert "Clonotypes: not read" in summary
+    assert "Clusters: not created" in summary
+    with pytest.raises(RuntimeError, match="clonotypes have not been read"):
+        clusters.create_clusters(verbose=False)
+    with pytest.raises(RuntimeError, match="clonotypes have not been read"):
+        clusters.add_metadata(pd.DataFrame({"sample_id": ["sample_1"]}))
+    with pytest.raises(RuntimeError, match="clusters have not been created"):
+        clusters.plot_cluster(0)
+    with pytest.raises(RuntimeError, match="clusters have not been created"):
+        clusters.as_dataframe()
+    with pytest.raises(RuntimeError, match="clusters have not been created"):
+        clusters.filter(cluster_size >= 1)
+    with pytest.raises(RuntimeError, match="clusters have not been created"):
+        clusters.save_to_cytoscape("unused")
+    with pytest.raises(RuntimeError, match="clusters have not been created"):
+        _ = clusters.properties
+    with pytest.raises(RuntimeError, match="clusters have not been created"):
+        clusters.alice(overlap_type="aaVJ", mismatches=1)
+
+
+def test_pooled_read_tracks_source_counts_and_state():
+    clusters = Clusters().read_from_pooled_clonoset(
+        _pooled_clonotypes_for_state_tests()
+    )
+
+    assert clusters.state["clonotypes_read"]
+    assert not clusters.state["clusters_created"]
+    assert clusters.state_parameters["clonotypes_read"] == {
+        "source": "pooled_clonoset",
+        "clonotypes": 2,
+        "samples": 2,
+        "converted": False,
+    }
+    summary = str(clusters)
+    assert "source: pooled_clonoset" in summary
+    assert "clonotypes: 2" in summary
+    assert "samples: 2" in summary
+
+
+def test_clonosets_df_read_tracks_filter_parameters(monkeypatch):
+    source = _pooled_clonotypes_for_state_tests().drop(columns="sample_id")
+    monkeypatch.setattr(
+        clustering_module, "read_clonoset", lambda filename: source.copy()
+    )
+    clonosets_df = pd.DataFrame(
+        {"sample_id": ["sample_1"], "filename": ["sample.tsv"]}
+    )
+    cl_filter = Filter(count_threshold=2)
+    clusters = Clusters().read_from_clonosets_df(
+        clonosets_df, cl_filter=cl_filter, verbose=False
+    )
+
+    parameters = clusters.state_parameters["clonotypes_read"]
+    assert parameters["source"] == "clonosets_df"
+    assert parameters["input_samples"] == 1
+    assert parameters["filter"]["count_threshold"] == 2
+    assert "count_threshold: 2" in str(clusters)
+
+
+def test_metadata_can_be_added_before_clustering_and_is_applied_later():
+    clusters = Clusters().read_from_pooled_clonoset(
+        _pooled_clonotypes_for_state_tests()
+    )
+    clusters.add_metadata(
+        pd.DataFrame(
+            {
+                "sample_id": ["sample_1", "sample_2"],
+                "group": ["control", "case"],
+                "timepoint": [0, 1],
+            }
+        )
+    )
+
+    assert clusters.state["metadata_added"]
+    assert clusters.state_parameters["metadata_added"]["columns"] == [
+        "group",
+        "timepoint",
+    ]
+    clusters.create_clusters(
+        overlap_type="aaVJ", mismatches=1, cpu=1, verbose=False
+    )
+
+    groups = {
+        node.sample_id: node.additional_properties["group"]
+        for cluster in clusters
+        for node in cluster
+    }
+    assert groups == {"sample_1": "control", "sample_2": "case"}
+    assert "Metadata columns: group, timepoint" in str(clusters)
+
+
+def test_create_clusters_tracks_parameters_and_reuses_identical_result(
+    monkeypatch, capsys
+):
+    clusters = Clusters().read_from_pooled_clonoset(
+        _pooled_clonotypes_for_state_tests()
+    )
+    clusters.create_clusters(
+        overlap_type="aaVJ", mismatches=1, cpu=1, verbose=False
+    )
+    original_clusters = clusters.clusters
+
+    def fail_if_recalculated(*args, **kwargs):
+        raise AssertionError("clustering was recalculated")
+
+    monkeypatch.setattr(clusters, "find_nodes_and_edges", fail_if_recalculated)
+    result = clusters.create_clusters(
+        overlap_type="aaVJ", mismatches=1, cpu=1, verbose=False
+    )
+
+    assert result is clusters
+    assert clusters.clusters is original_clusters
+    assert clusters.state_parameters["clusters_created"] == {
+        "method": "mismatches",
+        "overlap_type": "aaVJ",
+        "mismatches": 1,
+    }
+    output = capsys.readouterr().out
+    assert "already created from the same clonotypes" in output
+
+
+def test_properties_are_cached_and_return_defensive_copies(monkeypatch):
+    clusters = _clusters_with_two_samples()
+    original_eccentricity = clustering_module.nx.eccentricity
+    calls = []
+
+    def counted_eccentricity(cluster):
+        calls.append(cluster)
+        return original_eccentricity(cluster)
+
+    monkeypatch.setattr(
+        clustering_module.nx, "eccentricity", counted_eccentricity
+    )
+    first = clusters.properties
+    second = clusters.properties
+    first.loc[0, "total_count"] = -1
+    third = clusters.properties
+
+    assert len(calls) == 2
+    assert second["total_count"].tolist() == [15, 11]
+    assert third["total_count"].tolist() == [15, 11]
+
+
+def test_alice_tracks_pgen_and_parameters(monkeypatch):
+    clusters = _clusters_with_two_samples()
+    fake_module = types.ModuleType("repseq.pgen_calculation")
+
+    def fake_calculate_clonotypes_pgen(clonosets_df, **kwargs):
+        result = clonosets_df.copy()
+        result["pgen"] = 0.001
+        result["alice_neighbour_count"] = 0
+        result["n_neighbours"] = 0
+        return result
+
+    fake_module.calculate_clonotypes_pgen = fake_calculate_clonotypes_pgen
+    monkeypatch.setitem(
+        sys.modules, "repseq.pgen_calculation", fake_module
+    )
+
+    clusters.alice(
+        overlap_type="aaVJ",
+        mismatches=1,
+        generation_model="test_model",
+        Q=1,
+        alpha=0.05,
+    )
+
+    assert clusters.state["node_pgen_calculated"]
+    assert clusters.state["alice_calculated"]
+    assert (
+        clusters.state_parameters["alice_calculated"]["generation_model"]
+        == "test_model"
+    )
+    assert "Node Pgen: calculated" in str(clusters)
+    assert "ALICE: calculated" in str(clusters)

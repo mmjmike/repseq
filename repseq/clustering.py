@@ -13,6 +13,7 @@ from networkx.algorithms import community
 from scipy.sparse import csr_matrix
 import os
 import json
+import copy
 import functools
 import math
 import operator
@@ -466,6 +467,25 @@ class Clusters(list):
         self.cluster_communities_louvain = None
         self.alice_results = None
         self.tcrdist_radius = None
+        self.state = {
+            "empty": True,
+            "clonotypes_read": False,
+            "clusters_created": False,
+            "metadata_added": False,
+            "node_pgen_calculated": False,
+            "alice_calculated": False,
+        }
+        self.state_parameters = {
+            "clonotypes_read": None,
+            "clusters_created": None,
+            "metadata_added": {"columns": []},
+            "node_pgen_calculated": None,
+            "alice_calculated": None,
+        }
+        self._metadata_frames = []
+        self._clonotypes_revision = 0
+        self._cluster_cache_signature = None
+        self._properties_cache = None
         self.TCRDIST_BLOSUM = {('A', 'A'): 0,  ('A', 'C'): 4,  ('A', 'D'): 4,  ('A', 'E'): 4,  ('A', 'F'): 4,  ('A', 'G'): 4,  ('A', 'H'): 4,  ('A', 'I'): 4,  ('A', 'K'): 4,  ('A', 'L'): 4,  ('A', 'M'): 4,  ('A', 'N'): 4,  ('A', 'P'): 4,  ('A', 'Q'): 4,  ('A', 'R'): 4,  ('A', 'S'): 3,  ('A', 'T'): 4,  ('A', 'V'): 4,  ('A', 'W'): 4,  ('A', 'Y'): 4,  ('C', 'A'): 4,  ('C', 'C'): 0,  ('C', 'D'): 4,  ('C', 'E'): 4,  ('C', 'F'): 4,  ('C', 'G'): 4,  ('C', 'H'): 4,  ('C', 'I'): 4,  ('C', 'K'): 4,  ('C', 'L'): 4,  ('C', 'M'): 4,  ('C', 'N'): 4,  ('C', 'P'): 4,  ('C', 'Q'): 4,  ('C', 'R'): 4,  ('C', 'S'): 4,  ('C', 'T'): 4,  ('C', 'V'): 4,  ('C', 'W'): 4,  ('C', 'Y'): 4,  ('D', 'A'): 4,  ('D', 'C'): 4,  ('D', 'D'): 0,  ('D', 'E'): 2,  ('D', 'F'): 4,  ('D', 'G'): 4,  ('D', 'H'): 4,  ('D', 'I'): 4,  ('D', 'K'): 4,  ('D', 'L'): 4,  ('D', 'M'): 4,  ('D', 'N'): 3,  ('D', 'P'): 4,  ('D', 'Q'): 4,  ('D', 'R'): 4,  ('D', 'S'): 4,  ('D', 'T'): 4,  ('D', 'V'): 4,  ('D', 'W'): 4,  ('D', 'Y'): 4,  ('E', 'A'): 4,  ('E', 'C'): 4,  ('E', 'D'): 2,  ('E', 'E'): 0,  ('E', 'F'): 4,  ('E', 'G'): 4,  ('E', 'H'): 4,  ('E', 'I'): 4,  ('E', 'K'): 3,  ('E', 'L'): 4,  ('E', 'M'): 4,  ('E', 'N'): 4,  ('E', 'P'): 4,  ('E', 'Q'): 2,  ('E', 'R'): 4,  ('E', 'S'): 4,  ('E', 'T'): 4,  ('E', 'V'): 4,  ('E', 'W'): 4,  ('E', 'Y'): 4,  ('F', 'A'): 4,  ('F', 'C'): 4,  ('F', 'D'): 4,  ('F', 'E'): 4,  ('F', 'F'): 0,  ('F', 'G'): 4,  ('F', 'H'): 4,  ('F', 'I'): 4,  ('F', 'K'): 4,  ('F', 'L'): 4,  ('F', 'M'): 4,  ('F', 'N'): 4,  ('F', 'P'): 4,  ('F', 'Q'): 4,  ('F', 'R'): 4,  ('F', 'S'): 4,  ('F', 'T'): 4,  ('F', 'V'): 4,  ('F', 'W'): 3,  ('F', 'Y'): 1,  ('G', 'A'): 4,  ('G', 'C'): 4,  ('G', 'D'): 4,  ('G', 'E'): 4,  ('G', 'F'): 4,  ('G', 'G'): 0,  ('G', 'H'): 4,  ('G', 'I'): 4,  ('G', 'K'): 4,  ('G', 'L'): 4,  ('G', 'M'): 4,  ('G', 'N'): 4,  ('G', 'P'): 4,  ('G', 'Q'): 4,  ('G', 'R'): 4,  ('G', 'S'): 4,  ('G', 'T'): 4,  ('G', 'V'): 4,  ('G', 'W'): 4,  ('G', 'Y'): 4,  ('H', 'A'): 4,  ('H', 'C'): 4,  ('H', 'D'): 4,  ('H', 'E'): 4,  ('H', 'F'): 4,  ('H', 'G'): 4,  ('H', 'H'): 0,  ('H', 'I'): 4,  ('H', 'K'): 4,  ('H', 'L'): 4,  ('H', 'M'): 4,  ('H', 'N'): 3,  ('H', 'P'): 4,  ('H', 'Q'): 4,  ('H', 'R'): 4,  ('H', 'S'): 4,  ('H', 'T'): 4,  ('H', 'V'): 4,  ('H', 'W'): 4,  ('H', 'Y'): 2,  ('I', 'A'): 4,  ('I', 'C'): 4,  ('I', 'D'): 4,  ('I', 'E'): 4,  ('I', 'F'): 4,  ('I', 'G'): 4,  ('I', 'H'): 4,  ('I', 'I'): 0,  ('I', 'K'): 4,  ('I', 'L'): 2,  ('I', 'M'): 3,  ('I', 'N'): 4,  ('I', 'P'): 4,  ('I', 'Q'): 4,  ('I', 'R'): 4,  ('I', 'S'): 4,  ('I', 'T'): 4,  ('I', 'V'): 1,  ('I', 'W'): 4,  ('I', 'Y'): 4,  ('K', 'A'): 4,  ('K', 'C'): 4,  ('K', 'D'): 4,  ('K', 'E'): 3,  ('K', 'F'): 4,  ('K', 'G'): 4,  ('K', 'H'): 4,  ('K', 'I'): 4,  ('K', 'K'): 0,  ('K', 'L'): 4,  ('K', 'M'): 4,  ('K', 'N'): 4,  ('K', 'P'): 4,  ('K', 'Q'): 3,  ('K', 'R'): 2,  ('K', 'S'): 4,  ('K', 'T'): 4,  ('K', 'V'): 4,  ('K', 'W'): 4,  ('K', 'Y'): 4,  ('L', 'A'): 4,  ('L', 'C'): 4,  ('L', 'D'): 4,  ('L', 'E'): 4,  ('L', 'F'): 4,  ('L', 'G'): 4,  ('L', 'H'): 4,  ('L', 'I'): 2,  ('L', 'K'): 4,  ('L', 'L'): 0,  ('L', 'M'): 2,  ('L', 'N'): 4,  ('L', 'P'): 4,  ('L', 'Q'): 4,  ('L', 'R'): 4,  ('L', 'S'): 4,  ('L', 'T'): 4,  ('L', 'V'): 3,  ('L', 'W'): 4,  ('L', 'Y'): 4,  ('M', 'A'): 4,  ('M', 'C'): 4,  ('M', 'D'): 4,  ('M', 'E'): 4,  ('M', 'F'): 4,  ('M', 'G'): 4,  ('M', 'H'): 4,  ('M', 'I'): 3,  ('M', 'K'): 4,  ('M', 'L'): 2,  ('M', 'M'): 0,  ('M', 'N'): 4,  ('M', 'P'): 4,  ('M', 'Q'): 4,  ('M', 'R'): 4,  ('M', 'S'): 4,  ('M', 'T'): 4,  ('M', 'V'): 3,  ('M', 'W'): 4,  ('M', 'Y'): 4,  ('N', 'A'): 4,  ('N', 'C'): 4,  ('N', 'D'): 3,  ('N', 'E'): 4,  ('N', 'F'): 4,  ('N', 'G'): 4,  ('N', 'H'): 3,  ('N', 'I'): 4,  ('N', 'K'): 4,  ('N', 'L'): 4,  ('N', 'M'): 4,  ('N', 'N'): 0,  ('N', 'P'): 4,  ('N', 'Q'): 4,  ('N', 'R'): 4,  ('N', 'S'): 3,  ('N', 'T'): 4,  ('N', 'V'): 4,  ('N', 'W'): 4,  ('N', 'Y'): 4,  ('P', 'A'): 4,  ('P', 'C'): 4,  ('P', 'D'): 4,  ('P', 'E'): 4,  ('P', 'F'): 4,  ('P', 'G'): 4,  ('P', 'H'): 4,  ('P', 'I'): 4,  ('P', 'K'): 4,  ('P', 'L'): 4,  ('P', 'M'): 4,  ('P', 'N'): 4,  ('P', 'P'): 0,  ('P', 'Q'): 4,  ('P', 'R'): 4,  ('P', 'S'): 4,  ('P', 'T'): 4,  ('P', 'V'): 4,  ('P', 'W'): 4,  ('P', 'Y'): 4,  ('Q', 'A'): 4,  ('Q', 'C'): 4,  ('Q', 'D'): 4,  ('Q', 'E'): 2,  ('Q', 'F'): 4,  ('Q', 'G'): 4,  ('Q', 'H'): 4,  ('Q', 'I'): 4,  ('Q', 'K'): 3,  ('Q', 'L'): 4,  ('Q', 'M'): 4,  ('Q', 'N'): 4,  ('Q', 'P'): 4,  ('Q', 'Q'): 0,  ('Q', 'R'): 3,  ('Q', 'S'): 4,  ('Q', 'T'): 4,  ('Q', 'V'): 4,  ('Q', 'W'): 4,  ('Q', 'Y'): 4,  ('R', 'A'): 4,  ('R', 'C'): 4,  ('R', 'D'): 4,  ('R', 'E'): 4,  ('R', 'F'): 4,  ('R', 'G'): 4,  ('R', 'H'): 4,  ('R', 'I'): 4,  ('R', 'K'): 2,  ('R', 'L'): 4,  ('R', 'M'): 4,  ('R', 'N'): 4,  ('R', 'P'): 4,  ('R', 'Q'): 3,  ('R', 'R'): 0,  ('R', 'S'): 4,  ('R', 'T'): 4,  ('R', 'V'): 4,  ('R', 'W'): 4,  ('R', 'Y'): 4,  ('S', 'A'): 3,  ('S', 'C'): 4,  ('S', 'D'): 4,  ('S', 'E'): 4,  ('S', 'F'): 4,  ('S', 'G'): 4,  ('S', 'H'): 4,  ('S', 'I'): 4,  ('S', 'K'): 4,  ('S', 'L'): 4,  ('S', 'M'): 4,  ('S', 'N'): 3,  ('S', 'P'): 4,  ('S', 'Q'): 4,  ('S', 'R'): 4,  ('S', 'S'): 0,  ('S', 'T'): 3,  ('S', 'V'): 4,  ('S', 'W'): 4,  ('S', 'Y'): 4,  ('T', 'A'): 4,  ('T', 'C'): 4,  ('T', 'D'): 4,  ('T', 'E'): 4,  ('T', 'F'): 4,  ('T', 'G'): 4,  ('T', 'H'): 4,  ('T', 'I'): 4,  ('T', 'K'): 4,  ('T', 'L'): 4,  ('T', 'M'): 4,  ('T', 'N'): 4,  ('T', 'P'): 4,  ('T', 'Q'): 4,  ('T', 'R'): 4,  ('T', 'S'): 3,  ('T', 'T'): 0,  ('T', 'V'): 4,  ('T', 'W'): 4,  ('T', 'Y'): 4,  ('V', 'A'): 4,  ('V', 'C'): 4,  ('V', 'D'): 4,  ('V', 'E'): 4,  ('V', 'F'): 4,  ('V', 'G'): 4,  ('V', 'H'): 4,  ('V', 'I'): 1,  ('V', 'K'): 4,  ('V', 'L'): 3,  ('V', 'M'): 3,  ('V', 'N'): 4,  ('V', 'P'): 4,  ('V', 'Q'): 4,  ('V', 'R'): 4,  ('V', 'S'): 4,  ('V', 'T'): 4,  ('V', 'V'): 0,  ('V', 'W'): 4,  ('V', 'Y'): 4,  ('W', 'A'): 4,  ('W', 'C'): 4,  ('W', 'D'): 4,  ('W', 'E'): 4,  ('W', 'F'): 3,  ('W', 'G'): 4,  ('W', 'H'): 4,  ('W', 'I'): 4,  ('W', 'K'): 4,  ('W', 'L'): 4,  ('W', 'M'): 4,  ('W', 'N'): 4,  ('W', 'P'): 4,  ('W', 'Q'): 4,  ('W', 'R'): 4,  ('W', 'S'): 4,  ('W', 'T'): 4,  ('W', 'V'): 4,  ('W', 'W'): 0,  ('W', 'Y'): 2,  ('Y', 'A'): 4,  ('Y', 'C'): 4,  ('Y', 'D'): 4,  ('Y', 'E'): 4,  ('Y', 'F'): 1,  ('Y', 'G'): 4,  ('Y', 'H'): 2,  ('Y', 'I'): 4,  ('Y', 'K'): 4,  ('Y', 'L'): 4,  ('Y', 'M'): 4,  ('Y', 'N'): 4,  ('Y', 'P'): 4,  ('Y', 'Q'): 4,  ('Y', 'R'): 4,  ('Y', 'S'): 4,  ('Y', 'T'): 4,  ('Y', 'V'): 4,  ('Y', 'W'): 2,  ('Y', 'Y'): 0}
         self.TCRDIST_CDR3_N_CUT = 3
         self.TCRDIST_CDR3_C_CUT = 2
@@ -481,26 +501,248 @@ class Clusters(list):
     def __iter__(self):
        return iter(self.clusters)
 
-    def __str__(self):
+    def _sync_inferred_state(self):
+        if self.clonotypes is not None:
+            self.state["empty"] = False
+            self.state["clonotypes_read"] = True
+        if self.clusters:
+            self.state["empty"] = False
+            self.state["clusters_created"] = True
+        if self.alice_results is not None:
+            self.state["node_pgen_calculated"] = True
+            self.state["alice_calculated"] = True
+
+
+    def _has_clonotypes(self):
+        self._sync_inferred_state()
+        return self.state["clonotypes_read"]
+
+
+    def _has_clusters(self):
+        self._sync_inferred_state()
+        return self.state["clusters_created"]
+
+
+    def _require_clonotypes(self, action):
+        if not self._has_clonotypes():
+            raise RuntimeError(
+                f"Cannot {action}: clonotypes have not been read. Run "
+                "read_from_pooled_clonoset(...) or "
+                "read_from_clonosets_df(...) first."
+            )
+
+
+    def _require_clusters(self, action):
+        if not self._has_clusters():
+            raise RuntimeError(
+                f"Cannot {action}: clusters have not been created. Read "
+                "clonotypes and run create_clusters(...) first."
+            )
+
+
+    def _require_alice(self, action):
+        if not self.state["alice_calculated"] and self.alice_results is None:
+            raise RuntimeError(
+                f"Cannot {action}: ALICE has not been calculated. Run "
+                "alice(...) after creating clusters first."
+            )
+
+
+    def _invalidate_properties_cache(self):
+        self._properties_cache = None
+
+
+    def _invalidate_cluster_dependent_analysis(self):
+        self.cluster_communities_louvain = None
+        self.alice_results = None
+        self.state["node_pgen_calculated"] = False
+        self.state["alice_calculated"] = False
+        self.state_parameters["node_pgen_calculated"] = None
+        self.state_parameters["alice_calculated"] = None
+
+
+    @staticmethod
+    def _filter_parameters(cl_filter):
+        return {
+            name: value
+            for name, value in vars(cl_filter).items()
+            if not name.startswith("_")
+        }
+
+
+    def _reset_after_clonotype_read(self):
+        self.clusters = []
+        self.cluster_communities_louvain = None
+        self.alice_results = None
+        self._metadata_frames = []
+        self._cluster_cache_signature = None
+        self._invalidate_properties_cache()
+        self.state.update(
+            {
+                "empty": False,
+                "clonotypes_read": True,
+                "clusters_created": False,
+                "metadata_added": False,
+                "node_pgen_calculated": False,
+                "alice_calculated": False,
+            }
+        )
+        self.state_parameters.update(
+            {
+                "clusters_created": None,
+                "metadata_added": {"columns": []},
+                "node_pgen_calculated": None,
+                "alice_calculated": None,
+            }
+        )
+        self._clonotypes_revision += 1
+
+
+    def _mark_clonotypes_read(self, source, extra_parameters=None):
+        self._reset_after_clonotype_read()
+        sample_count = (
+            self.clonotypes["sample_id"].nunique()
+            if "sample_id" in self.clonotypes.columns
+            else None
+        )
+        parameters = {
+            "source": source,
+            "clonotypes": len(self.clonotypes),
+            "samples": sample_count,
+        }
+        if extra_parameters:
+            parameters.update(extra_parameters)
+        self.state_parameters["clonotypes_read"] = parameters
+
+
+    @staticmethod
+    def _metadata_columns(metadata):
+        return [column for column in metadata.columns if column != "sample_id"]
+
+
+    @staticmethod
+    def _apply_metadata_to_clusters(clusters, metadata):
+        metadata_dict = metadata.set_index("sample_id").to_dict("index")
+        for cluster in clusters:
+            for node in cluster:
+                node.add_properties(metadata_dict)
+
+
+    def _apply_stored_metadata(self):
+        for metadata in self._metadata_frames:
+            self._apply_metadata_to_clusters(self.clusters, metadata)
+
+
+    def _cluster_summary(self):
         total_clusters = len(self.clusters)
+        multi_node_clusters = sum(len(cluster) > 1 for cluster in self.clusters)
+        single_node_clusters = total_clusters - multi_node_clusters
         total_nodes = sum(len(cluster) for cluster in self.clusters)
-        multi_node_clusters = len(self.filter_one_node_clusters(inplace=False))
-        single_nodes = total_clusters - multi_node_clusters
-        possible_params = ['cl_filter', 'is_pooled', 'overlap_type','mismatches', 'tcrdist_radius']
-        params_used = {param: getattr(self, param, None)
-                        for param in possible_params
-                        if getattr(self, param, None) is not None}
-        params_used = ''.join(f'{k}: {v}\n' for k, v in params_used.items())
-        n_samples = len(self.clonotypes['sample_id'].unique()) if self.clonotypes is not None else 0
-        sample_word = 'samples' if n_samples != 1 else 'sample'
-        cluster_word = 'clusters' if total_clusters != 1 else 'cluster'
-        node_word = 'nodes' if total_nodes != 1 else 'node'
-        if single_nodes == 1:
-            single_nodes_summary = '1 is a single node'
+        total_edges = sum(cluster.number_of_edges() for cluster in self.clusters)
+        return {
+            "total_clusters": total_clusters,
+            "multi_node_clusters": multi_node_clusters,
+            "single_node_clusters": single_node_clusters,
+            "total_nodes": total_nodes,
+            "total_edges": total_edges,
+        }
+
+
+    @staticmethod
+    def _format_state_parameters(parameters, indent="    "):
+        if not parameters:
+            return []
+        lines = []
+        for name, value in parameters.items():
+            if isinstance(value, dict):
+                lines.append(f"{indent}{name}:")
+                lines.extend(
+                    Clusters._format_state_parameters(value, indent=indent + "  ")
+                )
+            else:
+                lines.append(f"{indent}{name}: {value}")
+        return lines
+
+
+    def __str__(self):
+        self._sync_inferred_state()
+        lines = ["Clusters state:"]
+        if self.state["empty"]:
+            lines.append("  State: empty")
         else:
-            single_nodes_summary = f'{single_nodes} are single nodes'
-        return f'Clusters from {n_samples} {sample_word} with {total_clusters} {cluster_word} and {total_nodes} {node_word}, of which {single_nodes_summary}.\nParameters:\n{params_used}'
-    
+            completed = [
+                label
+                for flag, label in (
+                    ("clonotypes_read", "clonotypes read"),
+                    ("clusters_created", "clusters created"),
+                    ("metadata_added", "metadata added"),
+                    ("node_pgen_calculated", "node Pgen calculated"),
+                    ("alice_calculated", "ALICE calculated"),
+                )
+                if self.state[flag]
+            ]
+            lines.append(f"  Completed: {', '.join(completed)}")
+
+        read_parameters = self.state_parameters.get("clonotypes_read")
+        if self.state["clonotypes_read"]:
+            lines.append("Clonotypes:")
+            lines.extend(self._format_state_parameters(read_parameters))
+        else:
+            lines.append("Clonotypes: not read")
+
+        if self.state["clusters_created"]:
+            summary = self._cluster_summary()
+            lines.append(
+                f"Graph: {summary['total_nodes']} nodes and "
+                f"{summary['total_edges']} edges"
+            )
+            cluster_word = (
+                "cluster" if summary["multi_node_clusters"] == 1 else "clusters"
+            )
+            single_node_word = (
+                "single node"
+                if summary["single_node_clusters"] == 1
+                else "single nodes"
+            )
+            lines.append(
+                f"Clusters: {summary['multi_node_clusters']} {cluster_word} "
+                f"(2 or more nodes) and {summary['single_node_clusters']} "
+                f"{single_node_word}. Total: {summary['total_clusters']}"
+            )
+            lines.append("Clustering parameters:")
+            lines.extend(
+                self._format_state_parameters(
+                    self.state_parameters.get("clusters_created")
+                )
+            )
+        else:
+            lines.append("Clusters: not created")
+
+        metadata_columns = self.state_parameters["metadata_added"]["columns"]
+        lines.append(
+            "Metadata columns: " + ", ".join(metadata_columns)
+            if metadata_columns
+            else "Metadata: not added"
+        )
+        lines.append(
+            "Node Pgen: calculated"
+            if self.state["node_pgen_calculated"]
+            else "Node Pgen: not calculated"
+        )
+        lines.append(
+            "ALICE: calculated"
+            if self.state["alice_calculated"]
+            else "ALICE: not calculated"
+        )
+        if self.state["alice_calculated"]:
+            lines.append("ALICE parameters:")
+            lines.extend(
+                self._format_state_parameters(
+                    self.state_parameters.get("alice_calculated")
+                )
+            )
+        return "\n".join(lines)
+
 
     def __repr__(self):
         return self.__str__()
@@ -515,15 +757,22 @@ class Clusters(list):
 
 
     def add_metadata(self, metadata):
-        columns = metadata.columns
-        if "sample_id" not in columns:
-            print("Error: 'sample_id' column is compulsory, but is not present in given metadata")
-            return 
-        metadata = metadata.set_index("sample_id")
-        metadata_dict = metadata.to_dict("index")
-        for cluster in self.clusters:
-            for node in cluster:
-                node.add_properties(metadata_dict)
+        self._require_clonotypes("add metadata")
+        if not isinstance(metadata, pd.DataFrame):
+            raise TypeError("metadata must be a pandas DataFrame.")
+        if "sample_id" not in metadata.columns:
+            raise ValueError("metadata must contain a 'sample_id' column.")
+        metadata = metadata.copy()
+        self._metadata_frames.append(metadata)
+        if self._has_clusters():
+            self._apply_metadata_to_clusters(self.clusters, metadata)
+        columns = self.state_parameters["metadata_added"]["columns"]
+        for column in self._metadata_columns(metadata):
+            if column not in columns:
+                columns.append(column)
+        self.state["metadata_added"] = True
+        self.state["empty"] = False
+        return self
 
 
     @staticmethod
@@ -542,9 +791,22 @@ class Clusters(list):
     def _copy_with_clusters(self, selected_clusters):
         result = Clusters()
         for attribute_name, value in self.__dict__.items():
-            if attribute_name != "clusters":
+            if attribute_name not in {
+                "clusters",
+                "state",
+                "state_parameters",
+                "_properties_cache",
+                "_cluster_cache_signature",
+            }:
                 setattr(result, attribute_name, value)
         result.clusters = list(selected_clusters)
+        result.state = copy.deepcopy(self.state)
+        result.state_parameters = copy.deepcopy(self.state_parameters)
+        result.state["clusters_created"] = True
+        result.state["empty"] = False
+        result._properties_cache = None
+        result._cluster_cache_signature = None
+        result._invalidate_cluster_dependent_analysis()
         return result
 
 
@@ -561,6 +823,7 @@ class Clusters(list):
             Clusters: Filtered collection. Original cluster identifiers are
             preserved.
         """
+        self._require_clusters("filter clusters")
         if not isinstance(condition, ClusterExpression) or not condition.is_boolean:
             raise TypeError("condition must be a boolean cluster expression.")
         if not isinstance(inplace, (bool, np.bool_)):
@@ -570,6 +833,9 @@ class Clusters(list):
         ]
         if inplace:
             self.clusters = selected_clusters
+            self._cluster_cache_signature = None
+            self._invalidate_properties_cache()
+            self._invalidate_cluster_dependent_analysis()
             return self
         return self._copy_with_clusters(selected_clusters)
 
@@ -581,6 +847,7 @@ class Clusters(list):
         requested expression columns. Use ``expression.alias(name)`` to set a
         custom output column name.
         """
+        self._require_clusters("calculate custom cluster properties")
         if isinstance(expressions, ClusterExpression):
             expressions = [expressions]
         else:
@@ -712,6 +979,7 @@ class Clusters(list):
         Returns:
             Result returned by ``get_logo_for_list_of_clonotypes``.
         """
+        self._require_clusters("plot a cluster logo")
         if (
             not isinstance(cluster_no, (int, np.integer))
             or isinstance(cluster_no, bool)
@@ -791,6 +1059,7 @@ class Clusters(list):
         Returns:
             matplotlib.figure.Figure: The generated figure.
         """
+        self._require_clusters("plot clusters")
         plot_all_clusters = cluster_no is None
         if plot_all_clusters:
             if (
@@ -1037,38 +1306,64 @@ class Clusters(list):
         return figure
 
 
-    # ! functools - cache
-    # ! @functools.lru_cache(maxsize=50) doesn't work - it requires hashable input
-    # ! total count for each cluster
     @property
-    def properties(self, weigh_by=None):
-        properties_list = ["cluster_no", "cluster_id", "nodes", "edges", "total_count", "diameter", "density", "eccentricity",
-                       "concensus_cdr3aa", "concensus_cdr3nt", "concensus_v", "concensus_j"]
-        results = []
-        for cluster in self.clusters:
-            for node in cluster:
-                break
-            cluster_no = node.additional_properties["cluster_no"]
-            cluster_id = f"cluster_{cluster_no}"
-            average_eccentricity = np.mean(list(nx.eccentricity(cluster).values()))
-            aa_consensus = cluster.calc_cluster_consensus(seq_type="prot", weigh_by=weigh_by)
-            nt_consensus = cluster.calc_cluster_consensus(seq_type="dna", weigh_by=weigh_by)
-            v_consensus = cluster.calc_cluster_consensus_segment(segment_type="v", weigh_by=weigh_by)
-            j_consensus = cluster.calc_cluster_consensus_segment(segment_type="j", weigh_by=weigh_by)
-            result = (cluster_no,
-                    cluster_id,
-                    len(cluster), 
-                    nx.number_of_edges(cluster), 
-                    sum(node.count for node in cluster),
-                    nx.diameter(cluster),
-                    nx.density(cluster), 
-                    average_eccentricity,
-                    aa_consensus,
-                    nt_consensus,
-                    v_consensus,
-                    j_consensus)
-            results.append(result)
-        return pd.DataFrame(results, columns=properties_list)
+    def properties(self):
+        """Return cached basic cluster properties as a dataframe copy."""
+        self._require_clusters("calculate cluster properties")
+        if self._properties_cache is None:
+            properties_list = [
+                "cluster_no",
+                "cluster_id",
+                "nodes",
+                "edges",
+                "total_count",
+                "diameter",
+                "density",
+                "eccentricity",
+                "concensus_cdr3aa",
+                "concensus_cdr3nt",
+                "concensus_v",
+                "concensus_j",
+            ]
+            results = []
+            for fallback_number, cluster in enumerate(self.clusters):
+                cluster_no = self._cluster_number(cluster, fallback_number)
+                cluster_id = f"cluster_{cluster_no}"
+                average_eccentricity = np.mean(
+                    list(nx.eccentricity(cluster).values())
+                )
+                aa_consensus = cluster.calc_cluster_consensus(
+                    seq_type="prot", weigh_by=None
+                )
+                nt_consensus = cluster.calc_cluster_consensus(
+                    seq_type="dna", weigh_by=None
+                )
+                v_consensus = cluster.calc_cluster_consensus_segment(
+                    segment_type="v", weigh_by=None
+                )
+                j_consensus = cluster.calc_cluster_consensus_segment(
+                    segment_type="j", weigh_by=None
+                )
+                results.append(
+                    (
+                        cluster_no,
+                        cluster_id,
+                        len(cluster),
+                        nx.number_of_edges(cluster),
+                        sum(node.count for node in cluster),
+                        nx.diameter(cluster),
+                        nx.density(cluster),
+                        average_eccentricity,
+                        aa_consensus,
+                        nt_consensus,
+                        v_consensus,
+                        j_consensus,
+                    )
+                )
+            self._properties_cache = pd.DataFrame(
+                results, columns=properties_list
+            )
+        return self._properties_cache.copy()
 
 
     def to_count_table(self, by_freq=False):
@@ -1082,6 +1377,7 @@ class Clusters(list):
             pd.DataFrame: Cluster identifiers and consensus properties followed
                 by one abundance column per sample.
         """
+        self._require_clusters("create a cluster count table")
         property_columns = [
             "cluster_id",
             "concensus_cdr3aa",
@@ -1138,6 +1434,7 @@ class Clusters(list):
         Returns:
             None
         """
+        self._require_clusters("split clusters into communities")
         if method == 'louvain':
             self.find_cluster_communities_louvain(resolution=resolution, 
                                                   threshold=threshold, 
@@ -1156,59 +1453,89 @@ class Clusters(list):
     def set_pooled(self, pooled: bool):
         self.is_pooled = pooled
 
-    def read_from_clonosets_df(self, clonosets_df: 'pd.DataFrame', cl_filter=Filter(), verbose=True):
+    def read_from_clonosets_df(
+        self, clonosets_df: "pd.DataFrame", cl_filter=Filter(), verbose=True
+    ):
+        """Read and pool clonotypes described by a sample/file dataframe."""
+        if not isinstance(clonosets_df, pd.DataFrame):
+            raise TypeError("clonosets_df must be a pandas DataFrame.")
+        required_columns = {"sample_id", "filename"}
+        missing_columns = required_columns.difference(clonosets_df.columns)
+        if missing_columns:
+            raise ValueError(
+                "clonosets_df is missing columns: "
+                + ", ".join(sorted(missing_columns))
+            )
 
-        self.clusters = []
-
-        if self.cl_filter is None:
-            self.cl_filter = cl_filter
-        self.clonosets_df = clonosets_df
-
+        self.cl_filter = cl_filter
+        self.clonosets_df = clonosets_df.copy()
         clonotypes_dfs = []
-        
-        for index, row in clonosets_df.iterrows():
+        for _, row in clonosets_df.iterrows():
             sample_id = row["sample_id"]
-            filename = row["filename"]
-            clonoset = read_clonoset(filename)
+            clonoset = read_clonoset(row["filename"])
             clonoset = cl_filter.apply(clonoset)
             clonoset["sample_id"] = sample_id
             clonotypes_dfs.append(clonoset)
 
         self.clonotypes = pd.concat(clonotypes_dfs).reset_index(drop=True)
         self.set_pooled(False)
+        self._mark_clonotypes_read(
+            "clonosets_df",
+            {
+                "input_samples": len(clonosets_df),
+                "filter": self._filter_parameters(cl_filter),
+            },
+        )
         if verbose:
-            print(f"Pooled {len(self.clonotypes)} clonotypes from {len(clonosets_df)} samples")
-        return
+            print(
+                f"Pooled {len(self.clonotypes)} clonotypes from "
+                f"{len(clonosets_df)} samples"
+            )
+        return self
 
 
-    def read_from_pooled_clonoset(self, pooled_clonoset: 'pd.DataFrame') -> None:
-        """
-        Reads clonotypes from a pooled clonoset. Automatically applies filtering
-        if compulsory columns are missing.
-        
-        Args:
-            pooled_clonoset (pd.DataFrame): Input clonoset to read from.
-            
-        Raises:
-            ValueError: If compulsory columns are missing after filtering.
-        """
-
-        self.clusters = []
-
-        compulsory_columns = ["freq", "count", "v", "j", "cdr3aa", "cdr3nt", "sample_id"]
+    def read_from_pooled_clonoset(self, pooled_clonoset: "pd.DataFrame"):
+        """Read clonotypes from an already pooled dataframe."""
+        if not isinstance(pooled_clonoset, pd.DataFrame):
+            raise TypeError("pooled_clonoset must be a pandas DataFrame.")
+        compulsory_columns = [
+            "freq",
+            "count",
+            "v",
+            "j",
+            "cdr3aa",
+            "cdr3nt",
+            "sample_id",
+        ]
         self.set_pooled(True)
+        self.clonosets_df = None
+        self.cl_filter = None
+        converted = False
         if self.check_compulsory_columns(pooled_clonoset, compulsory_columns):
-            self.clonotypes = pooled_clonoset
-            return
+            self.clonotypes = pooled_clonoset.copy()
         else:
             print("Trying to convert pooled clonoset...")
-            pooled_df = Filter(by_umi=True, convert=False, recount_fractions=False).apply(pooled_clonoset)
+            pooled_df = Filter(
+                by_umi=True, convert=False, recount_fractions=False
+            ).apply(pooled_clonoset)
             if not self.check_compulsory_columns(pooled_df, compulsory_columns):
-                error_message = "Couldn't find at least one of compulsory columns in pooled_df: " +", ".join(compulsory_columns)
-                if not 'sample_id' in pooled_clonoset.columns:
-                    error_message += '\nNo `sample_id` column. Ensure this column is present or add it manually before proceeding.'
-                raise ValueError(error_message)    
-        self.clonotypes = pooled_clonoset
+                error_message = (
+                    "Couldn't find at least one of compulsory columns in "
+                    "pooled_df: "
+                    + ", ".join(compulsory_columns)
+                )
+                if "sample_id" not in pooled_clonoset.columns:
+                    error_message += (
+                        "\nNo `sample_id` column. Ensure this column is present "
+                        "or add it manually before proceeding."
+                    )
+                raise ValueError(error_message)
+            self.clonotypes = pooled_df
+            converted = True
+        self._mark_clonotypes_read(
+            "pooled_clonoset", {"converted": converted}
+        )
+        return self
 
 
     def find_nodes_and_edges(self, mismatches, overlap_type, cpu=None, verbose=True):
@@ -1461,6 +1788,9 @@ class Clusters(list):
     def filter_one_node_clusters(self, inplace=False):
         if inplace:
             self.clusters = [c for c in self.clusters if len(c) > 1]
+            self._cluster_cache_signature = None
+            self._invalidate_properties_cache()
+            self._invalidate_cluster_dependent_analysis()
         else:
             return [c for c in self.clusters if len(c) > 1]
 
@@ -1488,6 +1818,7 @@ class Clusters(list):
         Returns:
             list: List of clusters (nx.Graph objects).
         """
+        self._require_clonotypes("create clusters")
         possible_overlap_types = ["aa", "aaV", "aaVJ", "nt", "ntV", "ntVJ", "VJ", "VJlen"]
         compulsory_columns = ["freq", "count", "v", "j", "cdr3aa", "cdr3nt", "sample_id"]
         tcr_dist = isinstance(tcrdist_radius, int)
@@ -1506,6 +1837,41 @@ class Clusters(list):
             self.mismatches = mismatches
 
         if tcr_dist:
+            cluster_parameters = {
+                "method": "tcrdist",
+                "tcrdist_radius": tcrdist_radius,
+            }
+            cache_parameters = ("tcrdist", tcrdist_radius)
+        else:
+            cluster_parameters = {
+                "method": "mismatches",
+                "overlap_type": overlap_type,
+                "mismatches": mismatches,
+            }
+            cache_parameters = ("mismatches", overlap_type, mismatches)
+        cache_signature = (
+            self._clonotypes_revision,
+            id(self.clonotypes),
+            len(self.clonotypes),
+            cache_parameters,
+        )
+        if (
+            self._cluster_cache_signature == cache_signature
+            and self.state["clusters_created"]
+        ):
+            summary = self._cluster_summary()
+            print(
+                "Clusters were already created from the same clonotypes with "
+                "the same parameters. "
+                f"Graph: {summary['total_nodes']} nodes and "
+                f"{summary['total_edges']} edges. "
+                f"{summary['multi_node_clusters']} clusters (2 or more nodes) "
+                f"and {summary['single_node_clusters']} single nodes. Total: "
+                f"{summary['total_clusters']}"
+            )
+            return self
+
+        if tcr_dist:
             self.tcrdist_radius = tcrdist_radius
             nodes, edges = self.find_nodes_and_edges_tcrdist_no_gaps(
                 radius=tcrdist_radius, cpu=cpu, verbose=verbose
@@ -1517,6 +1883,9 @@ class Clusters(list):
         
         main_graph = Cluster()
         main_graph.add_nodes_from(nodes)
+        main_graph.add_nodes_from(
+            node for edge in edges for node in edge[:2]
+        )
         if verbose:
             print("-----------------------------\nNexworkX graph created")
 
@@ -1549,6 +1918,24 @@ class Clusters(list):
                 node.additional_properties['n_neighbours'] = cluster.degree(node)
 
 
+        self._apply_stored_metadata()
+        self._cluster_cache_signature = cache_signature
+        self._invalidate_properties_cache()
+        self.alice_results = None
+        self.state.update(
+            {
+                "empty": False,
+                "clusters_created": True,
+                "node_pgen_calculated": False,
+                "alice_calculated": False,
+            }
+        )
+        self.state_parameters["clusters_created"] = cluster_parameters
+        self.state_parameters["node_pgen_calculated"] = None
+        self.state_parameters["alice_calculated"] = None
+        return self
+
+
 # !!! add check_progress
 # !!! add cluster_no before communities and visa versa
 # !!! add wrapper for louvain and leiden
@@ -1566,6 +1953,7 @@ class Clusters(list):
             List of NetworkX Graphs corresponding to detected communities.
         """
 
+        self._require_clusters("calculate Louvain communities")
         total_communities = 0
         self.cluster_communities_louvain = ClusterCommunities()
         self.cluster_communities_louvain.resolution = resolution
@@ -1601,6 +1989,7 @@ class Clusters(list):
         Returns:
             List of NetworkX Graphs corresponding to detected communities.
         """
+        self._require_clusters("calculate Leiden communities")
         try:
             import igraph as ig
             import leidenalg
@@ -1650,6 +2039,7 @@ class Clusters(list):
 
 
     def save_to_cytoscape(self, output_prefix, sample_metadata=None):
+        self._require_clusters("save clusters to Cytoscape")
         sif_filename = output_prefix + ".sif"
         properties_metadata_filename = output_prefix + ".prop.metadata.tsv"
         edges = []
@@ -1693,6 +2083,7 @@ class Clusters(list):
 
 
     def as_dataframe(self, filter_one_node_clusters=False):
+        self._require_clusters("convert clusters to a dataframe")
         additional_properties=[]
         for node in self.clusters[0]:
             additional_properties = list(node.additional_properties.keys())
@@ -1777,12 +2168,11 @@ class Clusters(list):
         skip_single_nodes=False,
         method='bonferroni'):
 
-        if not overlap_type:
+        self._require_clusters("run ALICE")
+        if overlap_type is None:
             overlap_type = self.overlap_type
-        if not mismatches:
+        if mismatches is None:
             mismatches = self.mismatches
-        if not self.clusters:
-            raise ValueError('No clusters are found.')
         if method not in ['bonferroni', 'sidak', 'holm-sidak', 'holm', 'simes-hochberg', 'hommel', 'fdr_bh', 'fdr_by','fdr_tsbh', 'fdr_tsbky']:
             raise ValueError("P-value adjustment method is not one on the list. Possible values are: ['bonferroni', 'sidak', 'holm-sidak', 'holm', 'simes-hochberg', 'hommel', 'fdr_bh', 'fdr_by','fdr_tsbh', 'fdr_tsbky']")
         if mismatches > 1:
@@ -1828,9 +2218,31 @@ class Clusters(list):
         else:
             self.alice_results = clusters_all_pgen.sort_values(by='p_value_adj').reset_index(drop=True)
 
+        alice_parameters = {
+            "overlap_type": overlap_type,
+            "mismatches": mismatches,
+            "generation_model": generation_model,
+            "Q": Q,
+            "alpha": alpha,
+            "olga_warnings": olga_warnings,
+            "skip_single_nodes": skip_single_nodes,
+            "method": method,
+        }
+        if cl_filter is not None:
+            alice_parameters["filter"] = self._filter_parameters(cl_filter)
+        self.state["node_pgen_calculated"] = True
+        self.state["alice_calculated"] = True
+        self.state_parameters["node_pgen_calculated"] = {
+            "overlap_type": overlap_type,
+            "mismatches": mismatches,
+            "generation_model": generation_model,
+        }
+        self.state_parameters["alice_calculated"] = alice_parameters
+        return self.alice_results
+
 
     def add_alice_hits_to_clusters(self):
-
+        self._require_alice("add ALICE hits to clusters")
         node_lookup = {}
         for cluster in self.clusters:
             for node in cluster:
@@ -1844,6 +2256,7 @@ class Clusters(list):
             node.additional_properties['p_value'] = row['p_value']
             node.additional_properties['p_value_adj'] = row['p_value_adj']
             node.additional_properties['is_alice_hit'] = row['is_alice_hit']
+        return self
 
 
     # def export_clusters_to_gae(self):

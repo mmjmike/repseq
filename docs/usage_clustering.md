@@ -32,6 +32,34 @@ clusters[:3]
 
 <br>
 
+## Object state and calculation caching
+
+`Clusters` tracks completed workflow stages in `clusters.state` and records the
+parameters used for each stage in `clusters.state_parameters`. Printing the
+object reports whether clonotypes were read, clusters were created, metadata was
+added, node Pgen was calculated, and ALICE was calculated. It also reports the
+input source, filter settings, metadata columns, clustering parameters, graph
+size, and cluster/singleton counts.
+
+```py
+print(clusters)
+clusters.state
+clusters.state_parameters
+```
+
+The expected order is to read clonotypes, create clusters, and then optionally
+run ALICE. Metadata may be supplied any time after clonotypes are read; metadata
+added before clustering is retained and applied when nodes are created. Methods
+that require clusters raise an actionable error if clustering has not yet been
+run.
+
+`Clusters.properties` is cached after its first calculation and returns a copy
+of the cached dataframe. Repeating `create_clusters` with unchanged clonotypes
+and identical mismatch/TCRdist parameters reuses the existing graph and prints
+the previously obtained cluster summary instead of recalculating it. Reading new
+clonotypes or changing/filtering the cluster collection invalidates applicable
+caches and downstream ALICE state.
+
 ## Plotting cluster networks
 
 Use `Clusters.plot_cluster` to plot one cluster, a list of up to 50 cluster
