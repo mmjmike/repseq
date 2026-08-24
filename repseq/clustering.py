@@ -6,7 +6,7 @@ from .io import read_clonoset
 from .plot import _isotype_colors, _isotype_order, _recode_isotype
 from scipy.stats import poisson
 from statsmodels.stats.multitest import multipletests
-from .common_functions import overlap_type_to_flags
+from .common_functions import overlap_type_to_flags, overlap_type_uses_sequence
 import numpy as np
 import networkx as nx
 from networkx.algorithms import community
@@ -310,6 +310,51 @@ def any_nodes(property_name, values):
         )
 
     return _FunctionClusterExpression(name, evaluate, is_boolean=True)
+
+
+def _intersect_clusters_with_clonoset_worker(args):
+    (
+        sample_id,
+        filename,
+        cl_filter,
+        cluster_dicts,
+        overlap_type,
+        mismatches,
+        by_freq,
+    ) = args
+    from .intersections import (
+        _similarity_pair_matches,
+        _similarity_total_count,
+        prepare_clonoset_for_intersection,
+    )
+
+    clonoset = read_clonoset(filename)
+    clonoset = cl_filter.apply(clonoset)
+    uses_sequence = overlap_type_uses_sequence(overlap_type)
+    target_dict = prepare_clonoset_for_intersection(
+        clonoset,
+        overlap_type=overlap_type,
+        by_freq=False,
+        len_vj_format=uses_sequence,
+    )
+    target_total = _similarity_total_count(target_dict, uses_sequence)
+
+    values = {}
+    for cluster_no, comparison_dict in cluster_dicts.items():
+        matched_target_counts = {}
+        matches = _similarity_pair_matches(
+            target_dict,
+            comparison_dict,
+            overlap_type,
+            mismatches,
+        )
+        for target_clone, _, target_count, _, _ in matches:
+            matched_target_counts.setdefault(target_clone, target_count)
+        value = float(sum(matched_target_counts.values()))
+        if by_freq:
+            value = value / target_total if target_total else 0.0
+        values[cluster_no] = value
+    return sample_id, values
 
 
 class ClusterCollectionSelector:
@@ -1548,6 +1593,140 @@ class Clusters(list):
         for sample_id, values in values_by_sample.items():
             count_table[sample_id] = values
 
+        return count_table
+
+
+    def intersect_with_clonosets(
+        self,
+        clonosets_df,
+        cl_filter=None,
+        overlap_type="aaVJ",
+        by_freq=False,
+        mismatches=1,
+        cpu=None,
+    ):
+        """Measure target-sample clonotypes similar to each cluster.
+
+        Each target clonotype contributes at most once to a cluster, even when
+        it is similar to several nodes in that cluster. Frequency values use
+        the directional similarity definition: matched target counts divided
+        by the filtered target clonoset's total count.
+        """
+        from .intersections import prepare_clonoset_for_intersection
+
+        self._require_clusters("intersect clusters with clonosets")
+        if not isinstance(clonosets_df, pd.DataFrame):
+            raise TypeError("clonosets_df must be a pandas DataFrame.")
+        required_columns = {"sample_id", "filename"}
+        missing_columns = required_columns.difference(clonosets_df.columns)
+        if missing_columns:
+            raise ValueError(
+                "clonosets_df is missing columns: "
+                + ", ".join(sorted(missing_columns))
+            )
+        if clonosets_df["sample_id"].duplicated().any():
+            raise ValueError("clonosets_df sample_id values must be unique.")
+        if not isinstance(by_freq, (bool, np.bool_)):
+            raise TypeError("by_freq must be a boolean.")
+        overlap_type_to_flags(overlap_type)
+        if (
+            not isinstance(mismatches, (int, np.integer))
+            or isinstance(mismatches, bool)
+        ):
+            raise TypeError("mismatches must be a non-negative integer.")
+        if mismatches < 0:
+            raise ValueError("mismatches must be a non-negative integer.")
+        uses_sequence = overlap_type_uses_sequence(overlap_type)
+        effective_mismatches = int(mismatches) if uses_sequence else 0
+
+        cluster_dicts = {}
+        for fallback_number, cluster in enumerate(self.clusters):
+            cluster_no = self._cluster_number(cluster, fallback_number)
+            cluster_clonotypes = pd.DataFrame(
+                [
+                    {
+                        "cdr3aa": node.seq_aa,
+                        "cdr3nt": node.seq_nt,
+                        "v": node.v,
+                        "j": node.j,
+                        "count": 1,
+                        "freq": 1,
+                    }
+                    for node in cluster
+                ]
+            )
+            cluster_dicts[cluster_no] = prepare_clonoset_for_intersection(
+                cluster_clonotypes,
+                overlap_type=overlap_type,
+                by_freq=False,
+                len_vj_format=uses_sequence,
+            )
+
+        if cl_filter is None:
+            cl_filter = Filter()
+        tasks = [
+            (
+                row["sample_id"],
+                row["filename"],
+                cl_filter.spawn(),
+                cluster_dicts,
+                overlap_type,
+                effective_mismatches,
+                bool(by_freq),
+            )
+            for _, row in clonosets_df.iterrows()
+        ]
+        sample_results = run_parallel_calculation(
+            _intersect_clusters_with_clonoset_worker,
+            tasks,
+            "Intersecting clusters with clonosets",
+            object_name="samples",
+            verbose=False,
+            cpu=cpu,
+        )
+        values_by_sample = dict(sample_results)
+
+        cluster_rows = []
+        cluster_numbers = []
+        for fallback_number, cluster in enumerate(self.clusters):
+            cluster_no = self._cluster_number(cluster, fallback_number)
+            cluster_numbers.append(cluster_no)
+            aa_consensus = cluster.calc_cluster_consensus(
+                seq_type="prot", weigh_by=None
+            )
+            v_consensus = cluster.calc_cluster_consensus_segment(
+                segment_type="v", weigh_by=None
+            )
+            j_consensus = cluster.calc_cluster_consensus_segment(
+                segment_type="j", weigh_by=None
+            )
+            cluster_rows.append(
+                {
+                    "cluster_id": f"cluster_{cluster_no}",
+                    "consensus": (
+                        f"{aa_consensus}|{v_consensus}|{j_consensus}"
+                    ),
+                    "concensus_cdr3aa": aa_consensus,
+                    "concensus_v": v_consensus,
+                    "concensus_j": j_consensus,
+                }
+            )
+        count_table = pd.DataFrame(
+            cluster_rows,
+            columns=[
+                "cluster_id",
+                "consensus",
+                "concensus_cdr3aa",
+                "concensus_v",
+                "concensus_j",
+            ],
+        )
+        for sample_id in clonosets_df["sample_id"]:
+            sample_values = values_by_sample.get(sample_id, {})
+            count_table[sample_id] = [
+                sample_values.get(cluster_no, 0.0)
+                for cluster_no in cluster_numbers
+            ]
         return count_table
 
 

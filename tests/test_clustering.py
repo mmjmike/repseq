@@ -1111,3 +1111,163 @@ def test_mixed_igh_and_tcr_constants_recode_independently():
         key=lambda value: "" if value is None else value,
     )
     assert isotypes == [None, "IgG1"]
+
+
+def _clusters_for_clonoset_intersection():
+    clusters = Clusters()
+    specifications = [
+        (10, [("CASS", "AAA"), ("CATS", "AAT")], "V1", "J1"),
+        (20, [("GGGG", "GGG")], "V2", "J2"),
+    ]
+    for cluster_no, sequences, v_gene, j_gene in specifications:
+        cluster = Cluster()
+        cluster.id = cluster_no
+        for node_index, (cdr3aa, cdr3nt) in enumerate(sequences):
+            node = Node(
+                f"{cluster_no}_{node_index}",
+                cdr3nt,
+                cdr3aa,
+                v_gene,
+                j_gene,
+                "comparison",
+                1 / len(sequences),
+                1,
+            )
+            node.additional_properties["cluster_no"] = cluster_no
+            cluster.add_node(node)
+        clusters.clusters.append(cluster)
+    return clusters
+
+
+def _target_clonosets_for_cluster_intersection():
+    return {
+        "sample_1.tsv": pd.DataFrame(
+            {
+                "cdr3aa": ["CARS", "CASS", "GGGG"],
+                "cdr3nt": ["AAC", "AAA", "GGG"],
+                "v": ["V1", "V1", "V2"],
+                "j": ["J1", "J1", "J2"],
+                "count": [5, 3, 2],
+                "freq": [0.5, 0.3, 0.2],
+            }
+        ),
+        "sample_2.tsv": pd.DataFrame(
+            {
+                "cdr3aa": ["CASS", "AAAA"],
+                "cdr3nt": ["AAA", "CCC"],
+                "v": ["V1", "V3"],
+                "j": ["J1", "J3"],
+                "count": [4, 6],
+                "freq": [0.4, 0.6],
+            }
+        ),
+    }
+
+
+def test_intersect_with_clonosets_counts_unique_target_clonotypes(
+    monkeypatch,
+):
+    clusters = _clusters_for_clonoset_intersection()
+    targets = _target_clonosets_for_cluster_intersection()
+    monkeypatch.setattr(
+        clustering_module,
+        "read_clonoset",
+        lambda filename: targets[filename].copy(),
+    )
+    samples = pd.DataFrame(
+        {
+            "sample_id": ["sample_1", "sample_2"],
+            "filename": ["sample_1.tsv", "sample_2.tsv"],
+        }
+    )
+
+    table = clusters.intersect_with_clonosets(
+        samples, overlap_type="aaVJ", mismatches=1, cpu=1
+    )
+
+    assert table.columns.tolist() == [
+        "cluster_id",
+        "consensus",
+        "concensus_cdr3aa",
+        "concensus_v",
+        "concensus_j",
+        "sample_1",
+        "sample_2",
+    ]
+    assert table["cluster_id"].tolist() == ["cluster_10", "cluster_20"]
+    np.testing.assert_allclose(table["sample_1"], [8, 2])
+    np.testing.assert_allclose(table["sample_2"], [4, 0])
+
+
+def test_intersect_with_clonosets_calculates_directional_frequencies(
+    monkeypatch,
+):
+    clusters = _clusters_for_clonoset_intersection()
+    targets = _target_clonosets_for_cluster_intersection()
+    monkeypatch.setattr(
+        clustering_module,
+        "read_clonoset",
+        lambda filename: targets[filename].copy(),
+    )
+    samples = pd.DataFrame(
+        {
+            "sample_id": ["sample_1", "sample_2"],
+            "filename": ["sample_1.tsv", "sample_2.tsv"],
+        }
+    )
+
+    table = clusters.intersect_with_clonosets(
+        samples,
+        overlap_type="aaVJ",
+        mismatches=1,
+        by_freq=True,
+        cpu=1,
+    )
+
+    np.testing.assert_allclose(table["sample_1"], [0.8, 0.2])
+    np.testing.assert_allclose(table["sample_2"], [0.4, 0])
+
+
+def test_intersect_with_clonosets_respects_mismatch_threshold(monkeypatch):
+    clusters = _clusters_for_clonoset_intersection()
+    targets = _target_clonosets_for_cluster_intersection()
+    monkeypatch.setattr(
+        clustering_module,
+        "read_clonoset",
+        lambda filename: targets[filename].copy(),
+    )
+    samples = pd.DataFrame(
+        {"sample_id": ["sample_1"], "filename": ["sample_1.tsv"]}
+    )
+
+    table = clusters.intersect_with_clonosets(
+        samples, overlap_type="aaVJ", mismatches=0, cpu=1
+    )
+
+    np.testing.assert_allclose(table["sample_1"], [3, 2])
+
+
+def test_intersect_with_clonosets_forwards_cpu(monkeypatch):
+    clusters = _clusters_for_clonoset_intersection()
+    targets = _target_clonosets_for_cluster_intersection()
+    monkeypatch.setattr(
+        clustering_module,
+        "read_clonoset",
+        lambda filename: targets[filename].copy(),
+    )
+    captured = {}
+
+    def fake_parallel(function, tasks, *args, **kwargs):
+        captured["cpu"] = kwargs["cpu"]
+        return [function(task) for task in tasks]
+
+    monkeypatch.setattr(
+        clustering_module, "run_parallel_calculation", fake_parallel
+    )
+    samples = pd.DataFrame(
+        {"sample_id": ["sample_1"], "filename": ["sample_1.tsv"]}
+    )
+
+    clusters.intersect_with_clonosets(samples, cpu=3)
+
+    assert captured["cpu"] == 3

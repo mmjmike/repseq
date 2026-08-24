@@ -233,6 +233,41 @@ cluster_table = clusters.custom_properties([
 ])
 ```
 
+## Intersecting clusters with new clonosets
+
+`Clusters.intersect_with_clonosets` measures how much of each target clonoset is
+similar to each existing cluster. Matching follows the directional rules used by
+`intersections.similarity`: `overlap_type` selects sequence and V/J constraints,
+and `mismatches` sets the maximum Hamming distance for sequence-based overlap
+types. A target clonotype contributes only once to a cluster even if it matches
+several nodes in that cluster.
+
+```py
+cluster_counts = clusters.intersect_with_clonosets(
+    target_clonosets,
+    cl_filter=func_filter,
+    overlap_type="aaVJ",
+    mismatches=1,
+    cpu=4,
+)
+```
+
+The result is a wide cluster count table with `cluster_id`, `consensus`,
+`concensus_cdr3aa`, `concensus_v`, and `concensus_j`, followed by one column per
+target `sample_id`. By default, sample columns contain the summed filtered target
+counts matching each cluster. With `by_freq=True`, they contain matched target
+counts divided by the filtered target sample's total count, matching
+`intersections.similarity(result="freq")`.
+
+```py
+cluster_frequencies = clusters.intersect_with_clonosets(
+    target_clonosets,
+    overlap_type="aaV",
+    mismatches=1,
+    by_freq=True,
+)
+```
+
 ## Clusters from a pooled DataFrame
 
 Alternatively, one can create clusters from a dataframe with clonotypes. Mandatory columns are [`freq`, `count`, `v`, `j`, `cdr3aa`, `cdr3nt`, `sample_id`].
