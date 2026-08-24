@@ -65,9 +65,12 @@ caches and downstream ALICE state.
 
 ## Plotting cluster networks
 
-Use `Clusters.plot_cluster` to plot one cluster, a list of up to 50 cluster
-indices, or every cluster as facets. Pass `cluster_no=None` to select every
-cluster. This automatic mode defaults to `max_clusters=50`; if the object has
+Use `Clusters.plot_cluster` to plot one cluster, a list of up to 50
+clusters, or every cluster as facets. Explicit selections use persistent integer
+`cluster_no` values or string IDs such as `"cluster_235"`, with the same mixed
+identifier behavior as `Clusters.select`; they are not positions in the current
+Python list. Pass `cluster_no=None` to select every cluster. This automatic mode
+defaults to `max_clusters=50`; if the object has
 more clusters, no figure is created until you either increase `max_clusters`
 or pass a smaller explicit selection. By default, node size uses linear `count`
 scaling with `min_size + linear_scale * count`, `min_size=50`, and
@@ -75,15 +78,17 @@ scaling with `min_size + linear_scale * count`, `min_size=50`, and
 for uniform nodes, or set `log_scaled=True` for
 `min_size + linear_scale * log2(value + 1)`. The
 default spring layout can be replaced with `kamada_kawai`, `circular`, `shell`,
-or `spectral`.
+or `spectral`. Each panel title shows the persistent `cluster_id`. `height`
+sets each facet's height in inches and `aspect` sets width divided by height; an
+explicit `figsize` still overrides these automatic dimensions.
 
 ```py
-fig = clusters.plot_cluster(0, label="seq_aa")
+fig = clusters.plot_cluster("cluster_10", label="seq_aa")
 
 fig = clusters.plot_cluster(None)
 
 fig = clusters.plot_cluster(
-    [0, 1, 2, 3],
+    ["cluster_10", 11, "cluster_12"],
     layout="kamada_kawai",
     color="sample_id",
     palette={"sample_1": "#4C78A8", "sample_2": "#F58518"},
@@ -93,6 +98,8 @@ fig = clusters.plot_cluster(
     min_size=50,
     log_scaled=False,
     linear_scale=1,
+    height=3.5,
+    aspect=1.2,
 )
 ```
 
@@ -109,15 +116,19 @@ these values as `NA` and uses the same ordering and palette as
 
 ## Plotting cluster sequence logos
 
-Use `Clusters.plot_logo` to create a protein or DNA sequence logo for one
-cluster. Logo weights may come from `count`, `freq`, `nodes`, or any custom
-non-negative numeric node property. `nodes` assigns equal weight to every node.
-Set `plot=False` to return the normalized motif dataframe instead of drawing.
+Use `Clusters.plot_logo` to create protein or DNA sequence logos for one or
+more clusters. The first argument accepts persistent cluster numbers, `cluster_N`
+IDs, or mixed iterables using the same rules as `select`. Logo weights may come
+from `count`, `freq`, `nodes`, or any custom non-negative numeric node property.
+`nodes` assigns equal weight to every node. Set `plot=False` to return the
+normalized motif dataframe; multiple clusters return a dictionary keyed by
+`cluster_id`.
 
 ```py
-clusters.plot_logo(0)
-clusters.plot_logo(0, seq_type="dna", weight="freq")
-motif = clusters.plot_logo(0, weight="custom_weight", plot=False)
+clusters.plot_logo("cluster_10")
+clusters.plot_logo(10, seq_type="dna", weight="freq")
+motif = clusters.plot_logo("cluster_10", weight="custom_weight", plot=False)
+motifs = clusters.plot_logo([10, "cluster_11"], plot=False)
 ```
 
 ## Filtering clusters and calculating custom properties

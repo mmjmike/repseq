@@ -190,7 +190,7 @@ def test_plot_cluster_facets_style_nodes_and_add_legends():
         linear_scale=10,
     )
 
-    assert [axis.get_title() for axis in figure.axes] == ["Cluster 0", "Cluster 1"]
+    assert [axis.get_title() for axis in figure.axes] == ["cluster_0", "cluster_1"]
     assert [legend.get_title().get_text() for legend in figure.legends] == [
         "color_group",
         "shape_group",
@@ -216,7 +216,7 @@ def test_plot_cluster_facets_style_nodes_and_add_legends():
 def test_plot_cluster_supports_common_layouts(layout):
     figure = _clusters_with_two_samples().plot_cluster(0, layout=layout)
 
-    assert figure.axes[0].get_title() == "Cluster 0"
+    assert figure.axes[0].get_title() == "cluster_0"
     plt.close(figure)
 
 
@@ -224,8 +224,8 @@ def test_plot_cluster_none_plots_all_clusters():
     figure = _clusters_with_two_samples().plot_cluster(None)
 
     assert [axis.get_title() for axis in figure.axes] == [
-        "Cluster 0",
-        "Cluster 1",
+        "cluster_0",
+        "cluster_1",
     ]
     plt.close(figure)
 
@@ -250,15 +250,30 @@ def test_plot_cluster_ignores_max_clusters_for_explicit_selection():
     figure = _clusters_with_two_samples().plot_cluster([0, 1], max_clusters=1)
 
     assert [axis.get_title() for axis in figure.axes] == [
-        "Cluster 0",
-        "Cluster 1",
+        "cluster_0",
+        "cluster_1",
     ]
     plt.close(figure)
 
 
 def test_plot_cluster_none_can_raise_max_clusters_above_default():
-    clusters = _clusters_with_two_samples()
-    clusters.clusters = clusters.clusters * 26
+    clusters = Clusters()
+    for cluster_no in range(52):
+        cluster = Cluster()
+        cluster.id = cluster_no
+        node = Node(
+            cluster_no,
+            "TGT",
+            "CASS",
+            "TRBV1",
+            "TRBJ1",
+            "sample_1",
+            1.0,
+            1,
+        )
+        node.additional_properties["cluster_no"] = cluster_no
+        cluster.add_node(node)
+        clusters.clusters.append(cluster)
 
     figure = clusters.plot_cluster(
         None,
@@ -270,7 +285,7 @@ def test_plot_cluster_none_can_raise_max_clusters_above_default():
     )
 
     assert len(figure.axes) == 60
-    assert figure.axes[51].get_title() == "Cluster 51"
+    assert figure.axes[51].get_title() == "cluster_51"
     assert all(not axis.get_visible() for axis in figure.axes[52:])
     plt.close(figure)
 
@@ -1271,3 +1286,62 @@ def test_intersect_with_clonosets_forwards_cpu(monkeypatch):
     clusters.intersect_with_clonosets(samples, cpu=3)
 
     assert captured["cpu"] == 3
+
+
+def _renumber_clusters(clusters, cluster_numbers):
+    for cluster, cluster_no in zip(clusters, cluster_numbers):
+        cluster.id = cluster_no
+        for node in cluster:
+            node.additional_properties["cluster_no"] = cluster_no
+    return clusters
+
+
+def test_plot_cluster_uses_persistent_ids_after_filtering_and_scales_facets():
+    clusters = _renumber_clusters(_clusters_with_two_samples(), [10, 11])
+    filtered = clusters.select([10, 11])
+
+    figure = filtered.plot_cluster(
+        ["cluster_10", 11],
+        ncols=2,
+        height=3,
+        aspect=1.5,
+        size=None,
+    )
+
+    assert [axis.get_title() for axis in figure.axes] == [
+        "cluster_10",
+        "cluster_11",
+    ]
+    np.testing.assert_allclose(figure.get_size_inches(), [9, 3])
+    with pytest.raises(KeyError, match="cluster_0"):
+        filtered.plot_cluster(0)
+
+
+def test_plot_logo_accepts_cluster_ids_and_mixed_lists(monkeypatch):
+    clusters = _renumber_clusters(_clusters_with_two_samples(), [10, 11])
+    calls = []
+
+    def fake_logo(clonotypes, seq_type, plot=True):
+        calls.append((clonotypes, seq_type, plot))
+        return f"logo_{len(calls)}"
+
+    monkeypatch.setattr(
+        clustering_module, "get_logo_for_list_of_clonotypes", fake_logo
+    )
+
+    single = clusters.plot_logo("cluster_10", plot=False)
+    multiple = clusters.plot_logo([10, "cluster_11"], plot=False)
+
+    assert single == "logo_1"
+    assert multiple == {"cluster_10": "logo_2", "cluster_11": "logo_3"}
+    assert len(calls[0][0]) == 3
+    assert len(calls[1][0]) == 3
+    assert len(calls[2][0]) == 1
+
+
+@pytest.mark.parametrize(("height", "aspect"), [(0, 1), (3, 0), (-1, 1), (3, -1)])
+def test_plot_cluster_validates_height_and_aspect(height, aspect):
+    with pytest.raises(ValueError, match="positive number"):
+        _clusters_with_two_samples().plot_cluster(
+            0, height=height, aspect=aspect
+        )

@@ -910,13 +910,7 @@ class Clusters(list):
         return result
 
 
-    def select(self, cluster_identifiers):
-        """Select clusters by integer cluster numbers or ``cluster_N`` IDs.
-
-        Input order is preserved and duplicate identifiers are returned once.
-        Scalars, ranges, pandas Series, and other iterables are accepted.
-        """
-        self._require_clusters("select clusters")
+    def _resolve_cluster_identifiers(self, cluster_identifiers):
         if isinstance(cluster_identifiers, (str, int, np.integer)) and not isinstance(
             cluster_identifiers, bool
         ):
@@ -926,11 +920,9 @@ class Clusters(list):
                 identifiers = list(cluster_identifiers)
             except TypeError as error:
                 raise TypeError(
-                    "cluster_identifiers must be an identifier or iterable of "
+                    "cluster identifiers must be an identifier or iterable of "
                     "identifiers."
                 ) from error
-        if not identifiers:
-            return self._copy_with_clusters([])
 
         clusters_by_number = {}
         for fallback_number, cluster in enumerate(self.clusters):
@@ -967,8 +959,22 @@ class Clusters(list):
             missing = [repr(value) for value in invalid_identifiers]
             missing.extend(f"cluster_{number}" for number in missing_numbers)
             raise KeyError("Unknown cluster identifiers: " + ", ".join(missing))
+        return [
+            (cluster_no, f"cluster_{cluster_no}", clusters_by_number[cluster_no])
+            for cluster_no in requested_numbers
+        ]
+
+
+    def select(self, cluster_identifiers):
+        """Select clusters by integer cluster numbers or ``cluster_N`` IDs.
+
+        Input order is preserved and duplicate identifiers are returned once.
+        Scalars, ranges, pandas Series, and other iterables are accepted.
+        """
+        self._require_clusters("select clusters")
+        resolved_clusters = self._resolve_cluster_identifiers(cluster_identifiers)
         return self._copy_with_clusters(
-            [clusters_by_number[number] for number in requested_numbers]
+            [cluster for _, _, cluster in resolved_clusters]
         )
 
 
@@ -1142,29 +1148,17 @@ class Clusters(list):
         weight="count",
         plot=True,
     ):
-        """Create a weighted sequence logo for one cluster.
+        """Create weighted sequence logos selected by cluster number or ID.
 
-        Args:
-            cluster_no (int): Cluster index in this collection.
-            seq_type (str): ``prot`` for amino-acid sequences or ``dna`` for
-                nucleotide sequences.
-            weight (str): ``count``, ``freq``, ``nodes``, or another numeric
-                node property.
-            plot (bool): Draw the logo when ``True``. When ``False``, return
-                the normalized motif dataframe.
-
-        Returns:
-            Result returned by ``get_logo_for_list_of_clonotypes``.
+        ``cluster_no`` accepts an integer cluster number, a ``cluster_N`` ID,
+        or an iterable mixing both forms. For multiple clusters, ``plot=False``
+        returns a dictionary keyed by cluster ID; ``plot=True`` draws each logo
+        and returns ``None``.
         """
         self._require_clusters("plot a cluster logo")
-        if (
-            not isinstance(cluster_no, (int, np.integer))
-            or isinstance(cluster_no, bool)
-        ):
-            raise TypeError("cluster_no must be an integer.")
-        cluster_no = int(cluster_no)
-        if cluster_no < 0 or cluster_no >= len(self.clusters):
-            raise IndexError(f"Cluster index out of range: {cluster_no}")
+        resolved_clusters = self._resolve_cluster_identifiers(cluster_no)
+        if not resolved_clusters:
+            raise ValueError("At least one cluster identifier must be provided.")
         if seq_type not in {"prot", "dna"}:
             raise ValueError("seq_type must be either 'prot' or 'dna'.")
         if not isinstance(weight, str) or not weight:
@@ -1172,17 +1166,25 @@ class Clusters(list):
         if not isinstance(plot, (bool, np.bool_)):
             raise TypeError("plot must be a boolean.")
 
-        clonotypes = []
-        for node in self.clusters[cluster_no]:
-            sequence = node.seq_aa if seq_type == "prot" else node.seq_nt
-            if seq_type == "dna" and sequence == "-":
-                raise ValueError(
-                    f"Node '{node.id}' does not have a cdr3nt sequence."
-                )
-            clonotypes.append((sequence, _node_weight(node, weight)))
-        return get_logo_for_list_of_clonotypes(
-            clonotypes, seq_type, plot=bool(plot)
-        )
+        results = {}
+        for _, cluster_id, cluster in resolved_clusters:
+            clonotypes = []
+            for node in cluster:
+                sequence = node.seq_aa if seq_type == "prot" else node.seq_nt
+                if seq_type == "dna" and sequence == "-":
+                    raise ValueError(
+                        f"Node '{node.id}' does not have a cdr3nt sequence."
+                    )
+                clonotypes.append((sequence, _node_weight(node, weight)))
+            results[cluster_id] = get_logo_for_list_of_clonotypes(
+                clonotypes, seq_type, plot=bool(plot)
+            )
+
+        if len(results) == 1:
+            return next(iter(results.values()))
+        if plot:
+            return None
+        return results
 
 
     def plot_cluster(
@@ -1201,6 +1203,8 @@ class Clusters(list):
         log_scaled=False,
         linear_scale=1,
         max_clusters=50,
+        height=4,
+        aspect=1,
     ):
         """Plot one, selected, or all clusters as network facets.
 
@@ -1210,8 +1214,8 @@ class Clusters(list):
         scaling uses ``min_size + linear_scale * value``.
 
         Args:
-            cluster_no (int | list[int] | None): Cluster index, cluster indices,
-                or ``None`` to plot every cluster in the object.
+            cluster_no (int | str | iterable | None): Cluster numbers,
+                ``cluster_N`` IDs, mixed iterables, or ``None`` for all clusters.
             layout (str): ``spring`` (default), ``kamada_kawai``, ``circular``,
                 ``shell``, or ``spectral``.
             color (str | None): Node property used for color grouping.
@@ -1230,7 +1234,9 @@ class Clusters(list):
             linear_scale (float): Multiplier for linear or log2-transformed
                 values.
             max_clusters (int): Maximum number of clusters automatically plotted
-                when ``cluster_no=None``. Ignored for explicit cluster indices.
+                when ``cluster_no=None``. Ignored for explicit identifiers.
+            height (float): Height of each facet in inches.
+            aspect (float): Facet width divided by facet height.
 
         Returns:
             matplotlib.figure.Figure: The generated figure.
@@ -1254,52 +1260,56 @@ class Clusters(list):
                     f"{cluster_count} clusters, which exceeds "
                     f"max_clusters={max_clusters}. No plot was created. "
                     "Increase max_clusters if plotting every cluster is "
-                    "intentional, or pass an integer or list of cluster "
-                    "indices to plot a smaller selection."
+                    "intentional, or pass cluster numbers/IDs for a smaller "
+                    "selection."
                 )
-            cluster_numbers = list(range(cluster_count))
-        elif (
-            isinstance(cluster_no, (int, np.integer))
-            and not isinstance(cluster_no, bool)
-        ):
-            cluster_numbers = [int(cluster_no)]
-        elif isinstance(cluster_no, (list, tuple, np.ndarray, pd.Index)):
-            cluster_numbers = list(cluster_no)
+            identifiers = [
+                self._cluster_number(cluster, fallback_number)
+                for fallback_number, cluster in enumerate(self.clusters)
+            ]
         else:
-            raise TypeError(
-                "cluster_no must be None, an integer, or a list of integers."
-            )
+            if isinstance(cluster_no, (str, int, np.integer)) and not isinstance(
+                cluster_no, bool
+            ):
+                identifiers = cluster_no
+            else:
+                try:
+                    identifiers = list(cluster_no)
+                except TypeError as error:
+                    raise TypeError(
+                        "cluster_no must be None, a cluster number/ID, or an "
+                        "iterable of cluster numbers/IDs."
+                    ) from error
+                if len(identifiers) > 50:
+                    raise ValueError("At most 50 clusters can be plotted at once.")
 
-        if not cluster_numbers:
-            raise ValueError("At least one cluster_no must be provided.")
-        if not plot_all_clusters and len(cluster_numbers) > 50:
-            raise ValueError("At most 50 clusters can be plotted at once.")
-        if any(
-            not isinstance(number, (int, np.integer)) or isinstance(number, bool)
-            for number in cluster_numbers
-        ):
-            raise TypeError("Every cluster_no must be an integer.")
-        cluster_numbers = [int(number) for number in cluster_numbers]
-        if len(set(cluster_numbers)) != len(cluster_numbers):
-            raise ValueError("cluster_no values must be unique.")
-        invalid_numbers = [
-            number
-            for number in cluster_numbers
-            if number < 0 or number >= len(self.clusters)
-        ]
-        if invalid_numbers:
-            invalid_text = ", ".join(str(number) for number in invalid_numbers)
-            raise IndexError(f"Cluster index out of range: {invalid_text}")
+        resolved_clusters = self._resolve_cluster_identifiers(identifiers)
+        if not resolved_clusters:
+            raise ValueError("At least one cluster identifier must be provided.")
+        cluster_numbers = [number for number, _, _ in resolved_clusters]
+        cluster_ids = [cluster_id for _, cluster_id, _ in resolved_clusters]
+        selected_clusters = [cluster for _, _, cluster in resolved_clusters]
         if palette is not None and color is None:
             raise ValueError("palette requires a color property.")
         if ncols is not None and (not isinstance(ncols, int) or ncols < 1):
             raise ValueError("ncols must be a positive integer.")
         if min_size < 0 or linear_scale < 0:
             raise ValueError("Node size parameters must be non-negative.")
+        if (
+            not isinstance(height, Real)
+            or isinstance(height, (bool, np.bool_))
+            or height <= 0
+        ):
+            raise ValueError("height must be a positive number.")
+        if (
+            not isinstance(aspect, Real)
+            or isinstance(aspect, (bool, np.bool_))
+            or aspect <= 0
+        ):
+            raise ValueError("aspect must be a positive number.")
         if not isinstance(log_scaled, (bool, np.bool_)):
             raise TypeError("log_scaled must be a boolean.")
 
-        selected_clusters = [self.clusters[number] for number in cluster_numbers]
         selected_nodes = [
             node for cluster in selected_clusters for node in cluster.nodes
         ]
@@ -1368,14 +1378,14 @@ class Clusters(list):
         ncols = min(ncols, facet_count)
         nrows = math.ceil(facet_count / ncols)
         if figsize is None:
-            figsize = (4 * ncols, 4 * nrows)
+            figsize = (float(height) * float(aspect) * ncols, float(height) * nrows)
         figure, axes = plt.subplots(
             nrows, ncols, figsize=figsize, squeeze=False
         )
         axes_flat = axes.ravel()
 
-        for axis, number, cluster in zip(
-            axes_flat, cluster_numbers, selected_clusters
+        for axis, cluster_id, cluster in zip(
+            axes_flat, cluster_ids, selected_clusters
         ):
             positions = self._plot_cluster_layout(cluster, layout, seed)
             nx.draw_networkx_edges(
@@ -1421,7 +1431,7 @@ class Clusters(list):
                         fontsize=8,
                         zorder=4,
                     )
-            axis.set_title(f"Cluster {number}")
+            axis.set_title(cluster_id)
             axis.set_axis_off()
 
         for axis in axes_flat[facet_count:]:
