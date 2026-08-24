@@ -588,7 +588,7 @@ def test_cluster_boolean_expressions_short_circuit():
 
 
 def test_properties_includes_total_count_between_edges_and_diameter():
-    properties = _clusters_with_two_samples().properties
+    properties = _clusters_with_two_samples().properties(cpu=1)
 
     assert properties.columns.tolist()[:7] == [
         "cluster_no",
@@ -694,7 +694,7 @@ def test_empty_state_and_prerequisite_messages():
     with pytest.raises(RuntimeError, match="clusters have not been created"):
         clusters.save_to_cytoscape("unused")
     with pytest.raises(RuntimeError, match="clusters have not been created"):
-        _ = clusters.properties
+        _ = clusters.properties(cpu=1)
     with pytest.raises(RuntimeError, match="clusters have not been created"):
         clusters.alice(overlap_type="aaVJ", mismatches=1)
 
@@ -818,12 +818,12 @@ def test_properties_are_cached_and_return_defensive_copies(monkeypatch):
     monkeypatch.setattr(
         clustering_module.nx, "eccentricity", counted_eccentricity
     )
-    first = clusters.properties
-    second = clusters.properties
+    first = clusters.properties(cpu=1)
+    second = clusters.properties(cpu=1)
     first.loc[0, "total_count"] = -1
-    third = clusters.properties
+    third = clusters.properties(cpu=1)
 
-    assert len(calls) == 2
+    assert len(calls) == 1
     assert second["total_count"].tolist() == [15, 11]
     assert third["total_count"].tolist() == [15, 11]
 
@@ -1345,3 +1345,78 @@ def test_plot_cluster_validates_height_and_aspect(height, aspect):
         _clusters_with_two_samples().plot_cluster(
             0, height=height, aspect=aspect
         )
+
+
+def test_properties_forwards_cpu_and_uses_parallel_runner(monkeypatch):
+    clusters = _clusters_with_two_samples()
+    captured = {}
+
+    def fake_parallel(function, tasks, *args, **kwargs):
+        captured["cpu"] = kwargs["cpu"]
+        captured["task_count"] = len(tasks)
+        return [function(task) for task in tasks]
+
+    monkeypatch.setattr(
+        clustering_module, "run_parallel_calculation", fake_parallel
+    )
+
+    properties = clusters.properties(cpu=3)
+
+    assert captured == {"cpu": 3, "task_count": 2}
+    assert properties["cluster_id"].tolist() == ["cluster_0", "cluster_1"]
+
+
+def test_properties_singleton_shortcut_skips_all_consensus_calculations(
+    monkeypatch,
+):
+    clusters = _clusters_with_two_samples()
+    original_consensus = Cluster.calc_cluster_consensus
+    original_segment = Cluster.calc_cluster_consensus_segment
+
+    def guarded_consensus(cluster, *args, **kwargs):
+        if len(cluster) == 1:
+            raise AssertionError("singleton sequence consensus was calculated")
+        return original_consensus(cluster, *args, **kwargs)
+
+    def guarded_segment(cluster, *args, **kwargs):
+        if len(cluster) == 1:
+            raise AssertionError("singleton segment consensus was calculated")
+        return original_segment(cluster, *args, **kwargs)
+
+    monkeypatch.setattr(Cluster, "calc_cluster_consensus", guarded_consensus)
+    monkeypatch.setattr(Cluster, "calc_cluster_consensus_segment", guarded_segment)
+
+    properties = clusters.properties(cpu=1)
+    singleton = properties.loc[properties["nodes"] == 1].iloc[0]
+
+    assert singleton["concensus_cdr3aa"] == "CATS"
+    assert singleton["concensus_cdr3nt"] == "TGTGCC"
+    assert singleton["concensus_v"] == "TRBV2"
+    assert singleton["concensus_j"] == "TRBJ2"
+
+
+def test_properties_uses_first_v_and_j_when_overlap_requires_them(monkeypatch):
+    clusters = _clusters_with_two_samples()
+    clusters.overlap_type = "aaVJ"
+
+    def fail_segment_consensus(cluster, *args, **kwargs):
+        raise AssertionError("V/J modal consensus should have been skipped")
+
+    monkeypatch.setattr(
+        Cluster, "calc_cluster_consensus_segment", fail_segment_consensus
+    )
+
+    properties = clusters.properties(cpu=1)
+
+    assert properties["concensus_v"].tolist() == ["TRBV1", "TRBV2"]
+    assert properties["concensus_j"].tolist() == ["TRBJ1", "TRBJ2"]
+
+
+def test_properties_prints_progress_on_first_calculation(capsys):
+    clusters = _clusters_with_two_samples()
+
+    clusters.properties(cpu=1)
+
+    output = capsys.readouterr().out
+    assert "Calculating cluster properties" in output
+    assert "2/2 clusters processed" in output

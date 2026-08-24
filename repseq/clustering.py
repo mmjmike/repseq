@@ -312,6 +312,83 @@ def any_nodes(property_name, values):
     return _FunctionClusterExpression(name, evaluate, is_boolean=True)
 
 
+_CLUSTER_PROPERTY_COLUMNS = [
+    "cluster_no",
+    "cluster_id",
+    "nodes",
+    "edges",
+    "total_count",
+    "diameter",
+    "density",
+    "eccentricity",
+    "concensus_cdr3aa",
+    "concensus_cdr3nt",
+    "concensus_v",
+    "concensus_j",
+]
+
+
+def _cluster_properties_worker(args):
+    cluster_no, cluster, use_first_v, use_first_j = args
+    nodes = list(cluster)
+    if not nodes:
+        raise ValueError(f"Cluster {cluster_no} does not contain any nodes.")
+
+    first_node = nodes[0]
+    node_count = len(nodes)
+    edge_count = cluster.number_of_edges()
+    total_node_count = sum(node.count for node in nodes)
+    if node_count == 1:
+        diameter = 0
+        density = 0
+        average_eccentricity = 0
+        aa_consensus = first_node.seq_aa
+        nt_consensus = first_node.seq_nt
+        v_consensus = first_node.v
+        j_consensus = first_node.j
+    else:
+        diameter = nx.diameter(cluster)
+        density = nx.density(cluster)
+        average_eccentricity = np.mean(
+            list(nx.eccentricity(cluster).values())
+        )
+        aa_consensus = cluster.calc_cluster_consensus(
+            seq_type="prot", weigh_by=None
+        )
+        nt_consensus = cluster.calc_cluster_consensus(
+            seq_type="dna", weigh_by=None
+        )
+        v_consensus = (
+            first_node.v
+            if use_first_v
+            else cluster.calc_cluster_consensus_segment(
+                segment_type="v", weigh_by=None
+            )
+        )
+        j_consensus = (
+            first_node.j
+            if use_first_j
+            else cluster.calc_cluster_consensus_segment(
+                segment_type="j", weigh_by=None
+            )
+        )
+
+    return (
+        cluster_no,
+        f"cluster_{cluster_no}",
+        node_count,
+        edge_count,
+        total_node_count,
+        diameter,
+        density,
+        average_eccentricity,
+        aa_consensus,
+        nt_consensus,
+        v_consensus,
+        j_consensus,
+    )
+
+
 def _intersect_clusters_with_clonoset_worker(args):
     (
         sample_id,
@@ -1492,62 +1569,46 @@ class Clusters(list):
         return figure
 
 
-    @property
-    def properties(self):
-        """Return cached basic cluster properties as a dataframe copy."""
+    def properties(self, cpu=None):
+        """Return cached basic cluster properties calculated in parallel.
+
+        Args:
+            cpu (int | None): Number of worker processes. Use ``1`` for a
+                sequential calculation; ``None`` uses the executor default.
+        """
         self._require_clusters("calculate cluster properties")
         if self._properties_cache is None:
-            properties_list = [
-                "cluster_no",
-                "cluster_id",
-                "nodes",
-                "edges",
-                "total_count",
-                "diameter",
-                "density",
-                "eccentricity",
-                "concensus_cdr3aa",
-                "concensus_cdr3nt",
-                "concensus_v",
-                "concensus_j",
+            overlap_type = self.overlap_type
+            if overlap_type is None:
+                cluster_parameters = self.state_parameters.get(
+                    "clusters_created"
+                )
+                if cluster_parameters:
+                    overlap_type = cluster_parameters.get("overlap_type")
+            if overlap_type is None:
+                check_v = False
+                check_j = False
+            else:
+                _, check_v, check_j = overlap_type_to_flags(overlap_type)
+
+            tasks = [
+                (
+                    self._cluster_number(cluster, fallback_number),
+                    cluster,
+                    check_v,
+                    check_j,
+                )
+                for fallback_number, cluster in enumerate(self.clusters)
             ]
-            results = []
-            for fallback_number, cluster in enumerate(self.clusters):
-                cluster_no = self._cluster_number(cluster, fallback_number)
-                cluster_id = f"cluster_{cluster_no}"
-                average_eccentricity = np.mean(
-                    list(nx.eccentricity(cluster).values())
-                )
-                aa_consensus = cluster.calc_cluster_consensus(
-                    seq_type="prot", weigh_by=None
-                )
-                nt_consensus = cluster.calc_cluster_consensus(
-                    seq_type="dna", weigh_by=None
-                )
-                v_consensus = cluster.calc_cluster_consensus_segment(
-                    segment_type="v", weigh_by=None
-                )
-                j_consensus = cluster.calc_cluster_consensus_segment(
-                    segment_type="j", weigh_by=None
-                )
-                results.append(
-                    (
-                        cluster_no,
-                        cluster_id,
-                        len(cluster),
-                        nx.number_of_edges(cluster),
-                        sum(node.count for node in cluster),
-                        nx.diameter(cluster),
-                        nx.density(cluster),
-                        average_eccentricity,
-                        aa_consensus,
-                        nt_consensus,
-                        v_consensus,
-                        j_consensus,
-                    )
-                )
+            results = run_parallel_calculation(
+                _cluster_properties_worker,
+                tasks,
+                "Calculating cluster properties",
+                object_name="clusters",
+                cpu=cpu,
+            )
             self._properties_cache = pd.DataFrame(
-                results, columns=properties_list
+                results, columns=_CLUSTER_PROPERTY_COLUMNS
             )
         return self._properties_cache.copy()
 
@@ -1570,7 +1631,7 @@ class Clusters(list):
             "concensus_v",
             "concensus_j",
         ]
-        count_table = self.properties[property_columns].copy()
+        count_table = self.properties()[property_columns].copy()
         count_table.insert(
             1,
             "consensus",

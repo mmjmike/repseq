@@ -56,8 +56,12 @@ added before clustering is retained and applied when nodes are created. Methods
 that require clusters raise an actionable error if clustering has not yet been
 run.
 
-`Clusters.properties` is cached after its first calculation and returns a copy
-of the cached dataframe. Repeating `create_clusters` with unchanged clonotypes
+`Clusters.properties(cpu=None)` calculates one cluster per worker with a progress
+bar, caches the result after its first calculation, and returns a copy of the
+cached dataframe. Use `cpu=1` for sequential calculation. Single-node clusters
+reuse their node values directly; V and J consensus calculations are skipped
+when the clustering `overlap_type` already guarantees a single V or J value.
+Repeating `create_clusters` with unchanged clonotypes
 and identical mismatch/TCRdist parameters reuses the existing graph and prints
 the previously obtained cluster summary instead of recalculating it. Reading new
 clonotypes or changing/filtering the cluster collection invalidates applicable
