@@ -102,7 +102,9 @@ fig = clusters.plot_cluster(
 circle, triangle, rhombus, hexagon, and square. Color and shape legends are
 placed below the faceted panel. For IGH clusters, constant-gene calls are
 stored as the `isotype` node property with labels such as `IgM`, `IgG1`, and
-`IgA2`. Coloring by `isotype` uses the same ordering and palette as
+`IgA2`. Non-IGH constant calls, including IGK, IGL, TRA, TRB, TRG, and TRD,
+produce `isotype=None` rather than an error. Coloring by `isotype` displays
+these values as `NA` and uses the same ordering and palette as
 `rsplot.isotype_fraction`.
 
 ## Plotting cluster sequence logos

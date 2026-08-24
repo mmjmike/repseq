@@ -33,6 +33,21 @@ _NODE_PROPERTY_ALIASES = {
 }
 
 
+def _recode_cluster_isotype(constant_call):
+    """Recode IGH constants and return None for non-IGH chains."""
+    if pd.isna(constant_call):
+        return None
+    normalized_call = str(constant_call).strip().upper()
+    normalized_call = re.split(r"[,;|]", normalized_call, maxsplit=1)[0]
+    normalized_call = normalized_call.split("(", 1)[0].split("*", 1)[0]
+    if not normalized_call.startswith("IGH"):
+        return None
+    try:
+        return _recode_isotype(constant_call)
+    except ValueError:
+        return None
+
+
 def _node_property_value(node, property_name):
     if not isinstance(property_name, str) or not property_name:
         raise TypeError("Node property names must be non-empty strings.")
@@ -1718,7 +1733,7 @@ class Clusters(list):
         is_freq = "freq" in clonoset.columns
         is_count = "count" in clonoset.columns
         if igh:
-            clonoset["isotype"] = clonoset["c"].apply(_recode_isotype)
+            clonoset["isotype"] = clonoset["c"].apply(_recode_cluster_isotype)
         # if is_count:
         #     clonoset["count"] = 1
 
@@ -1758,7 +1773,10 @@ class Clusters(list):
                         freq=freq,
                         count=count)
             if igh:
-                node.additional_properties["isotype"] = row["isotype"]
+                isotype = row["isotype"]
+                node.additional_properties["isotype"] = (
+                    None if pd.isna(isotype) else isotype
+                )
             nodes_by_comparison_group[comparison_group].append(node)
             list_of_all_nodes.append(node)
         if verbose:
@@ -1853,7 +1871,7 @@ class Clusters(list):
         igh = "c" in clonoset.columns 
 
         if igh:
-            clonoset["isotype"] = clonoset["c"].apply(_recode_isotype)
+            clonoset["isotype"] = clonoset["c"].apply(_recode_cluster_isotype)
 
 
         nodes_by_len = {}
@@ -1891,7 +1909,10 @@ class Clusters(list):
                 nodes_by_len[len_cdr3aa] = []
             node = Node(node_id, cdr3nt, cdr3aa, v, j, sample_id, freq=freq, count=count)
             if igh:
-                node.additional_properties["isotype"] = row["isotype"]
+                isotype = row["isotype"]
+                node.additional_properties["isotype"] = (
+                    None if pd.isna(isotype) else isotype
+                )
             nodes_by_len[len_cdr3aa].append(node)
             list_of_all_nodes.append(node)
         if verbose:

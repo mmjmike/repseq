@@ -1055,3 +1055,59 @@ def test_verbosity_overrides_legacy_verbose_keyword(capsys):
     )
 
     assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize(
+    "constant_call",
+    ["TRBC2", "TRAC", "TRGC1", "TRDC", "IGKC", "IGLC1"],
+)
+def test_non_igh_constant_segments_have_none_isotype(constant_call):
+    pooled = pd.DataFrame(
+        {
+            "cdr3aa": ["CASS", "CATS"],
+            "cdr3nt": ["TGTGCT", "TGTGCC"],
+            "v": ["TRBV1", "TRBV1"],
+            "j": ["TRBJ1", "TRBJ1"],
+            "c": [constant_call, constant_call],
+            "sample_id": ["sample_1", "sample_1"],
+            "freq": [0.5, 0.5],
+            "count": [2, 1],
+        }
+    )
+    clusters = Clusters()
+    clusters.read_from_pooled_clonoset(pooled, verbosity=False)
+
+    clusters.create_clusters(
+        overlap_type="aaV", mismatches=1, cpu=1, verbosity=False
+    )
+
+    nodes = [node for cluster in clusters for node in cluster]
+    assert all(node.additional_properties["isotype"] is None for node in nodes)
+    figure = clusters.plot_cluster(0, color="isotype", size=None)
+    assert [text.get_text() for text in figure.legends[0].get_texts()] == ["NA"]
+
+
+def test_mixed_igh_and_tcr_constants_recode_independently():
+    pooled = pd.DataFrame(
+        {
+            "cdr3aa": ["CASS", "CATS"],
+            "cdr3nt": ["TGTGCT", "TGTGCC"],
+            "v": ["TRBV1", "TRBV2"],
+            "j": ["TRBJ1", "TRBJ1"],
+            "c": ["IGHG1*01", "TRBC2"],
+            "sample_id": ["sample_1", "sample_1"],
+            "freq": [0.5, 0.5],
+            "count": [2, 1],
+        }
+    )
+    clusters = Clusters()
+    clusters.read_from_pooled_clonoset(pooled, verbosity=False)
+    clusters.create_clusters(
+        overlap_type="aaV", mismatches=1, cpu=1, verbosity=False
+    )
+
+    isotypes = sorted(
+        (node.additional_properties["isotype"] for cluster in clusters for node in cluster),
+        key=lambda value: "" if value is None else value,
+    )
+    assert isotypes == [None, "IgG1"]
