@@ -2507,3 +2507,123 @@ def test_cluster_properties_plot_uses_default_metrics(monkeypatch):
         "norm_shannon_wiener",
     ]
     assert captured["kwargs"]["zero_bottom"] is True
+
+
+def _timepoint_count_table():
+    return pd.DataFrame(
+        {
+            "feature_id": ["feature_1", "feature_2", "feature_3"],
+            "feature_type": ["expanded", "stable", "other"],
+            "annotation": ["a", "b", "c"],
+            "sample_1": [1, 2, 9],
+            "sample_2": [3, 4, 6],
+            "sample_3": [5, 8, 3],
+        }
+    )
+
+
+def _timepoint_metadata(column="timepoint"):
+    return pd.DataFrame(
+        {
+            "sample_id": ["sample_1", "sample_2", "sample_3"],
+            column: [1, 1, 2],
+        }
+    )
+
+
+def _trajectory_lines(axis):
+    return [line for line in axis.lines if line.get_linestyle() == "-"]
+
+
+def test_timepoint_trajectory_averages_replicates_and_ignores_annotations():
+    grid = rsplot.timepoint_trajectory(
+        _timepoint_count_table(),
+        _timepoint_metadata(),
+    )
+    axis = grid.axes.flat[0]
+    lines = _trajectory_lines(axis)
+
+    assert len(lines) == 3
+    assert lines[0].get_ydata().tolist() == pytest.approx([2, 5])
+    assert lines[1].get_ydata().tolist() == pytest.approx([3, 8])
+    assert lines[2].get_ydata().tolist() == pytest.approx([7.5, 3])
+    assert [tick.get_text() for tick in axis.get_xticklabels()] == ["1", "2"]
+    assert axis.get_xlabel() == "timepoint"
+    assert axis.get_ylabel() == "Feature abundance"
+
+
+def test_timepoint_trajectory_colors_two_groups_and_accepts_custom_timepoint():
+    count_table = _timepoint_count_table().iloc[:2]
+    grid = rsplot.timepoint_trajectory(
+        count_table,
+        _timepoint_metadata("visit"),
+        timepoint_feature="visit",
+        feature_group="feature_type",
+        height=3,
+        aspect=2,
+    )
+    axis = grid.axes.flat[0]
+    lines = _trajectory_lines(axis)
+
+    assert to_rgba(lines[0].get_color()) == to_rgba("#F05670")
+    assert to_rgba(lines[1].get_color()) == to_rgba("#CCCCCC")
+    assert grid.fig.get_size_inches().tolist() == pytest.approx([6, 3])
+    assert axis.get_xlabel() == "visit"
+    assert [text.get_text() for text in axis.get_legend().get_texts()] == [
+        "expanded",
+        "stable",
+    ]
+
+
+def test_timepoint_trajectory_uses_palette_for_multiple_groups():
+    grid = rsplot.timepoint_trajectory(
+        _timepoint_count_table(),
+        _timepoint_metadata(),
+        feature_group="feature_type",
+        palette={"expanded": "blue", "stable": "green", "other": "orange"},
+    )
+    lines = _trajectory_lines(grid.axes.flat[0])
+
+    assert [to_rgba(line.get_color()) for line in lines] == [
+        to_rgba("blue"),
+        to_rgba("green"),
+        to_rgba("orange"),
+    ]
+
+
+def test_timepoint_trajectory_separate_panels_use_tree_analyzer_color():
+    grid = rsplot.timepoint_trajectory(
+        _timepoint_count_table().iloc[:2],
+        _timepoint_metadata(),
+        feature_group="feature_type",
+        separate=True,
+        height=2,
+        aspect=1.5,
+    )
+
+    assert len(grid.axes.flat) == 2
+    assert [axis.get_title() for axis in grid.axes.flat] == ["feature_1", "feature_2"]
+    assert all(
+        to_rgba(_trajectory_lines(axis)[0].get_color()) == to_rgba("#F05670")
+        for axis in grid.axes.flat
+    )
+    assert grid.fig.get_size_inches()[1] == pytest.approx(2)
+
+
+def test_timepoint_trajectory_validates_feature_and_metadata_columns():
+    duplicate_features = _timepoint_count_table().copy()
+    duplicate_features.loc[1, "feature_id"] = "feature_1"
+
+    with pytest.raises(ValueError, match="values must be unique"):
+        rsplot.timepoint_trajectory(duplicate_features, _timepoint_metadata())
+    with pytest.raises(ValueError, match="metadata must contain columns: timepoint"):
+        rsplot.timepoint_trajectory(
+            _timepoint_count_table(),
+            _timepoint_metadata("visit"),
+        )
+    with pytest.raises(ValueError, match="feature_group 'missing'"):
+        rsplot.timepoint_trajectory(
+            _timepoint_count_table(),
+            _timepoint_metadata(),
+            feature_group="missing",
+        )

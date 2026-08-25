@@ -4318,6 +4318,279 @@ def _draw_clonotypes_coverage_bars(data, trim_high_zero_bins=True, **kwargs):
     ax.set_xticks(range(len(labels)), labels)
 
 
+def _timepoint_order(series):
+    values = series.dropna()
+    if isinstance(values.dtype, pd.CategoricalDtype):
+        present = set(values)
+        return [value for value in values.cat.categories if value in present]
+    unique_values = values.drop_duplicates().tolist()
+    try:
+        return sorted(unique_values)
+    except TypeError:
+        return sorted(unique_values, key=lambda value: str(value))
+
+
+def _timepoint_trajectory_palette(groups, palette):
+    if palette is not None:
+        return _palette_mapping(groups, palette)
+    if len(groups) <= 1:
+        return {group: "#F05670" for group in groups}
+    if len(groups) == 2:
+        return {groups[0]: "#F05670", groups[1]: "#CCCCCC"}
+
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    return {
+        group: colors[index % len(colors)]
+        for index, group in enumerate(groups)
+    }
+
+
+def _draw_timepoint_trajectories(
+    data,
+    timepoint_feature,
+    timepoint_order,
+    color_map,
+    separate,
+    **kwargs,
+):
+    ax = kwargs.get("ax", plt.gca())
+    positions = {value: index for index, value in enumerate(timepoint_order)}
+    for _, feature_data in data.groupby("_feature", sort=False, observed=True):
+        feature_data = feature_data.copy()
+        feature_data["_position"] = feature_data[timepoint_feature].map(positions)
+        feature_data = feature_data.sort_values("_position")
+        means = feature_data["mean"].to_numpy(dtype=float)
+        lower_errors = means - feature_data["minimum"].to_numpy(dtype=float)
+        upper_errors = feature_data["maximum"].to_numpy(dtype=float) - means
+        color = "#F05670" if separate else color_map[feature_data["_group"].iloc[0]]
+        ax.plot(
+            feature_data["_position"],
+            means,
+            color=color,
+            linewidth=1.5,
+            zorder=2,
+        )
+        ax.scatter(
+            feature_data["_position"],
+            means,
+            color="0.15",
+            s=32,
+            zorder=3,
+        )
+        ax.errorbar(
+            feature_data["_position"],
+            means,
+            yerr=np.vstack([lower_errors, upper_errors]),
+            fmt="none",
+            ecolor="0.25",
+            elinewidth=1,
+            capsize=3,
+            zorder=1,
+        )
+
+    ax.set_xticks(range(len(timepoint_order)))
+    ax.set_xticklabels([str(value) for value in timepoint_order])
+    ax.grid(axis="y", color="0.9", linewidth=0.8)
+
+
+def timepoint_trajectory(
+    count_table,
+    metadata,
+    feature_column=None,
+    timepoint_feature=None,
+    feature_group=None,
+    separate=False,
+    palette=None,
+    height=4,
+    aspect=1.75,
+):
+    """Plot feature abundance trajectories across sample timepoints.
+
+    ``count_table`` is a wide feature-by-sample table. Sample columns are
+    identified by matching their names to ``metadata['sample_id']``; other
+    annotation columns are ignored. Replicate samples at the same timepoint
+    are summarized by their mean, with minimum-to-maximum error bars.
+
+    Parameters
+    ----------
+    count_table : pandas.DataFrame
+        Wide count or frequency table with one row per feature.
+    metadata : pandas.DataFrame
+        Sample metadata containing unique ``sample_id`` values and a
+        ``timepoint`` column, or the column selected by ``timepoint_feature``.
+    feature_column : str, optional
+        Unique feature identifier. The first count-table column is used by
+        default.
+    timepoint_feature : str, optional
+        Metadata column defining timepoints. Defaults to ``timepoint``.
+    feature_group : str, optional
+        Count-table annotation used to color trajectories in a combined plot.
+    separate : bool
+        Draw each feature in its own panel instead of one combined panel.
+    palette : optional
+        Group color mapping or any seaborn-compatible palette. With two groups,
+        the default colors are pink-red and grey; larger group sets use the
+        matplotlib color cycle.
+    height, aspect : float
+        Height and width-to-height ratio of each panel.
+
+    Returns
+    -------
+    seaborn.FacetGrid
+        Grid containing the combined or faceted trajectories.
+    """
+    if not isinstance(count_table, pd.DataFrame):
+        raise TypeError("count_table must be a pandas DataFrame")
+    if not isinstance(metadata, pd.DataFrame):
+        raise TypeError("metadata must be a pandas DataFrame")
+    if count_table.empty:
+        raise ValueError("count_table is empty")
+    if count_table.shape[1] == 0:
+        raise ValueError("count_table must contain at least one column")
+
+    selected_feature = (
+        count_table.columns[0] if feature_column is None else feature_column
+    )
+    if selected_feature not in count_table.columns:
+        raise ValueError(
+            f"feature_column '{selected_feature}' is not present in count_table"
+        )
+    if count_table[selected_feature].isna().any():
+        raise ValueError(f"feature_column '{selected_feature}' contains missing values")
+    if count_table[selected_feature].duplicated().any():
+        raise ValueError(f"feature_column '{selected_feature}' values must be unique")
+
+    selected_timepoint = "timepoint" if timepoint_feature is None else timepoint_feature
+    required_metadata = {"sample_id", selected_timepoint}
+    missing_metadata = required_metadata.difference(metadata.columns)
+    if missing_metadata:
+        raise ValueError(
+            "metadata must contain columns: " + ", ".join(sorted(missing_metadata))
+        )
+    duplicated_samples = metadata["sample_id"].duplicated(keep=False)
+    if duplicated_samples.any():
+        duplicates = (
+            metadata.loc[duplicated_samples, "sample_id"].drop_duplicates().tolist()
+        )
+        raise ValueError(
+            "metadata['sample_id'] values must be unique; duplicated values: "
+            f"{duplicates}"
+        )
+
+    if feature_group is not None and feature_group not in count_table.columns:
+        raise ValueError(
+            f"feature_group '{feature_group}' is not present in count_table"
+        )
+    if feature_group is not None and count_table[feature_group].isna().any():
+        raise ValueError(f"feature_group '{feature_group}' contains missing values")
+
+    sample_columns = [
+        sample_id
+        for sample_id in metadata["sample_id"]
+        if sample_id in count_table.columns
+    ]
+    if not sample_columns:
+        raise ValueError(
+            "metadata['sample_id'] values do not match any count_table columns"
+        )
+
+    sample_metadata = metadata.set_index("sample_id").loc[
+        sample_columns, [selected_timepoint]
+    ]
+    sample_metadata = sample_metadata.dropna(subset=[selected_timepoint])
+    if sample_metadata.empty:
+        raise ValueError(f"metadata has no non-missing '{selected_timepoint}' values")
+    sample_columns = sample_metadata.index.tolist()
+
+    values = count_table[sample_columns].apply(pd.to_numeric, errors="raise")
+    normalized = values.copy()
+    normalized["_feature"] = count_table[selected_feature].to_numpy()
+    if feature_group is None:
+        normalized["_group"] = "Feature"
+    else:
+        normalized["_group"] = count_table[feature_group].to_numpy()
+    normalized = normalized.melt(
+        id_vars=["_feature", "_group"],
+        value_vars=sample_columns,
+        var_name="sample_id",
+        value_name="value",
+    )
+    normalized = normalized.merge(
+        sample_metadata.reset_index(),
+        on="sample_id",
+        how="inner",
+        validate="many_to_one",
+    )
+
+    summary = (
+        normalized.groupby(
+            ["_feature", "_group", selected_timepoint],
+            sort=False,
+            observed=True,
+            dropna=False,
+        )["value"]
+        .agg(mean="mean", minimum="min", maximum="max")
+        .reset_index()
+    )
+    timepoint_order = _timepoint_order(sample_metadata[selected_timepoint])
+    groups = (
+        _category_order(count_table[feature_group])
+        if feature_group
+        else ["Feature"]
+    )
+    color_map = _timepoint_trajectory_palette(groups, palette)
+
+    if separate:
+        grid = sns.FacetGrid(
+            summary,
+            col="_feature",
+            col_wrap=3,
+            sharex=True,
+            sharey=True,
+            height=height,
+            aspect=aspect,
+            despine=True,
+        )
+        grid.map_dataframe(
+            _draw_timepoint_trajectories,
+            timepoint_feature=selected_timepoint,
+            timepoint_order=timepoint_order,
+            color_map=color_map,
+            separate=True,
+        )
+        grid.set_titles("{col_name}")
+    else:
+        grid = sns.FacetGrid(summary, height=height, aspect=aspect, despine=True)
+        grid.map_dataframe(
+            _draw_timepoint_trajectories,
+            timepoint_feature=selected_timepoint,
+            timepoint_order=timepoint_order,
+            color_map=color_map,
+            separate=False,
+        )
+        grid.axes.flat[0].set_title("Timepoint trajectories")
+        if feature_group is not None:
+            handles = [
+                Line2D(
+                    [],
+                    [],
+                    color=color_map[group],
+                    linewidth=1.5,
+                    label=str(group),
+                )
+                for group in groups
+            ]
+            grid.axes.flat[0].legend(
+                handles=handles,
+                title=feature_group,
+                frameon=False,
+            )
+
+    grid.set_axis_labels(selected_timepoint, "Feature abundance")
+    grid.tight_layout()
+    return grid
+
+
 def clonotypes_coverage(
     coverage_df,
     metadata=None,
@@ -4863,6 +5136,7 @@ __all__ = [
     "de_pairing",
     "beta_table",
     "rarefaction_curve",
+    "timepoint_trajectory",
     "clonotypes_coverage",
     "clonotype_coverage",
     "clonoset_stats",
