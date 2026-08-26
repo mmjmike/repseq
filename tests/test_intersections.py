@@ -552,20 +552,30 @@ def test_calc_publics_removes_trbv21_1_before_pgen_calculation(monkeypatch, caps
             "clonotype": [
                 "CASS1|TRBV21-1|TRBJ1-1",
                 "CASS2|TRBV21-1*01|TRBJ1-1",
-                "CASS3|TRBV30|TRBJ1-1",
+                "CASS3|TRBV7-5|TRBJ1-1",
+                "CASS4|TRBV7-5*01|TRBJ1-1",
+                "CASS5|TRBV30|TRBJ1-1",
             ],
-            "cdr3aa": ["CASS1", "CASS2", "CASS3"],
-            "v": ["TRBV21-1", "TRBV21-1*01", "TRBV30"],
-            "j": ["TRBJ1-1"] * 3,
-            "sample1": [1, 1, 1],
+            "cdr3aa": ["CASS1", "CASS2", "CASS3", "CASS4", "CASS5"],
+            "v": [
+                "TRBV21-1",
+                "TRBV21-1*01",
+                "TRBV7-5",
+                "TRBV7-5*01",
+                "TRBV30",
+            ],
+            "j": ["TRBJ1-1"] * 5,
+            "sample1": [1, 1, 1, 1, 1],
         }
     )
 
     result = intersections.calc_publics(table, _RecordingPgenModel())
 
-    assert result["cdr3aa"].tolist() == ["CASS3"]
-    assert observed_clonotypes == [("CASS3", "TRBV30", "TRBJ1-1")]
+    assert result["cdr3aa"].tolist() == ["CASS5"]
+    assert observed_clonotypes == [("CASS5", "TRBV30", "TRBJ1-1")]
     assert capsys.readouterr().out.startswith(
         "Unfamiliar v gene TRBV21-1 for OLGA Pgen calculation (non-functional). "
+        "Removed 2 clonotypes from resulting table\n"
+        "Unfamiliar v gene TRBV7-5 for OLGA Pgen calculation (non-functional). "
         "Removed 2 clonotypes from resulting table\n"
     )
