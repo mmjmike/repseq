@@ -2627,3 +2627,41 @@ def test_timepoint_trajectory_validates_feature_and_metadata_columns():
             _timepoint_metadata(),
             feature_group="missing",
         )
+
+
+
+def _publics_point_offsets(grid):
+    offsets = []
+    for collection in grid.axes.flat[0].collections:
+        collection_offsets = np.asarray(collection.get_offsets())
+        if collection_offsets.ndim == 2 and collection_offsets.shape[1] == 2:
+            offsets.extend(collection_offsets.tolist())
+    return np.asarray(offsets, dtype=float)
+
+
+def test_publics_orders_samples_and_draws_deterministic_jitter():
+    table = pd.DataFrame(
+        {
+            "samples": [10, 1, 2, 1, 2, 10],
+            "log10_pgen": [4.0, 2.0, 3.0, 2.5, 3.5, 4.5],
+        }
+    )
+
+    first = rsplot.publics(table, height=5, aspect=1.4)
+    second = rsplot.publics(table, height=5, aspect=1.4)
+
+    axis = first.axes.flat[0]
+    assert [tick.get_text() for tick in axis.get_xticklabels()] == ["1", "2", "10"]
+    assert axis.get_xlabel() == "Samples"
+    assert axis.get_ylabel() == "-log10(pgen)"
+    assert first.fig.get_figheight() == pytest.approx(5)
+    assert first.fig.get_figwidth() == pytest.approx(7)
+    np.testing.assert_allclose(
+        _publics_point_offsets(first),
+        _publics_point_offsets(second),
+    )
+
+
+def test_publics_validates_required_columns():
+    with pytest.raises(ValueError, match="log10_pgen"):
+        rsplot.publics(pd.DataFrame({"samples": [1]}))

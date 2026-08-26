@@ -208,6 +208,72 @@ def parse_gene_name(gene):
     }
 
 
+def publics(publics_table, height=4, aspect=1.2):
+    """Plot clonotype generation probability by sample prevalence.
+
+    Parameters
+    ----------
+    publics_table : pandas.DataFrame
+        Output of :func:`repseq.intersections.calc_publics`, containing
+        ``samples`` and ``log10_pgen`` columns.
+    height, aspect : float, default 4 and 1.2
+        Height and width-to-height ratio of the plot.
+
+    Returns
+    -------
+    seaborn.FacetGrid
+        A one-panel grid containing boxplots and jittered clonotype points.
+    """
+    if not isinstance(publics_table, pd.DataFrame):
+        raise TypeError("publics_table must be a pandas DataFrame")
+    required_columns = {"samples", "log10_pgen"}
+    missing_columns = required_columns.difference(publics_table.columns)
+    if missing_columns:
+        raise ValueError(
+            "publics_table is missing required columns: "
+            + ", ".join(sorted(missing_columns))
+        )
+    if publics_table.empty:
+        raise ValueError("publics_table must contain at least one clonotype")
+    if not pd.api.types.is_numeric_dtype(publics_table["samples"]):
+        raise TypeError("publics_table['samples'] must be numeric")
+    if not pd.api.types.is_numeric_dtype(publics_table["log10_pgen"]):
+        raise TypeError("publics_table['log10_pgen'] must be numeric")
+
+    sample_order = sorted(publics_table["samples"].dropna().unique())
+    grid = sns.FacetGrid(publics_table, height=height, aspect=aspect, despine=True)
+    ax = grid.axes.flat[0]
+    sns.boxplot(
+        data=publics_table,
+        x="samples",
+        y="log10_pgen",
+        order=sample_order,
+        showfliers=False,
+        color=sns.color_palette()[0],
+        ax=ax,
+    )
+    random_state = np.random.get_state()
+    try:
+        np.random.seed(10)
+        sns.stripplot(
+            data=publics_table,
+            x="samples",
+            y="log10_pgen",
+            order=sample_order,
+            jitter=0.2,
+            linewidth=0.3,
+            edgecolor="black",
+            alpha=0.75,
+            color=sns.color_palette()[0],
+            ax=ax,
+        )
+    finally:
+        np.random.set_state(random_state)
+    grid.set_axis_labels("Samples", "-log10(pgen)")
+    grid.tight_layout()
+    return grid
+
+
 def _natural_sort_key(value):
     return tuple(
         (0, int(part)) if part.isdigit() else (1, part.casefold())
@@ -5124,6 +5190,7 @@ __all__ = [
     "PROCESSING_PROPERTIES",
     "PHEATMAP_CMAP",
     "parse_gene_name",
+    "publics",
     "plot_stats",
     "segment_usage",
     "isotype_fraction",

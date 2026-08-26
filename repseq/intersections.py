@@ -333,6 +333,102 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
     return format_clonotype_columns(count_table, overlap_type)
 
 
+def calc_publics(count_table, pgen_model, presence_treshold=1):
+    """Add sample prevalence and OLGA generation probabilities to a count table.
+
+    Parameters
+    ----------
+    count_table : pandas.DataFrame
+        Table returned by :func:`count_table`. It must contain ``cdr3aa`` and
+        one numeric column per sample. Optional ``v`` and ``j`` columns control
+        which OLGA model arguments are supplied.
+    pgen_model : object
+        An initialized OLGA generation probability model exposing
+        ``compute_aa_CDR3_pgen``.
+    presence_treshold : int or float, default 1
+        Minimum count or frequency at which a clonotype is considered present
+        in a sample.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A copy of ``count_table`` with ``samples``, ``pgen``, and
+        ``log10_pgen`` columns. ``log10_pgen`` is ``-log10(pgen)``.
+    """
+    if not isinstance(count_table, pd.DataFrame):
+        raise TypeError("count_table must be a pandas DataFrame")
+    if "cdr3aa" not in count_table.columns:
+        raise ValueError("count_table must contain a 'cdr3aa' column")
+    if "j" in count_table.columns and "v" not in count_table.columns:
+        raise ValueError("count_table cannot contain 'j' without a 'v' column")
+    if not hasattr(pgen_model, "compute_aa_CDR3_pgen"):
+        raise TypeError("pgen_model must provide compute_aa_CDR3_pgen")
+    if not isinstance(presence_treshold, (int, float, np.integer, np.floating)):
+        raise TypeError("presence_treshold must be numeric")
+
+    result = count_table.copy()
+    feature_columns = {
+        "clonotype",
+        "cdr3aa",
+        "cdr3nt",
+        "v",
+        "j",
+        "len",
+        "samples",
+        "pgen",
+        "log10_pgen",
+    }
+    sample_columns = [
+        column for column in result.columns if column not in feature_columns
+    ]
+    if not sample_columns:
+        raise ValueError("count_table must contain at least one sample column")
+    non_numeric_columns = [
+        column
+        for column in sample_columns
+        if not pd.api.types.is_numeric_dtype(result[column])
+    ]
+    if non_numeric_columns:
+        raise TypeError(
+            "Sample columns must be numeric: " + ", ".join(map(str, non_numeric_columns))
+        )
+
+    result["samples"] = (result[sample_columns] >= presence_treshold).sum(axis=1)
+    if result.empty:
+        result["pgen"] = pd.Series(dtype=float)
+        result["log10_pgen"] = pd.Series(dtype=float)
+        return result
+
+    pgen_columns = ["cdr3aa"]
+    if "v" in result.columns:
+        pgen_columns.append("v")
+    if "j" in result.columns:
+        pgen_columns.append("j")
+    clonotypes = list(result[pgen_columns].itertuples(index=False, name=None))
+    chunk_count = min(50, len(clonotypes))
+    chunk_indices = np.array_split(np.arange(len(clonotypes)), chunk_count)
+    tasks = [
+        ([clonotypes[index] for index in indices], pgen_model)
+        for indices in chunk_indices
+        if len(indices)
+    ]
+    chunk_results = run_parallel_calculation(
+        _calc_publics_pgen_chunk,
+        tasks,
+        "Calculating p_gen using OLGA",
+        object_name="chunks",
+    )
+    result["pgen"] = [pgen for chunk in chunk_results for pgen in chunk]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        result["log10_pgen"] = -np.log10(result["pgen"].astype(float))
+    return result
+
+
+def _calc_publics_pgen_chunk(args):
+    clonotypes, pgen_model = args
+    return [pgen_model.compute_aa_CDR3_pgen(*clonotype) for clonotype in clonotypes]
+
+
 def _clonotypes_from_custom_dataframe(custom_clonotypes_df, overlap_type):
     required_columns_by_overlap_type = {
         "aa": ["cdr3aa"],

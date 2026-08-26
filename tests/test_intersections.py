@@ -440,3 +440,95 @@ def test_tcrnet_returns_string_clonotype_and_component_columns(monkeypatch):
     assert "clone" not in table.columns
     assert set(table["clonotype"]) == {"AAA|V1|J1", "AAT|V1|J1"}
     assert all(isinstance(clonotype, str) for clonotype in table["clonotype"])
+
+
+class _RecordingPgenModel:
+    def __init__(self, probability=1e-6):
+        self.probability = probability
+        self.calls = []
+
+    def compute_aa_CDR3_pgen(self, *args):
+        self.calls.append(args)
+        return self.probability
+
+
+@pytest.mark.parametrize(
+    ("feature_columns", "expected_call"),
+    [
+        ({}, ("CASS",)),
+        ({"v": ["TRBV30"]}, ("CASS", "TRBV30")),
+        (
+            {"v": ["TRBV30"], "j": ["TRBJ1-1"]},
+            ("CASS", "TRBV30", "TRBJ1-1"),
+        ),
+    ],
+)
+def test_calc_publics_uses_available_olga_arguments(
+    monkeypatch,
+    feature_columns,
+    expected_call,
+):
+    monkeypatch.setattr(intersections, "run_parallel_calculation", _run_sequential)
+    table = pd.DataFrame(
+        {
+            "clonotype": ["CASS"],
+            "cdr3aa": ["CASS"],
+            **feature_columns,
+            "sample1": [2],
+            "sample2": [1],
+        }
+    )
+    model = _RecordingPgenModel(probability=1e-6)
+
+    result = intersections.calc_publics(table, model, presence_treshold=2)
+
+    assert model.calls == [expected_call]
+    assert result.loc[0, "samples"] == 1
+    assert result.loc[0, "pgen"] == pytest.approx(1e-6)
+    assert result.loc[0, "log10_pgen"] == pytest.approx(6)
+    assert "samples" not in table.columns
+
+
+def test_calc_publics_splits_clonotypes_into_50_balanced_chunks(monkeypatch):
+    observed_tasks = []
+
+    def run_and_record(function, tasks, *args, **kwargs):
+        observed_tasks.extend(tasks)
+        return [function(task) for task in tasks]
+
+    monkeypatch.setattr(intersections, "run_parallel_calculation", run_and_record)
+    row_count = 103
+    table = pd.DataFrame(
+        {
+            "clonotype": [f"CASS{index}" for index in range(row_count)],
+            "cdr3aa": [f"CASS{index}" for index in range(row_count)],
+            "v": ["TRBV30"] * row_count,
+            "j": ["TRBJ1-1"] * row_count,
+            "sample1": [1] * row_count,
+        }
+    )
+
+    result = intersections.calc_publics(table, _RecordingPgenModel())
+
+    chunk_sizes = [len(task[0]) for task in observed_tasks]
+    assert len(chunk_sizes) == 50
+    assert max(chunk_sizes) - min(chunk_sizes) <= 1
+    assert len(result) == row_count
+    assert result["samples"].eq(1).all()
+
+
+def test_calc_publics_requires_amino_acid_and_numeric_sample_columns(monkeypatch):
+    monkeypatch.setattr(intersections, "run_parallel_calculation", _run_sequential)
+    model = _RecordingPgenModel()
+
+    with pytest.raises(ValueError, match="cdr3aa"):
+        intersections.calc_publics(
+            pd.DataFrame({"clonotype": ["ATG"], "cdr3nt": ["ATG"], "s1": [1]}),
+            model,
+        )
+
+    with pytest.raises(TypeError, match="Sample columns must be numeric"):
+        intersections.calc_publics(
+            pd.DataFrame({"clonotype": ["CASS"], "cdr3aa": ["CASS"], "s1": ["1"]}),
+            model,
+        )
