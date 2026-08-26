@@ -532,3 +532,40 @@ def test_calc_publics_requires_amino_acid_and_numeric_sample_columns(monkeypatch
             pd.DataFrame({"clonotype": ["CASS"], "cdr3aa": ["CASS"], "s1": ["1"]}),
             model,
         )
+
+
+
+def test_calc_publics_removes_trbv21_1_before_pgen_calculation(monkeypatch, capsys):
+    observed_clonotypes = []
+
+    def run_and_record(function, tasks, *args, **kwargs):
+        observed_clonotypes.extend(
+            clonotype
+            for task in tasks
+            for clonotype in task[0]
+        )
+        return [function(task) for task in tasks]
+
+    monkeypatch.setattr(intersections, "run_parallel_calculation", run_and_record)
+    table = pd.DataFrame(
+        {
+            "clonotype": [
+                "CASS1|TRBV21-1|TRBJ1-1",
+                "CASS2|TRBV21-1*01|TRBJ1-1",
+                "CASS3|TRBV30|TRBJ1-1",
+            ],
+            "cdr3aa": ["CASS1", "CASS2", "CASS3"],
+            "v": ["TRBV21-1", "TRBV21-1*01", "TRBV30"],
+            "j": ["TRBJ1-1"] * 3,
+            "sample1": [1, 1, 1],
+        }
+    )
+
+    result = intersections.calc_publics(table, _RecordingPgenModel())
+
+    assert result["cdr3aa"].tolist() == ["CASS3"]
+    assert observed_clonotypes == [("CASS3", "TRBV30", "TRBJ1-1")]
+    assert capsys.readouterr().out.startswith(
+        "Unfamiliar v gene TRBV21-1 for OLGA Pgen calculation (non-functional). "
+        "Removed 2 clonotypes from resulting table\n"
+    )

@@ -367,6 +367,18 @@ def calc_publics(count_table, pgen_model, presence_treshold=1):
         raise TypeError("presence_treshold must be numeric")
 
     result = count_table.copy()
+    if "v" in result.columns:
+        unfamiliar_v = result["v"].astype("string").str.contains(
+            "TRBV21-1", regex=False, na=False
+        )
+        removed_count = int(unfamiliar_v.sum())
+        if removed_count:
+            result = result.loc[~unfamiliar_v].copy()
+            print(
+                "Unfamiliar v gene TRBV21-1 for OLGA Pgen calculation "
+                f"(non-functional). Removed {removed_count} clonotypes from resulting table"
+            )
+
     feature_columns = {
         "clonotype",
         "cdr3aa",
