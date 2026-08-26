@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 import types
+import warnings
 import pandas as pd
 import pytest
 from matplotlib.collections import PathCollection
@@ -600,6 +601,20 @@ def test_properties_includes_total_count_between_edges_and_diameter():
         "density",
     ]
     assert properties["total_count"].tolist() == [15, 11]
+
+
+def test_properties_is_method_without_legacy_property_behavior():
+    clusters = _clusters_with_two_samples()
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        properties_method = clusters.properties
+
+    assert isinstance(Clusters.__dict__["properties"], types.FunctionType)
+    assert isinstance(properties_method, types.MethodType)
+    assert caught == []
+    with pytest.raises(AttributeError):
+        _ = properties_method.columns
 
 
 @pytest.mark.parametrize(

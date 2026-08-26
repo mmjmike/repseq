@@ -1570,7 +1570,9 @@ class Clusters(list):
 
 
     def properties(self, cpu=None):
-        """Return cached basic cluster properties calculated in parallel.
+        """Calculate and return cached basic cluster properties.
+
+        This is a method and must be called as ``clusters.properties()``.
 
         Args:
             cpu (int | None): Number of worker processes. Use ``1`` for a
