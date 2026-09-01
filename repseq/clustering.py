@@ -3,7 +3,7 @@ from .common_functions import run_parallel_calculation, print_progress_bar
 from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_dict, get_logo_for_list_of_clonotypes
 from .clone_filter import Filter
 from .io import read_clonoset
-from .plot import _isotype_colors, _isotype_order, _recode_isotype
+from .plot import _category_order, _isotype_colors, _isotype_order, _recode_isotype
 from scipy.stats import poisson
 from statsmodels.stats.multitest import multipletests
 from .common_functions import overlap_type_to_flags, overlap_type_uses_sequence
@@ -1159,6 +1159,11 @@ class Clusters(list):
     def _plot_node_property(node, property_name):
         value = _node_property_value(node, property_name)
 
+        return Clusters._plot_property_value(value)
+
+
+    @staticmethod
+    def _plot_property_value(value):
         if value is None:
             return "NA"
         missing = pd.isna(value)
@@ -1169,6 +1174,39 @@ class Clusters(list):
         except TypeError:
             return str(value)
         return value
+
+
+    def _plot_property_levels(self, property_name, selected_nodes, values):
+        observed_levels = set(values.values())
+        source_series = None
+        for metadata in reversed(self._metadata_frames):
+            if property_name in metadata.columns:
+                source_series = metadata[property_name]
+                break
+        if source_series is None:
+            for data in (self.clonotypes, getattr(self, "clonosets_df", None)):
+                if isinstance(data, pd.DataFrame) and property_name in data.columns:
+                    source_series = data[property_name]
+                    break
+
+        levels = []
+        if source_series is not None:
+            for value in _category_order(source_series):
+                level = self._plot_property_value(value)
+                if level in observed_levels and level not in levels:
+                    levels.append(level)
+
+        indexed_nodes = list(enumerate(selected_nodes))
+        if indexed_nodes and all(
+            isinstance(node.id, Real) and not isinstance(node.id, (bool, np.bool_))
+            for _, node in indexed_nodes
+        ):
+            indexed_nodes.sort(key=lambda item: (item[1].id, item[0]))
+        for _, node in indexed_nodes:
+            level = values[node]
+            if level not in levels:
+                levels.append(level)
+        return levels
 
 
     @staticmethod
@@ -1392,13 +1430,13 @@ class Clusters(list):
         ]
 
         color_values = {}
-        color_levels = []
         if color is not None:
             for node in selected_nodes:
                 value = self._plot_node_property(node, color)
                 color_values[node] = value
-                if value not in color_levels:
-                    color_levels.append(value)
+            color_levels = self._plot_property_levels(
+                color, selected_nodes, color_values
+            )
             if color == "isotype":
                 color_levels = _isotype_order(color_levels)
                 if palette is None:
@@ -1409,13 +1447,13 @@ class Clusters(list):
 
         shape_markers = ["o", "^", "D", "h", "s"]
         shape_values = {}
-        shape_levels = []
         if shape is not None:
             for node in selected_nodes:
                 value = self._plot_node_property(node, shape)
                 shape_values[node] = value
-                if value not in shape_levels:
-                    shape_levels.append(value)
+            shape_levels = self._plot_property_levels(
+                shape, selected_nodes, shape_values
+            )
             if len(shape_levels) > len(shape_markers):
                 raise ValueError(
                     "shape supports at most five levels: circle, triangle, "

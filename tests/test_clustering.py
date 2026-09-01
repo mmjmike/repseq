@@ -211,6 +211,37 @@ def test_plot_cluster_facets_style_nodes_and_add_legends():
     assert figure.number not in plt.get_fignums()
 
 
+def test_plot_cluster_orders_color_and_shape_levels_by_source_columns():
+    clusters = Clusters()
+    cluster = Cluster()
+    nodes = [
+        Node(index, "TGTGCT", "CASS", "TRBV1", "TRBJ1", "sample_1", 0.1, 1)
+        for index in range(3)
+    ]
+    color_groups = ["first", "second", "third"]
+    shape_groups = ["circle", "triangle", "diamond"]
+    for node, color_group, shape_group in zip(nodes, color_groups, shape_groups):
+        node.additional_properties.update(
+            {"color_group": color_group, "shape_group": shape_group}
+        )
+    cluster.add_nodes_from([nodes[2], nodes[0], nodes[1]])
+    clusters.clusters = [cluster]
+    clusters.clonotypes = pd.DataFrame(
+        {"color_group": color_groups, "shape_group": shape_groups}
+    )
+
+    figure = clusters.plot_cluster(
+        0, color="color_group", shape="shape_group", size=None
+    )
+
+    assert [text.get_text() for text in figure.legends[0].get_texts()] == color_groups
+    assert [text.get_text() for text in figure.legends[1].get_texts()] == shape_groups
+    assert [
+        handle.get_marker() for handle in figure.legends[1].legend_handles
+    ] == ["o", "^", "D"]
+    plt.close(figure)
+
+
 @pytest.mark.parametrize(
     "layout", ["spring", "kamada_kawai", "circular", "shell", "spectral"]
 )
