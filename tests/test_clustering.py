@@ -10,7 +10,7 @@ import types
 import warnings
 import pandas as pd
 import pytest
-from matplotlib.collections import PathCollection
+from matplotlib.collections import LineCollection, PathCollection
 from matplotlib.colors import to_rgba
 
 import repseq.clustering as clustering_module
@@ -416,6 +416,38 @@ def test_plot_cluster_supports_linear_and_uniform_node_sizes():
     np.testing.assert_allclose(_plotted_node_sizes(uniform_figure), [45, 45, 45])
     assert linear_figure.number not in plt.get_fignums()
     assert uniform_figure.number not in plt.get_fignums()
+
+
+@pytest.mark.parametrize(("edge_width", "expected_width"), [(None, 0.6), (2.5, 2.5)])
+def test_plot_cluster_supports_edge_width_and_draws_nodes_without_strokes(
+    edge_width, expected_width
+):
+    kwargs = {} if edge_width is None else {"edge_width": edge_width}
+    figure = _clusters_with_two_samples().plot_cluster(0, **kwargs)
+
+    edge_collections = [
+        collection
+        for collection in figure.axes[0].collections
+        if isinstance(collection, LineCollection)
+    ]
+    node_collections = [
+        collection
+        for collection in figure.axes[0].collections
+        if isinstance(collection, PathCollection)
+    ]
+
+    assert len(edge_collections) == 1
+    np.testing.assert_allclose(
+        edge_collections[0].get_linewidths(), [expected_width]
+    )
+    assert node_collections
+    assert all(
+        collection.get_edgecolors().size == 0 for collection in node_collections
+    )
+    assert all(
+        np.all(collection.get_linewidths() == 0) for collection in node_collections
+    )
+    plt.close(figure)
 
 
 def test_find_nodes_and_edges_recodes_igh_c_as_isotype():

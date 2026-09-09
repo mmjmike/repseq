@@ -1320,6 +1320,7 @@ class Clusters(list):
         max_clusters=50,
         height=4,
         aspect=1,
+        edge_width=0.6,
     ):
         """Plot one, selected, or all clusters as network facets.
 
@@ -1352,6 +1353,7 @@ class Clusters(list):
                 when ``cluster_no=None``. Ignored for explicit identifiers.
             height (float): Height of each facet in inches.
             aspect (float): Facet width divided by facet height.
+            edge_width (float): Width of graph edges. Defaults to ``0.6``.
 
         Returns:
             matplotlib.figure.Figure: The generated figure.
@@ -1422,6 +1424,13 @@ class Clusters(list):
             or aspect <= 0
         ):
             raise ValueError("aspect must be a positive number.")
+        if (
+            not isinstance(edge_width, Real)
+            or isinstance(edge_width, (bool, np.bool_))
+            or not np.isfinite(edge_width)
+            or edge_width < 0
+        ):
+            raise ValueError("edge_width must be a finite non-negative number.")
         if not isinstance(log_scaled, (bool, np.bool_)):
             raise TypeError("log_scaled must be a boolean.")
 
@@ -1508,7 +1517,7 @@ class Clusters(list):
                 positions,
                 ax=axis,
                 edge_color="#A9A9A9",
-                width=0.6,
+                width=edge_width,
                 alpha=0.75,
             )
             levels_to_draw = shape_levels if shape is not None else [None]
@@ -1530,8 +1539,8 @@ class Clusters(list):
                     node_size=[node_sizes[node] for node in nodes_for_shape],
                     node_color=node_colors,
                     node_shape=shape_map[shape_level],
-                    edgecolors="white",
-                    linewidths=0.8,
+                    edgecolors="none",
+                    linewidths=0,
                     ax=axis,
                 )
             if label is not None:
