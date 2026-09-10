@@ -2284,6 +2284,20 @@ def _tcrnet_volcano_table():
     )
 
 
+def test_tcrnet_volcano_sets_negative_log2_fc_values_to_zero():
+    plotted = rsplot._prepare_tcrnet_volcano_data(
+        pd.DataFrame(
+            {
+                "log2_fc": [-np.inf, -0.5, 1.0],
+                "log10_b_adj": [1.0, 1.0, 1.0],
+            }
+        ),
+        "log10_b_adj",
+    )
+
+    assert plotted["log2_fc"].tolist() == [0, 0, 1]
+
+
 def test_tcrnet_volcano_draws_thresholds_and_four_pass_states():
     fig = rsplot.tcrnet_volcano(
         _tcrnet_volcano_table(),
