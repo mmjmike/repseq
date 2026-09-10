@@ -488,8 +488,53 @@ Calling the method again overwrites `splitted_community_id` on the source object
 
 ## [ALICE](https://journals.plos.org/plosbiology/article?id=10.1371/journal.pbio.3000314) (Antigen-specific Lymphocyte Identification by Clustering of Expanded sequences)
 
-ALICE works by treating clonotypes as graph vertices, with edges connecting sequences which differ by at most 1 CDR3 amino acid. It identifies clonotypes with a higher numbers of neighbors than expected by a null model of recombination, separating clusters of antigen-responding clonotypes from clusters arising from recombination statistics.<br>Currently, it is implemented for <i>H.sapiens</i> only.
+ALICE identifies clonotypes with more one-amino-acid-mismatch neighbours than
+expected from their random generation probabilities. Pass an initialized OLGA
+model directly to `Clusters.alice()`:
 
 ```py
-alice(clusters, overlap_type='aaVJ', mismatches=1, species="hs", olga_warnings=False)
+from repseq.pgen_calculation import create_olga_model
+
+pgen_model = create_olga_model("human_T_beta")
+clusters.alice(
+    pgen_model,
+    overlap_type="aaVJ",
+    alice_alpha=0.05,
+    method="bonferroni",
+    cpu=4,
+)
+
+alice_table = clusters.as_dataframe()
 ```
+
+`overlap_type` may be `"aa"`, `"aaV"`, or `"aaVJ"`. It controls whether V and
+J calls are passed to OLGA and included when unique clonotypes and wildcard
+neighbours are identified. Unique pgen inputs are processed in chunks of 50;
+use `cpu=1` for sequential execution.
+
+Each tested node receives these additional properties:
+
+- `alice_pgen`: generation probability of the clonotype itself.
+- `neighbors_pgen`: corrected total probability of its one-mismatch neighbours.
+- `total_nodes`: number of nodes across every cluster, including singleton clusters.
+- `alice_p_value`: greater-tail binomial p-value for the observed graph degree.
+- `alice_p_adj`: p-value after the selected multiple-testing correction.
+- `log10_alice_pval`: `-log10(alice_p_value)`.
+- `alice_hit`: whether `alice_p_adj < alice_alpha`.
+
+Singleton clusters are not tested and have `alice_hit=False`. Nodes with OLGA-
+unsupported V calls such as `TRBV21-1` or `TRBV7-5` have missing ALICE values.
+Calling `alice()` again with the same model does not repeat the calculation; use
+`clusters.as_dataframe()` to retrieve the existing results.
+
+The current threshold is available through `get_alice_alpha()`. It can be changed
+without recalculating pgens or p-values:
+
+```py
+print(clusters.get_alice_alpha())  # 0.05
+clusters.set_alice_alpha(0.01)
+alice_table = clusters.as_dataframe()
+```
+
+Calling `set_alice_alpha()` before ALICE has been calculated leaves the default
+threshold unchanged.

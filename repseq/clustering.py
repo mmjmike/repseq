@@ -4,7 +4,7 @@ from .logo import create_motif_dict, sum_motif_dicts, get_consensus_from_motif_d
 from .clone_filter import Filter
 from .io import read_clonoset
 from .plot import _category_order, _isotype_colors, _isotype_order, _recode_isotype
-from scipy.stats import poisson
+from scipy.stats import binom
 from statsmodels.stats.multitest import multipletests
 from .common_functions import overlap_type_to_flags, overlap_type_uses_sequence
 import numpy as np
@@ -350,6 +350,14 @@ def _cluster_pgen_worker(args):
     return cluster_index, values
 
 
+def _alice_pgen_worker(args):
+    clonotypes, pgen_model = args
+    return {
+        clonotype: pgen_model.compute_aa_CDR3_pgen(*clonotype)
+        for clonotype in clonotypes
+    }
+
+
 def _cluster_properties_worker(args):
     cluster_no, cluster, use_first_v, use_first_j = args
     nodes = list(cluster)
@@ -667,6 +675,8 @@ class Clusters(list):
         self.clusters = []
         self.cluster_communities_louvain = None
         self.alice_results = None
+        self._alice_alpha = 0.05
+        self._alice_model = None
         self.tcrdist_radius = None
         self.state = {
             "empty": True,
@@ -758,6 +768,7 @@ class Clusters(list):
     def _invalidate_cluster_dependent_analysis(self):
         self.cluster_communities_louvain = None
         self.alice_results = None
+        self._alice_model = None
         self.state["cluster_communities_found"] = False
         self.state["node_pgen_calculated"] = False
         self.state["alice_calculated"] = False
@@ -779,6 +790,7 @@ class Clusters(list):
         self.clusters = []
         self.cluster_communities_louvain = None
         self.alice_results = None
+        self._alice_model = None
         self._metadata_frames = []
         self._cluster_cache_signature = None
         self._invalidate_properties_cache()
@@ -2638,6 +2650,7 @@ class Clusters(list):
         self._cluster_cache_signature = cache_signature
         self._invalidate_properties_cache()
         self.alice_results = None
+        self._alice_model = None
         self.state.update(
             {
                 "empty": False,
@@ -2921,105 +2934,235 @@ class Clusters(list):
     #     return result_df
 
 
-    def alice(self, 
-        cl_filter=None, 
-        overlap_type=None, 
-        mismatches=None,
-        generation_model='human_T_beta', 
-        Q=9.41, 
-        alpha=0.05, 
-        olga_warnings=False,
-        skip_single_nodes=False,
-        method='bonferroni'):
+    def alice(
+        self,
+        pgen_model=None,
+        overlap_type=None,
+        alice_alpha=0.05,
+        method="bonferroni",
+        cpu=None,
+        **legacy_options,
+    ):
+        """Calculate ALICE enrichment statistics and add them to the nodes.
 
+        The probability of the one-amino-acid-mismatch neighbourhood is
+        calculated with OLGA wildcard sequences. Singleton clusters and nodes
+        with V genes unsupported by the standard OLGA human TRB model are
+        retained in the result but are not tested.
+        """
         self._require_clusters("run ALICE")
-        if overlap_type is None:
-            overlap_type = self.overlap_type
-        if mismatches is None:
-            mismatches = self.mismatches
-        if method not in ['bonferroni', 'sidak', 'holm-sidak', 'holm', 'simes-hochberg', 'hommel', 'fdr_bh', 'fdr_by','fdr_tsbh', 'fdr_tsbky']:
-            raise ValueError("P-value adjustment method is not one on the list. Possible values are: ['bonferroni', 'sidak', 'holm-sidak', 'holm', 'simes-hochberg', 'hommel', 'fdr_bh', 'fdr_by','fdr_tsbh', 'fdr_tsbky']")
-        if mismatches > 1:
-            print(f'Using {mismatches} may increase runtime.')
-
-        try:
+        if pgen_model is None and "generation_model" in legacy_options:
             from .pgen_calculation import calculate_clonotypes_pgen
-        except ImportError as exc:
-            raise ImportError(
-                "ALICE pgen calculation requires optional pgen dependencies. "
-                "Install them with `pip install repseq[pgen]`."
-            ) from exc
-        
-        if skip_single_nodes:
-            clusters_all = self.as_dataframe()
-        clusters = self.as_dataframe(filter_one_node_clusters=skip_single_nodes)
-        clusters_all_pgen = calculate_clonotypes_pgen(clonosets_df=clusters, 
-                                                                    cl_filter=cl_filter, 
-                                                                    overlap_type=overlap_type, 
-                                                                    mismatches=mismatches, 
-                                                                    generation_model=generation_model, 
-                                                                    olga_warnings=olga_warnings)
 
+            generation_model = legacy_options["generation_model"]
+            legacy_alpha = legacy_options.get("alpha", alice_alpha)
+            self.alice_results = calculate_clonotypes_pgen(
+                clonosets_df=self.as_dataframe(),
+                overlap_type=overlap_type or self.overlap_type,
+                mismatches=legacy_options.get("mismatches", self.mismatches),
+                generation_model=generation_model,
+            )
+            self._alice_alpha = float(legacy_alpha)
+            self.state["node_pgen_calculated"] = True
+            self.state["alice_calculated"] = True
+            self.state_parameters["node_pgen_calculated"] = {
+                "generation_model": generation_model,
+            }
+            self.state_parameters["alice_calculated"] = {
+                "generation_model": generation_model,
+                "alice_alpha": self._alice_alpha,
+            }
+            return self.alice_results
+        if legacy_options:
+            names = ", ".join(sorted(legacy_options))
+            raise TypeError(f"Unexpected ALICE options: {names}")
+        if not hasattr(pgen_model, "compute_aa_CDR3_pgen"):
+            raise TypeError("pgen_model must provide compute_aa_CDR3_pgen")
+        if self.state["alice_calculated"] and self._alice_model is pgen_model:
+            print(
+                "ALICE was already run with this model. Get the results with "
+                "as_dataframe()."
+            )
+            return self.alice_results
+
+        if overlap_type is None:
+            overlap_type = self.overlap_type or "aaVJ"
         aa, check_v, check_j = overlap_type_to_flags(overlap_type)
-        if not check_v and not check_j:
-            clusters_all_pgen['n'] = len(clusters_all_pgen)
-        else:
-            columns_to_check = ['v']
-            if check_j:
-                columns_to_check = ['v', 'j']
-            group_counts = clusters_all_pgen[columns_to_check + ['cdr3aa']].groupby(by=columns_to_check).count().rename(columns={'cdr3aa': 'n'}).reset_index()
-            clusters_all_pgen = clusters_all_pgen.merge(group_counts)
-            
-        alice_lambda = clusters_all_pgen['n'] * Q * clusters_all_pgen['pgen'].to_numpy()
-        d = clusters_all_pgen['n_neighbours'].to_numpy()
-        p = poisson.pmf(d, mu=alice_lambda)
-        reject, pvals_corrected, alphacSidak, alphacBonf = multipletests(p, alpha=alpha, method=method)
-        clusters_all_pgen['p_value'] = p
-        clusters_all_pgen['p_value_adj'] = pvals_corrected
-        clusters_all_pgen['is_alice_hit'] = pvals_corrected < alpha
-        if skip_single_nodes:
-            self.alice_results = clusters_all.merge(clusters_all_pgen, how='left')
-        else:
-            self.alice_results = clusters_all_pgen.sort_values(by='p_value_adj').reset_index(drop=True)
-
-        alice_parameters = {
-            "overlap_type": overlap_type,
-            "mismatches": mismatches,
-            "generation_model": generation_model,
-            "Q": Q,
-            "alpha": alpha,
-            "olga_warnings": olga_warnings,
-            "skip_single_nodes": skip_single_nodes,
-            "method": method,
+        if not aa or not overlap_type_uses_sequence(overlap_type):
+            raise ValueError("ALICE supports only aa, aaV, and aaVJ overlap types.")
+        allowed_methods = {
+            "bonferroni", "sidak", "holm-sidak", "holm", "simes-hochberg",
+            "hommel", "fdr_bh", "fdr_by", "fdr_tsbh", "fdr_tsbky",
         }
-        if cl_filter is not None:
-            alice_parameters["filter"] = self._filter_parameters(cl_filter)
+        if method not in allowed_methods:
+            raise ValueError(
+                "P-value adjustment method is not supported by ALICE."
+            )
+        self._validate_alice_alpha(alice_alpha)
+
+        total_nodes = sum(len(cluster) for cluster in self.clusters)
+        property_names = [
+            "alice_pgen",
+            "neighbors_pgen",
+            "total_nodes",
+            "alice_p_value",
+            "alice_p_adj",
+            "log10_alice_pval",
+            "alice_hit",
+        ]
+        eligible_nodes = []
+        node_keys = {}
+        unique_clonotypes = set()
+        for cluster in self.clusters:
+            for node in cluster:
+                node.additional_properties.update(
+                    {name: None for name in property_names}
+                )
+                node.additional_properties["total_nodes"] = total_nodes
+                if self._has_unfamiliar_olga_v(node.v):
+                    continue
+                if len(cluster) == 1:
+                    node.additional_properties["alice_hit"] = False
+                    continue
+                clonotype = (
+                    node.seq_aa,
+                    node.v if check_v else None,
+                    node.j if check_j else None,
+                )
+                eligible_nodes.append((cluster, node))
+                node_keys[node] = clonotype
+                unique_clonotypes.add(clonotype)
+
+        wildcard_neighbours = {}
+        unique_pgen_inputs = set(unique_clonotypes)
+        for clonotype in unique_clonotypes:
+            cdr3aa, v_call, j_call = clonotype
+            neighbours = {
+                (cdr3aa[:position] + "X" + cdr3aa[position + 1:], v_call, j_call)
+                for position in range(len(cdr3aa))
+            }
+            wildcard_neighbours[clonotype] = neighbours
+            unique_pgen_inputs.update(neighbours)
+
+        pgen_values = {}
+        pgen_inputs = sorted(unique_pgen_inputs, key=lambda value: tuple(
+            "" if part is None else str(part) for part in value
+        ))
+        tasks = [
+            (pgen_inputs[index:index + 50], pgen_model)
+            for index in range(0, len(pgen_inputs), 50)
+        ]
+        if tasks:
+            pgen_chunks = run_parallel_calculation(
+                _alice_pgen_worker,
+                tasks,
+                "Calculating ALICE pgen using OLGA",
+                object_name="chunks",
+                cpu=cpu,
+            )
+            for chunk in pgen_chunks:
+                pgen_values.update(chunk)
+
+        valid_nodes = []
+        raw_p_values = []
+        for cluster, node in eligible_nodes:
+            clonotype = node_keys[node]
+            alice_pgen = pgen_values[clonotype]
+            neighbours_pgen = sum(
+                pgen_values[neighbour]
+                for neighbour in wildcard_neighbours[clonotype]
+            ) - (len(node.seq_aa) - 1) * alice_pgen
+            neighbours_pgen = float(np.clip(neighbours_pgen, 0, 1))
+            neighbour_count = cluster.degree(node)
+            p_value = float(
+                binom.sf(neighbour_count - 1, total_nodes, neighbours_pgen)
+            )
+            node.additional_properties["alice_pgen"] = alice_pgen
+            node.additional_properties["neighbors_pgen"] = neighbours_pgen
+            node.additional_properties["alice_p_value"] = p_value
+            with np.errstate(divide="ignore", invalid="ignore"):
+                node.additional_properties["log10_alice_pval"] = float(
+                    -np.log10(p_value)
+                )
+            valid_nodes.append(node)
+            raw_p_values.append(p_value)
+
+        if raw_p_values:
+            adjusted = multipletests(
+                raw_p_values, alpha=alice_alpha, method=method
+            )[1]
+            for node, p_value_adj in zip(valid_nodes, adjusted):
+                node.additional_properties["alice_p_adj"] = float(p_value_adj)
+                node.additional_properties["alice_hit"] = bool(
+                    p_value_adj < alice_alpha
+                )
+
+        self._alice_alpha = float(alice_alpha)
+        self._alice_model = pgen_model
         self.state["node_pgen_calculated"] = True
         self.state["alice_calculated"] = True
+        model_name = type(pgen_model).__name__
         self.state_parameters["node_pgen_calculated"] = {
-            "overlap_type": overlap_type,
-            "mismatches": mismatches,
-            "generation_model": generation_model,
+            "model": model_name,
+            "cpu": cpu,
         }
-        self.state_parameters["alice_calculated"] = alice_parameters
+        self.state_parameters["alice_calculated"] = {
+            "overlap_type": overlap_type,
+            "alice_alpha": self._alice_alpha,
+            "method": method,
+            "model": model_name,
+            "cpu": cpu,
+        }
+        self.alice_results = self.as_dataframe()
         return self.alice_results
+
+
+    @staticmethod
+    def _has_unfamiliar_olga_v(v_call):
+        normalized_v_call = "" if v_call is None else str(v_call)
+        return any(
+            gene in normalized_v_call for gene in _OLGA_UNFAMILIAR_V_GENES
+        )
+
+
+    @staticmethod
+    def _validate_alice_alpha(alice_alpha):
+        if (
+            isinstance(alice_alpha, (bool, np.bool_))
+            or not isinstance(alice_alpha, Real)
+            or not np.isfinite(alice_alpha)
+            or not 0 <= alice_alpha <= 1
+        ):
+            raise ValueError("alice_alpha must be a finite number from 0 to 1.")
+
+
+    def get_alice_alpha(self):
+        """Return the p-value threshold used to mark ALICE hits."""
+        return self._alice_alpha
+
+
+    def set_alice_alpha(self, alice_alpha):
+        """Change the ALICE hit threshold without recalculating p-values."""
+        if not self.state["alice_calculated"]:
+            return
+        self._validate_alice_alpha(alice_alpha)
+        self._alice_alpha = float(alice_alpha)
+        for cluster in self.clusters:
+            for node in cluster:
+                p_value_adj = node.additional_properties.get("alice_p_adj")
+                if p_value_adj is not None:
+                    node.additional_properties["alice_hit"] = bool(
+                        p_value_adj < self._alice_alpha
+                    )
+        self.state_parameters["alice_calculated"]["alice_alpha"] = (
+            self._alice_alpha
+        )
+        self.alice_results = self.as_dataframe()
 
 
     def add_alice_hits_to_clusters(self):
         self._require_alice("add ALICE hits to clusters")
-        node_lookup = {}
-        for cluster in self.clusters:
-            for node in cluster:
-                node_lookup[node.id] = node
-
-        for _, row in self.alice_results.iterrows():
-            node_id = row['node_id']
-            node = node_lookup[node_id]
-            node.additional_properties['pgen'] = row['pgen']
-            node.additional_properties['alice_neighbour_count'] = row['alice_neighbour_count']
-            node.additional_properties['p_value'] = row['p_value']
-            node.additional_properties['p_value_adj'] = row['p_value_adj']
-            node.additional_properties['is_alice_hit'] = row['is_alice_hit']
+        return None
 
 
     # def export_clusters_to_gae(self):

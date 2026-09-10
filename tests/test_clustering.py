@@ -906,39 +906,216 @@ def test_properties_are_cached_and_return_defensive_copies(monkeypatch):
     assert third["total_count"].tolist() == [15, 11]
 
 
-def test_alice_tracks_pgen_and_parameters(monkeypatch):
+def test_alice_calculates_wildcard_neighbour_statistics(monkeypatch):
     clusters = _clusters_with_two_samples()
-    fake_module = types.ModuleType("repseq.pgen_calculation")
+    model_calls = []
+    parallel_calls = []
 
-    def fake_calculate_clonotypes_pgen(clonosets_df, **kwargs):
-        result = clonosets_df.copy()
-        result["pgen"] = 0.001
-        result["alice_neighbour_count"] = 0
-        result["n_neighbours"] = 0
-        return result
+    class PgenModel:
+        def compute_aa_CDR3_pgen(self, cdr3aa, v, j):
+            model_calls.append((cdr3aa, v, j))
+            return 0.03 if "X" in cdr3aa else 0.01
 
-    fake_module.calculate_clonotypes_pgen = fake_calculate_clonotypes_pgen
-    monkeypatch.setitem(
-        sys.modules, "repseq.pgen_calculation", fake_module
+    def run_sequentially(function, tasks, program_name, **kwargs):
+        parallel_calls.append(
+            {
+                "function": function,
+                "task_sizes": [len(task[0]) for task in tasks],
+                "object_name": kwargs.get("object_name"),
+                "cpu": kwargs.get("cpu"),
+            }
+        )
+        return [function(task) for task in tasks]
+
+    monkeypatch.setattr(
+        clustering_module, "run_parallel_calculation", run_sequentially
+    )
+    result = clusters.alice(
+        PgenModel(), overlap_type="aaV", alice_alpha=0.05, cpu=1
     )
 
-    clusters.alice(
-        overlap_type="aaVJ",
-        mismatches=1,
-        generation_model="test_model",
-        Q=1,
-        alpha=0.05,
-    )
+    expected_neighbors_pgen = 4 * 0.03 - 3 * 0.01
+    tested_nodes = list(clusters[0])
+    expected_p_values = [
+        clustering_module.binom.sf(
+            clusters[0].degree(node) - 1,
+            4,
+            expected_neighbors_pgen,
+        )
+        for node in tested_nodes
+    ]
+    expected_adjusted = clustering_module.multipletests(
+        expected_p_values, alpha=0.05, method="bonferroni"
+    )[1]
 
+    assert parallel_calls == [
+        {
+            "function": clustering_module._alice_pgen_worker,
+            "task_sizes": [5],
+            "object_name": "chunks",
+            "cpu": 1,
+        }
+    ]
+    assert len(model_calls) == 5
+    assert all(v == "TRBV1" and j is None for _, v, j in model_calls)
+    assert {cdr3aa for cdr3aa, _, _ in model_calls} == {
+        "CASS",
+        "XASS",
+        "CXSS",
+        "CAXS",
+        "CASX",
+    }
+
+    for node, expected_p_value, expected_p_adj in zip(
+        tested_nodes, expected_p_values, expected_adjusted
+    ):
+        properties = node.additional_properties
+        assert properties["alice_pgen"] == pytest.approx(0.01)
+        assert properties["neighbors_pgen"] == pytest.approx(
+            expected_neighbors_pgen
+        )
+        assert properties["total_nodes"] == 4
+        assert properties["alice_p_value"] == pytest.approx(expected_p_value)
+        assert properties["alice_p_adj"] == pytest.approx(expected_p_adj)
+        assert properties["log10_alice_pval"] == pytest.approx(
+            -np.log10(expected_p_value)
+        )
+        assert properties["alice_hit"] == (expected_p_adj < 0.05)
+
+    singleton_properties = next(iter(clusters[1])).additional_properties
+    assert singleton_properties["alice_pgen"] is None
+    assert singleton_properties["neighbors_pgen"] is None
+    assert singleton_properties["alice_p_value"] is None
+    assert singleton_properties["alice_p_adj"] is None
+    assert singleton_properties["log10_alice_pval"] is None
+    assert singleton_properties["alice_hit"] is False
+    assert singleton_properties["total_nodes"] == 4
+    assert set(
+        [
+            "alice_pgen",
+            "neighbors_pgen",
+            "total_nodes",
+            "alice_p_value",
+            "alice_p_adj",
+            "log10_alice_pval",
+            "alice_hit",
+        ]
+    ).issubset(result.columns)
     assert clusters.state["node_pgen_calculated"]
     assert clusters.state["alice_calculated"]
-    assert (
-        clusters.state_parameters["alice_calculated"]["generation_model"]
-        == "test_model"
-    )
-    assert "Node Pgen: calculated" in str(clusters)
-    assert "ALICE: calculated" in str(clusters)
+    assert clusters.state_parameters["alice_calculated"] == {
+        "overlap_type": "aaV",
+        "alice_alpha": 0.05,
+        "method": "bonferroni",
+        "model": "PgenModel",
+        "cpu": 1,
+    }
 
+
+def test_alice_skips_unfamiliar_v_and_reuses_same_model(capsys):
+    clusters = _clusters_with_two_samples()
+    tested_nodes = list(clusters[0])
+    tested_nodes[1].v = "TRBV21-1*01"
+
+    class PgenModel:
+        def __init__(self):
+            self.calls = []
+
+        def compute_aa_CDR3_pgen(self, cdr3aa, v, j):
+            self.calls.append((cdr3aa, v, j))
+            return 1e-4
+
+    pgen_model = PgenModel()
+    clusters.alice(pgen_model, overlap_type="aaVJ", cpu=1)
+    calls_after_first_run = list(pgen_model.calls)
+    unsupported_properties = tested_nodes[1].additional_properties
+
+    assert calls_after_first_run
+    assert not any(v == "TRBV21-1*01" for _, v, _ in calls_after_first_run)
+    assert unsupported_properties["alice_pgen"] is None
+    assert unsupported_properties["neighbors_pgen"] is None
+    assert unsupported_properties["alice_p_value"] is None
+    assert unsupported_properties["alice_p_adj"] is None
+    assert unsupported_properties["log10_alice_pval"] is None
+    assert unsupported_properties["alice_hit"] is None
+
+    first_result = clusters.alice_results
+    second_result = clusters.alice(
+        pgen_model, overlap_type="aaVJ", cpu=1
+    )
+
+    output = capsys.readouterr().out
+    assert second_result is first_result
+    assert pgen_model.calls == calls_after_first_run
+    assert "already run with this model" in output
+    assert "as_dataframe()" in output
+
+
+def test_alice_alpha_accessors_update_hits_without_recalculation():
+    clusters = _clusters_with_two_samples()
+
+    class PgenModel:
+        def compute_aa_CDR3_pgen(self, cdr3aa, v, j):
+            return 1e-4
+
+    assert clusters.get_alice_alpha() == 0.05
+    clusters.set_alice_alpha(0.2)
+    assert clusters.get_alice_alpha() == 0.05
+
+    clusters.alice(PgenModel(), overlap_type="aaVJ", cpu=1)
+    clusters.set_alice_alpha(1.0)
+
+    assert clusters.get_alice_alpha() == 1.0
+    assert all(node.additional_properties["alice_hit"] for node in clusters[0])
+    assert next(iter(clusters[1])).additional_properties["alice_hit"] is False
+    assert clusters.state_parameters["alice_calculated"]["alice_alpha"] == 1.0
+    assert clusters.alice_results["alice_hit"].tolist() == [True, True, True, False]
+
+    with pytest.raises(ValueError, match="alice_alpha"):
+        clusters.set_alice_alpha(1.1)
+
+
+def test_alice_splits_unique_pgen_inputs_into_chunks_of_fifty(monkeypatch):
+    clusters = Clusters()
+    cluster = Cluster()
+    nodes = [
+        Node(
+            index,
+            "TGT",
+            f"CASS{index:02d}",
+            "TRBV1",
+            "TRBJ1",
+            "sample_1",
+            0.1,
+            1,
+        )
+        for index in range(12)
+    ]
+    cluster.add_edges_from(zip(nodes, nodes[1:]))
+    clusters.clusters = [cluster]
+    for node in cluster:
+        node.additional_properties["cluster_no"] = 0
+
+    task_sizes = []
+
+    class PgenModel:
+        def compute_aa_CDR3_pgen(self, cdr3aa, v, j):
+            return 1e-8
+
+    def run_sequentially(function, tasks, *args, **kwargs):
+        task_sizes.extend(len(task[0]) for task in tasks)
+        flattened = [clonotype for task in tasks for clonotype in task[0]]
+        assert len(flattened) == len(set(flattened))
+        return [function(task) for task in tasks]
+
+    monkeypatch.setattr(
+        clustering_module, "run_parallel_calculation", run_sequentially
+    )
+    clusters.alice(PgenModel(), overlap_type="aaVJ", cpu=1)
+
+    assert len(task_sizes) > 1
+    assert all(1 <= task_size <= 50 for task_size in task_sizes)
+    assert task_sizes[:-1] == [50] * (len(task_sizes) - 1)
 
 def test_calc_pgen_adds_node_properties_and_skips_unfamiliar_v_genes(
     monkeypatch,
