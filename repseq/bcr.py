@@ -16,6 +16,9 @@ from .clone_filter import Filter
 from .common_functions import print_progress_bar
 
 
+logo = None
+
+
 _SEQUENCE_COLUMNS = {
     "CDR1": "aaSeqCDR1",
     "FR2": "aaSeqFR2",
@@ -681,17 +684,21 @@ class TreeAnalyzer:
         if sequences.empty:
             raise ValueError(f"treeId {treeId!r} does not contain aaSeqCDR3 sequences")
 
-        try:
-            from . import logo
-        except ModuleNotFoundError as error:
-            if error.name == "logomaker":
-                raise ImportError(
-                    "get_logo_for_tree requires logomaker. "
-                    "Install repseq with the clustering optional dependencies."
-                ) from error
-            raise
+        logo_module = logo
+        if logo_module is None:
+            try:
+                from . import logo as logo_module
+            except ModuleNotFoundError as error:
+                if error.name == "logomaker":
+                    raise ImportError(
+                        "get_logo_for_tree requires logomaker. "
+                        "Install repseq with the clustering optional dependencies."
+                    ) from error
+                raise
         list_of_clonotypes = [(sequence,) for sequence in sequences]
-        return logo.get_logo_for_list_of_clonotypes(list_of_clonotypes, "prot")
+        return logo_module.get_logo_for_list_of_clonotypes(
+            list_of_clonotypes, "prot"
+        )
 
     def get_tree_clonotypes(self, treeId):
         """Return full clonoset rows for all observed clonotypes in one tree."""

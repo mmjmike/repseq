@@ -49,6 +49,9 @@ def find_all_mixcr_clonosets(folders, chain=None, show_offtarget=True, offtarget
     clonosets_df = pd.concat(clonosets_dfs)
     if "mix_id" in clonosets_df.columns:
         clonosets_df = clonosets_df[["sample_id", "mix_id", "chain", "filename"]]
+        clonosets_df["mix_id"] = clonosets_df["mix_id"].astype(object).where(
+            clonosets_df["mix_id"].notna(), None
+        )
     return clonosets_df
 
 

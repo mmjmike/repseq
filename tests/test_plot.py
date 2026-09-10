@@ -892,7 +892,7 @@ def test_segment_usage_renames_dot_segment_in_wide_tables():
         "NA",
     ]
     np.testing.assert_allclose(
-        np.asarray(heatmap.collections[0].get_array()),
+        np.asarray(heatmap.collections[0].get_array()).ravel(),
         [0.8, 0.2],
     )
 
