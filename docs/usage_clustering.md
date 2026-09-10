@@ -122,7 +122,7 @@ Calculate OLGA generation probabilities before plotting `log10_pgen` as a
 gradient:
 
 ```py
-clusters.calc_pgen(hum_pgen_model)
+clusters.calc_pgen(hum_pgen_model, cpu=4)
 fig = clusters.plot_cluster(
     "cluster_10",
     color="log10_pgen",
@@ -130,8 +130,10 @@ fig = clusters.plot_cluster(
 )
 ```
 
-Each node receives `pgen` and `log10_pgen` additional properties, where
-`log10_pgen` is `-log10(pgen)`. Nodes with `TRBV21-1` or `TRBV7-5` receive
+Each cluster is processed as a separate parallel job. Use `cpu=1` for a
+sequential calculation or omit `cpu` to use the executor default. Each node
+receives `pgen` and `log10_pgen` additional properties, where `log10_pgen` is
+`-log10(pgen)`. Nodes with `TRBV21-1` or `TRBV7-5` receive
 missing values because these genes are unfamiliar to the standard OLGA human
 TRB model. For IGH clusters, constant-gene calls are
 stored as the `isotype` node property with labels such as `IgM`, `IgG1`, and

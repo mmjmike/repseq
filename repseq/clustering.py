@@ -332,6 +332,24 @@ _CLUSTER_PROPERTY_COLUMNS = [
 ]
 
 
+def _cluster_pgen_worker(args):
+    cluster_index, clonotypes, pgen_model = args
+    values = []
+    for cdr3aa, v_call, j_call in clonotypes:
+        normalized_v_call = "" if v_call is None else str(v_call)
+        if any(
+            gene in normalized_v_call for gene in _OLGA_UNFAMILIAR_V_GENES
+        ):
+            values.append((None, None))
+            continue
+
+        pgen = pgen_model.compute_aa_CDR3_pgen(cdr3aa, v_call, j_call)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            log10_pgen = float(-np.log10(pgen))
+        values.append((pgen, log10_pgen))
+    return cluster_index, values
+
+
 def _cluster_properties_worker(args):
     cluster_no, cluster, use_first_v, use_first_j = args
     nodes = list(cluster)
@@ -972,42 +990,50 @@ class Clusters(list):
         self.state["empty"] = False
 
 
-    def calc_pgen(self, pgen_model):
+    def calc_pgen(self, pgen_model, cpu=None):
         """Add OLGA ``pgen`` and ``log10_pgen`` properties to every node.
 
-        ``log10_pgen`` is calculated as ``-log10(pgen)``. Nodes containing
-        ``TRBV21-1`` or ``TRBV7-5`` receive ``None`` for both properties
-        because these genes are unfamiliar to the standard OLGA human TRB
-        model.
+        Each cluster is submitted as a separate job through
+        :func:`run_parallel_calculation`. ``log10_pgen`` is calculated as
+        ``-log10(pgen)``. Nodes containing ``TRBV21-1`` or ``TRBV7-5`` receive
+        ``None`` for both properties because these genes are unfamiliar to the
+        standard OLGA human TRB model.
 
         Args:
             pgen_model (object): Initialized OLGA generation probability model
                 exposing ``compute_aa_CDR3_pgen``.
+            cpu (int | None): Number of worker processes. Use ``1`` for a
+                sequential calculation; ``None`` uses the executor default.
         """
         self._require_clusters("calculate node pgen values")
         if not hasattr(pgen_model, "compute_aa_CDR3_pgen"):
             raise TypeError("pgen_model must provide compute_aa_CDR3_pgen")
 
-        for cluster in self.clusters:
-            for node in cluster:
-                v_call = "" if node.v is None else str(node.v)
-                if any(gene in v_call for gene in _OLGA_UNFAMILIAR_V_GENES):
-                    node.additional_properties["pgen"] = None
-                    node.additional_properties["log10_pgen"] = None
-                    continue
-
-                pgen = pgen_model.compute_aa_CDR3_pgen(
-                    node.seq_aa, node.v, node.j
-                )
+        tasks = [
+            (
+                cluster_index,
+                [(node.seq_aa, node.v, node.j) for node in cluster],
+                pgen_model,
+            )
+            for cluster_index, cluster in enumerate(self.clusters)
+        ]
+        results = run_parallel_calculation(
+            _cluster_pgen_worker,
+            tasks,
+            "Calculating node pgen using OLGA",
+            object_name="clusters",
+            cpu=cpu,
+        )
+        for cluster_index, cluster_values in results:
+            cluster = self.clusters[cluster_index]
+            for node, (pgen, log10_pgen) in zip(cluster, cluster_values):
                 node.additional_properties["pgen"] = pgen
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    node.additional_properties["log10_pgen"] = float(
-                        -np.log10(pgen)
-                    )
+                node.additional_properties["log10_pgen"] = log10_pgen
 
         self.state["node_pgen_calculated"] = True
         self.state_parameters["node_pgen_calculated"] = {
             "model": type(pgen_model).__name__,
+            "cpu": cpu,
         }
 
 

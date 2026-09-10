@@ -940,7 +940,9 @@ def test_alice_tracks_pgen_and_parameters(monkeypatch):
     assert "ALICE: calculated" in str(clusters)
 
 
-def test_calc_pgen_adds_node_properties_and_skips_unfamiliar_v_genes():
+def test_calc_pgen_adds_node_properties_and_skips_unfamiliar_v_genes(
+    monkeypatch,
+):
     clusters = _clusters_with_two_samples()
     nodes = [node for cluster in clusters for node in cluster]
     nodes[1].v = "TRBV21-1*01"
@@ -954,9 +956,28 @@ def test_calc_pgen_adds_node_properties_and_skips_unfamiliar_v_genes():
             self.calls.append((cdr3aa, v, j))
             return 0.001
 
-    pgen_model = PgenModel()
-    clusters.calc_pgen(pgen_model)
+    parallel_call = {}
+    original_runner = clustering_module.run_parallel_calculation
 
+    def tracked_runner(function, tasks, program_name, **kwargs):
+        parallel_call["function"] = function
+        parallel_call["task_count"] = len(tasks)
+        parallel_call["object_name"] = kwargs.get("object_name")
+        parallel_call["cpu"] = kwargs.get("cpu")
+        return original_runner(function, tasks, program_name, **kwargs)
+
+    monkeypatch.setattr(
+        clustering_module, "run_parallel_calculation", tracked_runner
+    )
+    pgen_model = PgenModel()
+    clusters.calc_pgen(pgen_model, cpu=1)
+
+    assert parallel_call == {
+        "function": clustering_module._cluster_pgen_worker,
+        "task_count": len(clusters.clusters),
+        "object_name": "clusters",
+        "cpu": 1,
+    }
     assert len(pgen_model.calls) == 2
     assert nodes[0].additional_properties["pgen"] == 0.001
     assert nodes[0].additional_properties["log10_pgen"] == pytest.approx(3)
@@ -965,6 +986,7 @@ def test_calc_pgen_adds_node_properties_and_skips_unfamiliar_v_genes():
     assert nodes[2].additional_properties["pgen"] is None
     assert nodes[2].additional_properties["log10_pgen"] is None
     assert clusters.state["node_pgen_calculated"]
+    assert clusters.state_parameters["node_pgen_calculated"]["cpu"] == 1
 
 
 def test_plot_cluster_infers_continuous_numeric_colors_and_greys_missing():
