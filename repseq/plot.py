@@ -3461,6 +3461,144 @@ def _adjust_de_volcano_log2fc(values):
     return adjusted
 
 
+def _prepare_tcrnet_volcano_data(tcrnet_table, y):
+    if not isinstance(tcrnet_table, pd.DataFrame):
+        raise TypeError("tcrnet_table must be a pandas DataFrame")
+    if y not in {"log10_b_adj", "log10_p_adj"}:
+        raise ValueError("y must be either 'log10_b_adj' or 'log10_p_adj'")
+    required_columns = {"log2_fc", y}
+    missing_columns = required_columns.difference(tcrnet_table.columns)
+    if missing_columns:
+        raise ValueError(
+            "tcrnet_table is missing required volcano columns: "
+            f"{sorted(missing_columns)}"
+        )
+
+    plotted = tcrnet_table[["log2_fc", y]].dropna().copy()
+    if plotted.empty:
+        raise ValueError(
+            "No rows with complete TCRnet volcano-plot values are available"
+        )
+    for column in ["log2_fc", y]:
+        converted = pd.to_numeric(plotted[column], errors="coerce")
+        if converted.isna().any():
+            raise ValueError(f"tcrnet_table[{column!r}] must be numeric")
+        plotted[column] = converted.astype(float)
+
+    infinite = np.isinf(plotted[y].to_numpy(dtype=float))
+    if infinite.any():
+        finite_values = plotted.loc[~infinite, y]
+        if finite_values.empty:
+            raise ValueError(
+                f"tcrnet_table[{y!r}] must contain a non-infinite value"
+            )
+        plotted.loc[infinite, y] = float(finite_values.max()) + 1
+    if not np.isfinite(plotted["log2_fc"]).all():
+        raise ValueError("tcrnet_table['log2_fc'] values must be finite")
+    return plotted
+
+
+def tcrnet_volcano(
+    tcrnet_table,
+    y="log10_b_adj",
+    p_threshold=0.05,
+    log2_fc_threshold=1,
+    alpha=0.8,
+    height=6,
+    aspect=1.3,
+):
+    """Plot TCRnet fold changes against adjusted statistical significance.
+
+    Parameters
+    ----------
+    tcrnet_table : pandas.DataFrame
+        A table returned by :func:`repseq.intersections.tcrnet`.
+    y : {"log10_b_adj", "log10_p_adj"}, default "log10_b_adj"
+        Adjusted binomial or Poisson ``-log10(p)`` column used on the vertical
+        axis.
+    p_threshold : float, default 0.05
+        Adjusted p-value cutoff. The horizontal threshold is drawn at
+        ``-log10(p_threshold)``.
+    log2_fc_threshold : float, default 1
+        Minimum ``log2_fc`` cutoff. The vertical threshold is drawn at this
+        value.
+    alpha : float, default 0.8
+        Point opacity.
+    height, aspect : float
+        Figure height and width multiplier.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Closed volcano-plot figure.
+    """
+    plotted = _prepare_tcrnet_volcano_data(tcrnet_table, y)
+    if not isinstance(p_threshold, (int, float, np.number)):
+        raise TypeError("p_threshold must be numeric")
+    if not np.isfinite(p_threshold) or not 0 < p_threshold <= 1:
+        raise ValueError("p_threshold must be in the interval (0, 1]")
+    if not isinstance(log2_fc_threshold, (int, float, np.number)):
+        raise TypeError("log2_fc_threshold must be numeric")
+    if not np.isfinite(log2_fc_threshold):
+        raise ValueError("log2_fc_threshold must be finite")
+
+    significance_threshold = -np.log10(float(p_threshold))
+    passes_p = plotted[y] >= significance_threshold
+    passes_fc = plotted["log2_fc"] >= float(log2_fc_threshold)
+    state_colors = {
+        "neither": "#D9D9D9",
+        "p_only": "#969696",
+        "fc_only": "#636363",
+        "both": "#2C7FB8",
+    }
+    states = np.select(
+        [passes_p & passes_fc, passes_p, passes_fc],
+        ["both", "p_only", "fc_only"],
+        default="neither",
+    )
+
+    fig, ax = plt.subplots(figsize=(height * aspect, height))
+    ax.scatter(
+        plotted["log2_fc"],
+        plotted[y],
+        c=[state_colors[state] for state in states],
+        alpha=float(alpha),
+        edgecolors="none",
+        linewidths=0,
+    )
+    ax.axhline(
+        significance_threshold,
+        color="#888888",
+        linestyle="--",
+        linewidth=0.8,
+        zorder=0,
+    )
+    ax.axvline(
+        float(log2_fc_threshold),
+        color="#888888",
+        linestyle="--",
+        linewidth=0.8,
+        zorder=0,
+    )
+    ax.set_title("TCRnet volcano plot")
+    ax.set_xlabel("log2_fc")
+    ax.set_ylabel(y)
+    ax.grid(color="#eeeeee", linewidth=0.6)
+    ax.set_axisbelow(True)
+    ax.legend(
+        handles=[
+            Patch(facecolor=state_colors["both"], label="Passes both"),
+            Patch(facecolor=state_colors["p_only"], label="P-value only"),
+            Patch(facecolor=state_colors["fc_only"], label="Fold change only"),
+            Patch(facecolor=state_colors["neither"], label="Passes neither"),
+        ],
+        frameon=False,
+        loc="best",
+    )
+    fig.tight_layout()
+    return _close_and_return(fig)
+
+
 def _prepare_de_volcano_data(statistics_table, p_column):
     if not isinstance(statistics_table, pd.DataFrame):
         raise TypeError("statistics_table must be a pandas DataFrame")

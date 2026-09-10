@@ -2274,6 +2274,54 @@ def test_de_volcano_repeated_high_log2fc_adjustment_uses_maximum_below_value():
     assert adjusted.tolist() == [13, 13, 11, 4]
 
 
+def _tcrnet_volcano_table():
+    return pd.DataFrame(
+        {
+            "log2_fc": [0.5, 0.5, 1.5, 1.5, 2.0],
+            "log10_b_adj": [1.0, 2.0, 1.0, 2.0, np.inf],
+            "log10_p_adj": [0.5, 3.0, 0.5, 3.0, np.inf],
+        }
+    )
+
+
+def test_tcrnet_volcano_draws_thresholds_and_four_pass_states():
+    fig = rsplot.tcrnet_volcano(
+        _tcrnet_volcano_table(),
+        p_threshold=0.01,
+        log2_fc_threshold=1,
+    )
+    axis = fig.axes[0]
+    point_colors = axis.collections[0].get_facecolors()
+
+    assert fig.number not in plt.get_fignums()
+    assert axis.get_xlabel() == "log2_fc"
+    assert axis.get_ylabel() == "log10_b_adj"
+    assert [line.get_linestyle() for line in axis.lines] == ["--", "--"]
+    assert axis.lines[0].get_ydata() == pytest.approx([2, 2])
+    assert axis.lines[1].get_xdata() == pytest.approx([1, 1])
+    assert [to_rgba(color) for color in point_colors] == [
+        to_rgba("#D9D9D9", alpha=0.8),
+        to_rgba("#969696", alpha=0.8),
+        to_rgba("#636363", alpha=0.8),
+        to_rgba("#2C7FB8", alpha=0.8),
+        to_rgba("#2C7FB8", alpha=0.8),
+    ]
+    assert axis.collections[0].get_offsets()[-1, 1] == pytest.approx(3)
+
+
+def test_tcrnet_volcano_supports_poisson_y_and_validates_inputs():
+    fig = rsplot.tcrnet_volcano(_tcrnet_volcano_table(), y="log10_p_adj")
+
+    assert fig.axes[0].get_ylabel() == "log10_p_adj"
+    assert fig.axes[0].collections[0].get_offsets()[-1, 1] == pytest.approx(4)
+    with pytest.raises(ValueError, match="y must be either"):
+        rsplot.tcrnet_volcano(_tcrnet_volcano_table(), y="p_value_b_adj")
+    with pytest.raises(ValueError, match="interval"):
+        rsplot.tcrnet_volcano(_tcrnet_volcano_table(), p_threshold=0)
+    with pytest.raises(ValueError, match="required volcano columns"):
+        rsplot.tcrnet_volcano(pd.DataFrame({"log2_fc": [1]}))
+
+
 def test_beta_table_dots_uses_lower_triangle_and_upper_f2_values():
     fig = rsplot.beta_table(
         {"full_table": _beta_full_table_same_set()},

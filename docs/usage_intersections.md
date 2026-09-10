@@ -166,6 +166,19 @@ tcrnet_compared_clns = intersections.tcrnet(clonosets_df_exp, clonoset_df_contro
 |  2 | ('CASSLGGHPNEKLFF', 'TRBV11-2', 'TRBJ1-4') |           1 |               0 |                 7 |                    29 | 8.28571 |    0        |     0       |        0        |        0        |    inf        |    inf        |   3.05063 |
 
 
+Plot the TCRnet result as a volcano plot. Points are blue only when they pass both the adjusted p-value and fold-change thresholds; the other three pass states use different grey shades. Infinite significance values are plotted at one unit above the largest finite value.
+
+```py
+from repseq import plot as rsplot
+
+fig = rsplot.tcrnet_volcano(
+    tcrnet_compared_clns,
+    y="log10_b_adj",  # or "log10_p_adj"
+    p_threshold=0.05,
+    log2_fc_threshold=1,
+)
+```
+
 
 ??? info "Visualization"
     Properties from proc_table can be visualized in Jupyter notebook using %%R cell magic. 
