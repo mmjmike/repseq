@@ -30,6 +30,37 @@ Deprecated alias for `read_ngsik_metadata`.
     options:
           show_root_toc_entry: false
 
+## load_olga_models
+
+Load OLGA probability-generation and sequence-generation models from an
+organism model folder. OLGA is an optional dependency and can be installed
+with `pip install repseq[pgen]`.
+
+```py
+from repseq.io import load_olga_models
+
+human_olga_model_folder = "/home/mmyshkin/soft/OLGA/olga/default_models/human_T_beta/"
+hum_pgen_model, hum_seq_gen_model = load_olga_models(human_olga_model_folder)
+```
+
+By default, the function loads `model_params.txt`, `model_marginals.txt`,
+`V_gene_CDR3_anchors.csv`, and `J_gene_CDR3_anchors.csv`. Each filename can be
+changed independently:
+
+```py
+hum_pgen_model, hum_seq_gen_model = load_olga_models(
+    human_olga_model_folder,
+    params_filename="custom_model_params.txt",
+    marginals_filename="custom_model_marginals.txt",
+    v_anchor_filename="custom_V_gene_CDR3_anchors.csv",
+    j_anchor_filename="custom_J_gene_CDR3_anchors.csv",
+)
+```
+
+::: io.load_olga_models
+    options:
+          show_root_toc_entry: false
+
 ## read_clonoset
 
 ::: io.read_clonoset

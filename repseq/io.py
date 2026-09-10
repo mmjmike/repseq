@@ -160,6 +160,72 @@ CLONOSET_FORMAT_DTYPES = {
 }
 
 
+def load_olga_models(
+    organism_model_folder,
+    params_filename="model_params.txt",
+    marginals_filename="model_marginals.txt",
+    v_anchor_filename="V_gene_CDR3_anchors.csv",
+    j_anchor_filename="J_gene_CDR3_anchors.csv",
+):
+    """Load OLGA generation-probability and sequence-generation models.
+
+    Args:
+        organism_model_folder (str or os.PathLike): Folder containing an OLGA
+            VDJ model.
+        params_filename (str): Genomic model parameters filename.
+        marginals_filename (str): Generative model marginals filename.
+        v_anchor_filename (str): V-gene CDR3 anchors filename.
+        j_anchor_filename (str): J-gene CDR3 anchors filename.
+
+    Returns:
+        tuple: ``(pgen_model, seq_gen_model)``, containing initialized OLGA
+            ``GenerationProbabilityVDJ`` and ``SequenceGenerationVDJ`` models.
+
+    Raises:
+        ImportError: If the optional OLGA dependency is not installed.
+
+    Example:
+        >>> human_olga_model_folder = "/path/to/OLGA/olga/default_models/human_T_beta/"
+        >>> hum_pgen_model, hum_seq_gen_model = load_olga_models(
+        ...     human_olga_model_folder
+        ... )
+    """
+    try:
+        import olga.load_model as load_model
+        import olga.generation_probability as pgen
+        import olga.sequence_generation as seq_gen
+    except ImportError as exc:
+        raise ImportError(
+            "OLGA support requires optional pgen dependencies. "
+            "Install them with `pip install repseq[pgen]`."
+        ) from exc
+
+    # Resolve the standard OLGA model files, allowing custom filenames when
+    # models use a different naming convention.
+    params_file_name = os.path.join(organism_model_folder, params_filename)
+    marginals_file_name = os.path.join(organism_model_folder, marginals_filename)
+    v_anchor_pos_file = os.path.join(organism_model_folder, v_anchor_filename)
+    j_anchor_pos_file = os.path.join(organism_model_folder, j_anchor_filename)
+
+    # Load genomic sequences and V/J CDR3 anchor positions.
+    genomic_data = load_model.GenomicDataVDJ()
+    genomic_data.load_igor_genomic_data(
+        params_file_name,
+        v_anchor_pos_file,
+        j_anchor_pos_file,
+    )
+
+    # Load recombination-event probabilities from the IGoR marginals file.
+    generative_model = load_model.GenerativeModelVDJ()
+    generative_model.load_and_process_igor_model(marginals_file_name)
+
+    # Build both OLGA interfaces from the same loaded model data.
+    pgen_model = pgen.GenerationProbabilityVDJ(generative_model, genomic_data)
+    seq_gen_model = seq_gen.SequenceGenerationVDJ(generative_model, genomic_data)
+
+    return pgen_model, seq_gen_model
+
+
 def read_ngsik_metadata(folder, filename="metadata.yaml", verbose=True):
     
     """

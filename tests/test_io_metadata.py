@@ -4,11 +4,66 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import types
 
 import pandas as pd
 
 from repseq import io
 from repseq import vdjtools
+
+
+def test_load_olga_models_supports_custom_filenames(monkeypatch, tmp_path):
+    calls = {}
+
+    class GenomicDataVDJ:
+        def load_igor_genomic_data(self, params, v_anchor, j_anchor):
+            calls["genomic"] = (params, v_anchor, j_anchor)
+
+    class GenerativeModelVDJ:
+        def load_and_process_igor_model(self, marginals):
+            calls["marginals"] = marginals
+
+    class GenerationProbabilityVDJ:
+        def __init__(self, generative_model, genomic_data):
+            self.generative_model = generative_model
+            self.genomic_data = genomic_data
+
+    class SequenceGenerationVDJ:
+        def __init__(self, generative_model, genomic_data):
+            self.generative_model = generative_model
+            self.genomic_data = genomic_data
+
+    olga_module = types.ModuleType("olga")
+    olga_module.__path__ = []
+    load_model_module = types.ModuleType("olga.load_model")
+    load_model_module.GenomicDataVDJ = GenomicDataVDJ
+    load_model_module.GenerativeModelVDJ = GenerativeModelVDJ
+    pgen_module = types.ModuleType("olga.generation_probability")
+    pgen_module.GenerationProbabilityVDJ = GenerationProbabilityVDJ
+    seq_gen_module = types.ModuleType("olga.sequence_generation")
+    seq_gen_module.SequenceGenerationVDJ = SequenceGenerationVDJ
+
+    monkeypatch.setitem(sys.modules, "olga", olga_module)
+    monkeypatch.setitem(sys.modules, "olga.load_model", load_model_module)
+    monkeypatch.setitem(sys.modules, "olga.generation_probability", pgen_module)
+    monkeypatch.setitem(sys.modules, "olga.sequence_generation", seq_gen_module)
+
+    pgen_model, seq_gen_model = io.load_olga_models(
+        tmp_path,
+        params_filename="params.txt",
+        marginals_filename="marginals.txt",
+        v_anchor_filename="v.csv",
+        j_anchor_filename="j.csv",
+    )
+
+    assert calls["genomic"] == (
+        os.path.join(tmp_path, "params.txt"),
+        os.path.join(tmp_path, "v.csv"),
+        os.path.join(tmp_path, "j.csv"),
+    )
+    assert calls["marginals"] == os.path.join(tmp_path, "marginals.txt")
+    assert pgen_model.generative_model is seq_gen_model.generative_model
+    assert pgen_model.genomic_data is seq_gen_model.genomic_data
 
 
 def test_mixcr_import_does_not_require_requests(tmp_path):
