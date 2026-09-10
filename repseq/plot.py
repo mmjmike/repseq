@@ -3495,6 +3495,7 @@ def _prepare_tcrnet_volcano_data(tcrnet_table, y):
         plotted.loc[infinite, y] = float(finite_values.max()) + 1
     if not np.isfinite(plotted["log2_fc"]).all():
         raise ValueError("tcrnet_table['log2_fc'] values must be finite")
+    plotted["log2_fc"] = plotted["log2_fc"].clip(lower=0)
     return plotted
 
 

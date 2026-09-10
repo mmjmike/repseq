@@ -2277,7 +2277,7 @@ def test_de_volcano_repeated_high_log2fc_adjustment_uses_maximum_below_value():
 def _tcrnet_volcano_table():
     return pd.DataFrame(
         {
-            "log2_fc": [0.5, 0.5, 1.5, 1.5, 2.0],
+            "log2_fc": [-0.5, 0.5, 1.5, 1.5, 2.0],
             "log10_b_adj": [1.0, 2.0, 1.0, 2.0, np.inf],
             "log10_p_adj": [0.5, 3.0, 0.5, 3.0, np.inf],
         }
@@ -2306,6 +2306,7 @@ def test_tcrnet_volcano_draws_thresholds_and_four_pass_states():
         to_rgba("#2C7FB8", alpha=0.8),
         to_rgba("#2C7FB8", alpha=0.8),
     ]
+    assert axis.collections[0].get_offsets()[0, 0] == pytest.approx(0)
     assert axis.collections[0].get_offsets()[-1, 1] == pytest.approx(3)
 
 
