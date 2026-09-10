@@ -22,7 +22,7 @@ For development:
 ```bash
 git clone https://github.com/mmjmike/repseq
 cd repseq
-pip install -e ".[dev]"
+pip install -e ".[dev,clustering]"
 ```
 
 ## Library update
