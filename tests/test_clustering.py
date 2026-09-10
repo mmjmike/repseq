@@ -940,6 +940,108 @@ def test_alice_tracks_pgen_and_parameters(monkeypatch):
     assert "ALICE: calculated" in str(clusters)
 
 
+def test_calc_pgen_adds_node_properties_and_skips_unfamiliar_v_genes():
+    clusters = _clusters_with_two_samples()
+    nodes = [node for cluster in clusters for node in cluster]
+    nodes[1].v = "TRBV21-1*01"
+    nodes[2].v = "TRBV7-5"
+
+    class PgenModel:
+        def __init__(self):
+            self.calls = []
+
+        def compute_aa_CDR3_pgen(self, cdr3aa, v, j):
+            self.calls.append((cdr3aa, v, j))
+            return 0.001
+
+    pgen_model = PgenModel()
+    clusters.calc_pgen(pgen_model)
+
+    assert len(pgen_model.calls) == 2
+    assert nodes[0].additional_properties["pgen"] == 0.001
+    assert nodes[0].additional_properties["log10_pgen"] == pytest.approx(3)
+    assert nodes[1].additional_properties["pgen"] is None
+    assert nodes[1].additional_properties["log10_pgen"] is None
+    assert nodes[2].additional_properties["pgen"] is None
+    assert nodes[2].additional_properties["log10_pgen"] is None
+    assert clusters.state["node_pgen_calculated"]
+
+
+def test_plot_cluster_infers_continuous_numeric_colors_and_greys_missing():
+    clusters = _clusters_with_two_samples()
+    nodes = list(clusters[0])
+    for node, score in zip(nodes, [0.0, 10.0, None]):
+        node.additional_properties["score"] = score
+
+    figure = clusters.plot_cluster(
+        0,
+        color="score",
+        palette=["#000000", "#FF0000"],
+        layout="circular",
+        size=None,
+    )
+
+    facecolors = figure.axes[0].collections[-1].get_facecolors()
+    assert np.allclose(facecolors[0], to_rgba("#000000"))
+    assert np.allclose(facecolors[1], to_rgba("#FF0000"))
+    assert np.allclose(facecolors[2], to_rgba("#D3D3D3"))
+    assert figure.axes[-1].get_xlabel() == "score"
+    assert not figure.legends
+    plt.close(figure)
+
+
+def test_plot_cluster_can_force_numeric_colors_to_be_discrete():
+    clusters = _clusters_with_two_samples()
+    nodes = list(clusters[0])
+    for node, score in zip(nodes, [1, 2, None]):
+        node.additional_properties["score"] = score
+
+    figure = clusters.plot_cluster(
+        0,
+        color="score",
+        color_mode="discrete",
+        palette={1: "#112233", 2: "#AABBCC"},
+        size=None,
+    )
+
+    assert [text.get_text() for text in figure.legends[0].get_texts()] == [
+        "1",
+        "2",
+        "NA",
+    ]
+    legend_colors = [
+        to_rgba(handle.get_markerfacecolor())
+        for handle in figure.legends[0].legend_handles
+    ]
+    assert np.allclose(legend_colors[-1], to_rgba("#D3D3D3"))
+    plt.close(figure)
+
+
+def test_plot_cluster_keeps_numeric_categorical_dtype_discrete():
+    clusters = _clusters_with_two_samples()
+    nodes = list(clusters[0])
+    for node, score in zip(nodes, [1, 2, None]):
+        node.additional_properties["score"] = score
+    clusters.clonotypes = pd.DataFrame(
+        {"score": pd.Categorical([1, 2, None], categories=[2, 1])}
+    )
+
+    figure = clusters.plot_cluster(
+        0,
+        color="score",
+        palette={1: "#112233", 2: "#AABBCC"},
+        size=None,
+    )
+
+    assert [text.get_text() for text in figure.legends[0].get_texts()] == [
+        "2",
+        "1",
+        "NA",
+    ]
+    assert len(figure.axes) == 1
+    plt.close(figure)
+
+
 def test_plot_cluster_defaults_to_linear_count_sizes():
     figure = _clusters_with_two_samples().plot_cluster(0)
 

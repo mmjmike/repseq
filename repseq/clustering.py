@@ -24,7 +24,8 @@ from numbers import Real
 
 import matplotlib.pyplot as plt
 import seaborn as sns
-from matplotlib.colors import to_rgba
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import LinearSegmentedColormap, Normalize, to_rgba
 from matplotlib.lines import Line2D
 
 
@@ -32,6 +33,8 @@ _NODE_PROPERTY_ALIASES = {
     "cdr3aa": "seq_aa",
     "cdr3nt": "seq_nt",
 }
+_MISSING_NODE_COLOR = "#D3D3D3"
+_OLGA_UNFAMILIAR_V_GENES = ("TRBV21-1", "TRBV7-5")
 
 
 def _recode_cluster_isotype(constant_call):
@@ -969,6 +972,45 @@ class Clusters(list):
         self.state["empty"] = False
 
 
+    def calc_pgen(self, pgen_model):
+        """Add OLGA ``pgen`` and ``log10_pgen`` properties to every node.
+
+        ``log10_pgen`` is calculated as ``-log10(pgen)``. Nodes containing
+        ``TRBV21-1`` or ``TRBV7-5`` receive ``None`` for both properties
+        because these genes are unfamiliar to the standard OLGA human TRB
+        model.
+
+        Args:
+            pgen_model (object): Initialized OLGA generation probability model
+                exposing ``compute_aa_CDR3_pgen``.
+        """
+        self._require_clusters("calculate node pgen values")
+        if not hasattr(pgen_model, "compute_aa_CDR3_pgen"):
+            raise TypeError("pgen_model must provide compute_aa_CDR3_pgen")
+
+        for cluster in self.clusters:
+            for node in cluster:
+                v_call = "" if node.v is None else str(node.v)
+                if any(gene in v_call for gene in _OLGA_UNFAMILIAR_V_GENES):
+                    node.additional_properties["pgen"] = None
+                    node.additional_properties["log10_pgen"] = None
+                    continue
+
+                pgen = pgen_model.compute_aa_CDR3_pgen(
+                    node.seq_aa, node.v, node.j
+                )
+                node.additional_properties["pgen"] = pgen
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    node.additional_properties["log10_pgen"] = float(
+                        -np.log10(pgen)
+                    )
+
+        self.state["node_pgen_calculated"] = True
+        self.state_parameters["node_pgen_calculated"] = {
+            "model": type(pgen_model).__name__,
+        }
+
+
     @staticmethod
     def _cluster_number(cluster, fallback):
         if cluster.id is not None:
@@ -1193,18 +1235,19 @@ class Clusters(list):
         return value
 
 
-    def _plot_property_levels(self, property_name, selected_nodes, values):
-        observed_levels = set(values.values())
-        source_series = None
+    def _plot_property_source_series(self, property_name):
         for metadata in reversed(self._metadata_frames):
             if property_name in metadata.columns:
-                source_series = metadata[property_name]
-                break
-        if source_series is None:
-            for data in (self.clonotypes, getattr(self, "clonosets_df", None)):
-                if isinstance(data, pd.DataFrame) and property_name in data.columns:
-                    source_series = data[property_name]
-                    break
+                return metadata[property_name]
+        for data in (self.clonotypes, getattr(self, "clonosets_df", None)):
+            if isinstance(data, pd.DataFrame) and property_name in data.columns:
+                return data[property_name]
+        return None
+
+
+    def _plot_property_levels(self, property_name, selected_nodes, values):
+        observed_levels = set(values.values())
+        source_series = self._plot_property_source_series(property_name)
 
         levels = []
         if source_series is not None:
@@ -1226,32 +1269,98 @@ class Clusters(list):
         return levels
 
 
+    def _plot_color_mode(self, property_name, values, color_mode):
+        if color_mode not in {None, "discrete", "continuous"}:
+            raise ValueError(
+                "color_mode must be either 'discrete', 'continuous', or None."
+            )
+        if color_mode is not None:
+            return color_mode
+
+        source_series = self._plot_property_source_series(property_name)
+        if source_series is not None:
+            source_dtype = source_series.dtype
+            if (
+                isinstance(source_dtype, pd.CategoricalDtype)
+                or pd.api.types.is_bool_dtype(source_dtype)
+                or pd.api.types.is_string_dtype(source_dtype)
+                or pd.api.types.is_object_dtype(source_dtype)
+            ):
+                return "discrete"
+            if pd.api.types.is_numeric_dtype(source_dtype):
+                return "continuous"
+
+        observed_values = [
+            value
+            for value in values.values()
+            if self._plot_property_value(value) != "NA"
+        ]
+        if observed_values and all(
+            isinstance(value, Real)
+            and not isinstance(value, (bool, np.bool_))
+            for value in observed_values
+        ):
+            return "continuous"
+        return "discrete"
+
+
     @staticmethod
     def _plot_color_map(levels, palette):
+        non_missing_levels = [level for level in levels if level != "NA"]
         if isinstance(palette, dict):
-            missing_levels = [level for level in levels if level not in palette]
+            missing_levels = [
+                level for level in non_missing_levels if level not in palette
+            ]
             if missing_levels:
                 missing_text = ", ".join(str(level) for level in missing_levels)
                 raise ValueError(
                     f"Palette does not define colors for: {missing_text}"
                 )
-            color_map = {level: palette[level] for level in levels}
+            color_map = {level: palette[level] for level in non_missing_levels}
         else:
             if palette is None:
-                palette = "tab10" if len(levels) <= 10 else "husl"
+                palette = (
+                    "tab10" if len(non_missing_levels) <= 10 else "husl"
+                )
             if isinstance(palette, str):
-                colors = sns.color_palette(palette, n_colors=len(levels))
+                colors = sns.color_palette(
+                    palette, n_colors=len(non_missing_levels)
+                )
             else:
                 colors = list(palette)
-                if len(colors) < len(levels):
+                if len(colors) < len(non_missing_levels):
                     raise ValueError(
                         "Palette must contain at least as many colors as color levels."
                     )
-            color_map = dict(zip(levels, colors))
+            color_map = dict(zip(non_missing_levels, colors))
 
+        if "NA" in levels:
+            color_map["NA"] = _MISSING_NODE_COLOR
         for color_value in color_map.values():
             to_rgba(color_value)
         return color_map
+
+
+    @staticmethod
+    def _plot_continuous_color_map(palette):
+        if isinstance(palette, dict):
+            raise TypeError(
+                "Continuous coloring requires a palette name or color sequence, "
+                "not a level-to-color dictionary."
+            )
+        if palette is None:
+            palette = "viridis"
+        if isinstance(palette, str):
+            return sns.color_palette(palette, as_cmap=True)
+
+        colors = list(palette)
+        if len(colors) < 2:
+            raise ValueError(
+                "A continuous palette must contain at least two colors."
+            )
+        for color_value in colors:
+            to_rgba(color_value)
+        return LinearSegmentedColormap.from_list("repseq_continuous", colors)
 
 
     @staticmethod
@@ -1325,6 +1434,7 @@ class Clusters(list):
         layout="spring",
         color=None,
         palette=None,
+        color_mode=None,
         label=None,
         shape=None,
         ncols=None,
@@ -1351,9 +1461,13 @@ class Clusters(list):
                 ``cluster_N`` IDs, mixed iterables, or ``None`` for all clusters.
             layout (str): ``spring`` (default), ``kamada_kawai``, ``circular``,
                 ``shell``, or ``spectral``.
-            color (str | None): Node property used for color grouping.
+            color (str | None): Node property used for coloring.
             palette (dict | list | str | None): Custom level-to-color mapping,
-                color sequence, or seaborn palette name.
+                color sequence, or seaborn palette name. For continuous colors,
+                the palette defines the gradient.
+            color_mode (str | None): ``"discrete"`` or ``"continuous"``. By
+                default, numeric properties are continuous while boolean,
+                categorical, string, and other properties are discrete.
             label (str | None): Node property displayed in the node center.
             shape (str | None): Node property used for shape grouping. At most
                 five levels are supported.
@@ -1425,6 +1539,8 @@ class Clusters(list):
         selected_clusters = [cluster for _, _, cluster in resolved_clusters]
         if palette is not None and color is None:
             raise ValueError("palette requires a color property.")
+        if color_mode is not None and color is None:
+            raise ValueError("color_mode requires a color property.")
         if ncols is not None and (not isinstance(ncols, int) or ncols < 1):
             raise ValueError("ncols must be a positive integer.")
         if min_size < 0 or linear_scale < 0:
@@ -1456,18 +1572,62 @@ class Clusters(list):
         ]
 
         color_values = {}
+        resolved_color_mode = None
+        color_map = None
+        color_normalizer = None
+        continuous_color_map = None
         if color is not None:
-            for node in selected_nodes:
-                value = self._plot_node_property(node, color)
-                color_values[node] = value
-            color_levels = self._plot_property_levels(
-                color, selected_nodes, color_values
+            raw_color_values = {
+                node: _node_property_value(node, color) for node in selected_nodes
+            }
+            resolved_color_mode = self._plot_color_mode(
+                color, raw_color_values, color_mode
             )
-            if color == "isotype":
-                color_levels = _isotype_order(color_levels)
-                if palette is None:
-                    palette = _isotype_colors(color_levels)
-            color_map = self._plot_color_map(color_levels, palette)
+            if resolved_color_mode == "continuous":
+                finite_values = []
+                for node, value in raw_color_values.items():
+                    if self._plot_property_value(value) == "NA":
+                        color_values[node] = None
+                        continue
+                    if (
+                        not isinstance(value, Real)
+                        or isinstance(value, (bool, np.bool_))
+                    ):
+                        raise ValueError(
+                            f"Node '{node.id}' property '{color}' must be numeric "
+                            "for continuous coloring."
+                        )
+                    numeric_value = float(value)
+                    if not np.isfinite(numeric_value):
+                        raise ValueError(
+                            f"Node '{node.id}' property '{color}' must be finite "
+                            "or missing for continuous coloring."
+                        )
+                    color_values[node] = numeric_value
+                    finite_values.append(numeric_value)
+                if not finite_values:
+                    raise ValueError(
+                        f"Node property '{color}' has no numeric values for "
+                        "continuous coloring."
+                    )
+                color_normalizer = Normalize(
+                    vmin=min(finite_values), vmax=max(finite_values)
+                )
+                continuous_color_map = self._plot_continuous_color_map(palette)
+                color_levels = []
+            else:
+                color_values = {
+                    node: self._plot_property_value(value)
+                    for node, value in raw_color_values.items()
+                }
+                color_levels = self._plot_property_levels(
+                    color, selected_nodes, color_values
+                )
+                if color == "isotype":
+                    color_levels = _isotype_order(color_levels)
+                    if palette is None:
+                        palette = _isotype_colors(color_levels)
+                color_map = self._plot_color_map(color_levels, palette)
         else:
             color_map = {None: "#4C78A8"}
 
@@ -1544,11 +1704,21 @@ class Clusters(list):
                     for node in cluster.nodes
                     if shape is None or shape_values[node] == shape_level
                 ]
-                node_colors = [
-                    color_map[color_values[node]] if color is not None
-                    else color_map[None]
-                    for node in nodes_for_shape
-                ]
+                if resolved_color_mode == "continuous":
+                    node_colors = [
+                        _MISSING_NODE_COLOR
+                        if color_values[node] is None
+                        else continuous_color_map(
+                            color_normalizer(color_values[node])
+                        )
+                        for node in nodes_for_shape
+                    ]
+                else:
+                    node_colors = [
+                        color_map[color_values[node]] if color is not None
+                        else color_map[None]
+                        for node in nodes_for_shape
+                    ]
                 nx.draw_networkx_nodes(
                     cluster,
                     positions,
@@ -1579,7 +1749,7 @@ class Clusters(list):
             axis.set_visible(False)
 
         legend_rows = 0
-        if color is not None:
+        if color is not None and resolved_color_mode == "discrete":
             color_handles = [
                 Line2D(
                     [],
@@ -1627,8 +1797,21 @@ class Clusters(list):
             )
             legend_rows += 1
 
+        if color is not None and resolved_color_mode == "continuous":
+            legend_rows += 1
+
         bottom_margin = 0.04 + 0.08 * legend_rows
         figure.tight_layout(rect=(0, bottom_margin, 1, 1))
+        if color is not None and resolved_color_mode == "continuous":
+            colorbar_axis = figure.add_axes((0.25, 0.035, 0.5, 0.025))
+            colorbar = figure.colorbar(
+                ScalarMappable(
+                    norm=color_normalizer, cmap=continuous_color_map
+                ),
+                cax=colorbar_axis,
+                orientation="horizontal",
+            )
+            colorbar.set_label(color)
         plt.close(figure)
         return figure
 

@@ -109,9 +109,31 @@ fig = clusters.plot_cluster(
 
 `color`, `label`, and `shape` may name built-in node attributes such as `id`,
 `sample_id`, `v`, or `j`, or values previously added to
-`node.additional_properties`. Shape grouping supports five levels, displayed as
-circle, triangle, rhombus, hexagon, and square. Color and shape legends are
-placed below the faceted panel. For IGH clusters, constant-gene calls are
+`node.additional_properties`. Numeric color properties use a continuous gradient
+by default, while boolean, categorical, and string properties use discrete
+colors. Set `color_mode="discrete"` to treat numeric values as levels, or
+`color_mode="continuous"` to explicitly request a gradient. A palette name or
+color sequence controls continuous gradient colors. Missing color values are
+displayed in light grey. Shape grouping supports five levels, displayed as
+circle, triangle, rhombus, hexagon, and square. Discrete color and shape legends
+are placed below the faceted panel; continuous colors use a color bar.
+
+Calculate OLGA generation probabilities before plotting `log10_pgen` as a
+gradient:
+
+```py
+clusters.calc_pgen(hum_pgen_model)
+fig = clusters.plot_cluster(
+    "cluster_10",
+    color="log10_pgen",
+    palette="magma",
+)
+```
+
+Each node receives `pgen` and `log10_pgen` additional properties, where
+`log10_pgen` is `-log10(pgen)`. Nodes with `TRBV21-1` or `TRBV7-5` receive
+missing values because these genes are unfamiliar to the standard OLGA human
+TRB model. For IGH clusters, constant-gene calls are
 stored as the `isotype` node property with labels such as `IgM`, `IgG1`, and
 `IgA2`. Non-IGH constant calls, including IGK, IGL, TRA, TRB, TRG, and TRD,
 produce `isotype=None` rather than an error. Coloring by `isotype` displays
