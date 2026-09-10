@@ -18,6 +18,7 @@ import functools
 import math
 import operator
 import re
+import warnings
 from collections.abc import Iterable
 from numbers import Real
 
@@ -534,6 +535,7 @@ class Cluster(nx.Graph):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.id = None
+        self.additional_properties = {}
     
 
     def get_node_by_index(self, index):
@@ -649,6 +651,7 @@ class Clusters(list):
             "empty": True,
             "clonotypes_read": False,
             "clusters_created": False,
+            "cluster_communities_found": False,
             "metadata_added": False,
             "node_pgen_calculated": False,
             "alice_calculated": False,
@@ -656,6 +659,7 @@ class Clusters(list):
         self.state_parameters = {
             "clonotypes_read": None,
             "clusters_created": None,
+            "cluster_communities_found": None,
             "metadata_added": {"columns": []},
             "node_pgen_calculated": None,
             "alice_calculated": None,
@@ -733,8 +737,10 @@ class Clusters(list):
     def _invalidate_cluster_dependent_analysis(self):
         self.cluster_communities_louvain = None
         self.alice_results = None
+        self.state["cluster_communities_found"] = False
         self.state["node_pgen_calculated"] = False
         self.state["alice_calculated"] = False
+        self.state_parameters["cluster_communities_found"] = None
         self.state_parameters["node_pgen_calculated"] = None
         self.state_parameters["alice_calculated"] = None
 
@@ -760,6 +766,7 @@ class Clusters(list):
                 "empty": False,
                 "clonotypes_read": True,
                 "clusters_created": False,
+                "cluster_communities_found": False,
                 "metadata_added": False,
                 "node_pgen_calculated": False,
                 "alice_calculated": False,
@@ -768,6 +775,7 @@ class Clusters(list):
         self.state_parameters.update(
             {
                 "clusters_created": None,
+                "cluster_communities_found": None,
                 "metadata_added": {"columns": []},
                 "node_pgen_calculated": None,
                 "alice_calculated": None,
@@ -853,6 +861,7 @@ class Clusters(list):
                 for flag, label in (
                     ("clonotypes_read", "clonotypes read"),
                     ("clusters_created", "clusters created"),
+                    ("cluster_communities_found", "cluster communities found"),
                     ("metadata_added", "metadata added"),
                     ("node_pgen_calculated", "node Pgen calculated"),
                     ("alice_calculated", "ALICE calculated"),
@@ -895,6 +904,14 @@ class Clusters(list):
             )
         else:
             lines.append("Clusters: not created")
+
+        if self.state["cluster_communities_found"]:
+            lines.append("Community splitting parameters:")
+            lines.extend(
+                self._format_state_parameters(
+                    self.state_parameters.get("cluster_communities_found")
+                )
+            )
 
         metadata_columns = self.state_parameters["metadata_added"]["columns"]
         lines.append(
@@ -1852,28 +1869,23 @@ class Clusters(list):
 
     def split(self, method="leiden", resolution=0.5, threshold=1e-07, seed=1):
         """
-        Performs a community detection on pre-calculated clusters. Available methods are `louvain` and `leiden`. 
-        The latter uses `leidenalg` implementation. The result is saved as either `cluster_communities_leiden` or `cluster_communities_louvain`.
+        Split pre-calculated clusters using Leiden or Louvain communities.
 
         Args:
-            method (str): method for detecting communities. Possible options are `leiden` and `louvain`.
-            resolution (float): Default is 0.5
-            threshold (float): Default is 1e-07.
-            seed (int): default is 1.
-        
+            method (str): ``"leiden"`` or ``"louvain"``.
+            resolution (float): Community detection resolution.
+            threshold (float): Louvain convergence threshold.
+            seed (int): Random seed.
+
         Returns:
-            None
+            Clusters: A new object containing the detected communities.
         """
-        self._require_clusters("split clusters into communities")
-        if method == 'louvain':
-            self.find_cluster_communities_louvain(resolution=resolution, 
-                                                  threshold=threshold, 
-                                                  seed=seed)
-        elif method == 'leiden':
-            self.find_cluster_communities_leiden(resolution=resolution, 
-                                                  seed=seed)
-        else:
-            raise ValueError(f'Unknown method: {method}')
+        return self.find_cluster_communities(
+            algorithm=method,
+            resolution=resolution,
+            threshold=threshold,
+            seed=seed,
+        )
 
 
     def check_compulsory_columns(self, clonoset, compulsory_columns):
@@ -2421,110 +2433,159 @@ class Clusters(list):
             {
                 "empty": False,
                 "clusters_created": True,
+                "cluster_communities_found": False,
                 "node_pgen_calculated": False,
                 "alice_calculated": False,
             }
         )
         self.state_parameters["clusters_created"] = cluster_parameters
+        self.state_parameters["cluster_communities_found"] = None
         self.state_parameters["node_pgen_calculated"] = None
         self.state_parameters["alice_calculated"] = None
 
 
-# !!! add check_progress
-# !!! add cluster_no before communities and visa versa
-# !!! add wrapper for louvain and leiden
-# !!! remove networkx representation from the user
-    def find_cluster_communities_louvain(self, resolution=1, threshold=1e-07, seed=1):
+    def find_cluster_communities(
+        self,
+        resolution=1,
+        algorithm="leiden",
+        threshold=1e-07,
+        seed=1,
+    ):
         """
-        Apply Louvain community detection to each cluster.
-        
+        Split every cluster into communities and return them as new clusters.
+
+        Clusters with fewer than four nodes are copied without running community
+        detection. New clusters and nodes receive ``previous_community_id``;
+        source clusters and nodes receive ``splitted_community_id``.
+
         Args:
-            resolution (float): Resolution parameter for Louvain algorithm.
-            threshold (float): Convergence threshold.
+            resolution (float): Resolution parameter for community detection.
+            algorithm (str): ``"leiden"`` or ``"louvain"``.
+            threshold (float): Louvain convergence threshold.
             seed (int): Random seed for reproducibility.
-        
+
         Returns:
-            List of NetworkX Graphs corresponding to detected communities.
+            Clusters: A new object containing the detected communities.
         """
+        self._require_clusters("split clusters into communities")
+        if not isinstance(algorithm, str):
+            raise TypeError("algorithm must be 'leiden' or 'louvain'.")
+        normalized_algorithm = algorithm.lower()
+        if normalized_algorithm not in {"leiden", "louvain"}:
+            raise ValueError(
+                f"Unknown algorithm: {algorithm}. Possible values: leiden, louvain"
+            )
 
-        self._require_clusters("calculate Louvain communities")
-        total_communities = 0
-        self.cluster_communities_louvain = ClusterCommunities()
-        self.cluster_communities_louvain.resolution = resolution
-        self.cluster_communities_louvain.threshold = threshold
-        self.cluster_communities_louvain.seed = seed 
+        ig = None
+        leidenalg = None
 
-        for cluster in self.clusters:
-            if len(cluster) < 2:
-                for node in cluster:
-                    node.additional_properties["community"] = total_communities
-                total_communities += 1 
-                self.cluster_communities_louvain.communities.append(cluster)
+        new_clusters = []
+        next_cluster_id = 0
+        for fallback_id, cluster in enumerate(self.clusters):
+            previous_community_id = self._cluster_number(cluster, fallback_id)
+            if len(cluster) < 4:
+                communities = [list(cluster)]
+            elif normalized_algorithm == "louvain":
+                communities = community.louvain_communities(
+                    cluster,
+                    resolution=resolution,
+                    threshold=threshold,
+                    seed=seed,
+                )
             else:
-                cluster_communities = community.louvain_communities(cluster, resolution=resolution, threshold=threshold, seed=seed)
-                for com in cluster_communities:
-                    com_nodes = []
-                    for node in com:
-                        node.additional_properties["community"] = total_communities
-                        com_nodes.append(node)
-                    total_communities += 1  
-                    self.cluster_communities_louvain.communities.append(cluster.subgraph(com_nodes))
-        self.cluster_communities_louvain.communities.sort(key=lambda x: len(x), reverse=True)
-
-
-    def find_cluster_communities_leiden(self, resolution=1, seed=1):
-        """
-        Apply Leiden community detection to each cluster.
-        
-        Args:
-            resolution (float): Resolution parameter for Leiden algorithm.
-            seed (int): Random seed for reproducibility.
-        
-        Returns:
-            List of NetworkX Graphs corresponding to detected communities.
-        """
-        self._require_clusters("calculate Leiden communities")
-        try:
-            import igraph as ig
-            import leidenalg
-        except ImportError as exc:
-            raise ImportError(
-                "Leiden community detection requires optional clustering "
-                "dependencies. Install them with `pip install repseq[clustering]`."
-            ) from exc
-
-        total_communities = 0
-        self.cluster_communities_leiden = ClusterCommunities()
-        self.cluster_communities_leiden.resolution = resolution
-        self.cluster_communities_leiden.seed = seed 
-
-        for cluster in self.clusters:
-            if len(cluster) < 2:
-                for node in cluster:
-                    node.additional_properties["leiden_community"] = total_communities
-                total_communities += 1 
-                self.cluster_communities_leiden.communities.append(cluster)
-            else:
-                # leidenalg requires an igraph Graph, hence the conversion
+                if ig is None or leidenalg is None:
+                    try:
+                        import igraph as ig
+                        import leidenalg
+                    except ImportError as exc:
+                        raise ImportError(
+                            "Leiden community detection requires optional clustering "
+                            "dependencies. Install them with "
+                            "`pip install repseq[clustering]`."
+                        ) from exc
                 cluster_igraph = ig.Graph.from_networkx(cluster)
                 nodes = cluster_igraph.vs["_nx_name"]
-
                 partition = leidenalg.find_partition(
                     cluster_igraph,
                     leidenalg.RBConfigurationVertexPartition,
                     resolution_parameter=resolution,
-                    seed=seed)
+                    seed=seed,
+                )
+                communities = [[nodes[index] for index in group] for group in partition]
 
-                for com in partition:
-                    com_nodes = []
-                    for i in com:
-                        node = nodes[i]
-                        node.additional_properties["leiden_community"] = total_communities
-                        com_nodes.append(node)
-                    total_communities += 1  
-                    self.cluster_communities_leiden.communities.append(cluster.subgraph(com_nodes))
+            derived_cluster_ids = []
+            for community_nodes in communities:
+                derived_cluster = copy.deepcopy(
+                    cluster.subgraph(community_nodes).copy()
+                )
+                derived_cluster.id = next_cluster_id
+                derived_cluster.additional_properties["previous_community_id"] = (
+                    previous_community_id
+                )
+                for node in derived_cluster:
+                    node.additional_properties["cluster_no"] = next_cluster_id
+                    node.additional_properties["previous_community_id"] = (
+                        previous_community_id
+                    )
+                    node.additional_properties.pop("splitted_community_id", None)
+                    node.additional_properties["n_neighbours"] = derived_cluster.degree(node)
+                new_clusters.append(derived_cluster)
+                derived_cluster_ids.append(next_cluster_id)
+                next_cluster_id += 1
 
-        self.cluster_communities_leiden.communities.sort(key=lambda x: len(x), reverse=True)
+            cluster.additional_properties["splitted_community_id"] = derived_cluster_ids
+            for derived_cluster_id, community_nodes in zip(
+                derived_cluster_ids, communities
+            ):
+                for node in community_nodes:
+                    node.additional_properties["splitted_community_id"] = (
+                        derived_cluster_id
+                    )
+
+        result = self._copy_with_clusters(new_clusters)
+        result.state["cluster_communities_found"] = True
+        splitting_parameters = {
+            "algorithm": normalized_algorithm,
+            "resolution": resolution,
+            "seed": seed,
+            "minimum_cluster_size": 4,
+        }
+        if normalized_algorithm == "louvain":
+            splitting_parameters["threshold"] = threshold
+        result.state_parameters["cluster_communities_found"] = splitting_parameters
+        result._invalidate_properties_cache()
+        return result
+
+
+    def find_cluster_communities_louvain(self, resolution=1, threshold=1e-07, seed=1):
+        """Deprecated alias for :meth:`find_cluster_communities`."""
+        warnings.warn(
+            "`find_cluster_communities_louvain` is deprecated; use "
+            "`find_cluster_communities(algorithm='louvain', ...)` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.find_cluster_communities(
+            algorithm="louvain",
+            resolution=resolution,
+            threshold=threshold,
+            seed=seed,
+        )
+
+
+    def find_cluster_communities_leiden(self, resolution=1, seed=1):
+        """Deprecated alias for :meth:`find_cluster_communities`."""
+        warnings.warn(
+            "`find_cluster_communities_leiden` is deprecated; use "
+            "`find_cluster_communities(algorithm='leiden', ...)` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.find_cluster_communities(
+            algorithm="leiden",
+            resolution=resolution,
+            seed=seed,
+        )
 
 
     @staticmethod

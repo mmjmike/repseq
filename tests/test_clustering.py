@@ -1498,3 +1498,162 @@ def test_properties_prints_progress_on_first_calculation(capsys):
     output = capsys.readouterr().out
     assert "Calculating cluster properties" in output
     assert "2/2 clusters processed" in output
+
+
+def _clusters_for_community_splitting():
+    clusters = Clusters()
+    cluster_sizes = [6, 4, 3]
+    next_node_id = 0
+    for cluster_id, size in enumerate(cluster_sizes):
+        cluster = Cluster()
+        cluster.id = cluster_id
+        nodes = []
+        for _ in range(size):
+            node = Node(
+                next_node_id,
+                "TGTGCT",
+                f"CASS{next_node_id}",
+                "TRBV1",
+                "TRBJ1",
+                "sample_1",
+                0.1,
+                1,
+            )
+            node.additional_properties["cluster_no"] = cluster_id
+            nodes.append(node)
+            next_node_id += 1
+        cluster.add_nodes_from(nodes)
+        cluster.add_edges_from(zip(nodes, nodes[1:]))
+        clusters.clusters.append(cluster)
+    return clusters
+
+
+def test_find_cluster_communities_returns_renumbered_clusters_with_provenance(
+    monkeypatch,
+):
+    clusters = _clusters_for_community_splitting()
+    calls = []
+
+    def fake_louvain(cluster, resolution, threshold, seed):
+        calls.append((len(cluster), resolution, threshold, seed))
+        nodes = list(cluster)
+        if len(cluster) == 6:
+            return [set(nodes[:2]), set(nodes[2:4]), set(nodes[4:])]
+        return [set(nodes[:2]), set(nodes[2:])]
+
+    monkeypatch.setattr(
+        clustering_module.community, "louvain_communities", fake_louvain
+    )
+
+    split_clusters = clusters.find_cluster_communities(
+        algorithm="Louvain", resolution=1.5, threshold=1e-6, seed=7
+    )
+
+    assert isinstance(split_clusters, Clusters)
+    assert calls == [(6, 1.5, 1e-6, 7), (4, 1.5, 1e-6, 7)]
+    assert [cluster.id for cluster in split_clusters] == [0, 1, 2, 3, 4, 5]
+    assert [len(cluster) for cluster in split_clusters] == [2, 2, 2, 2, 2, 3]
+    assert [
+        cluster.additional_properties["previous_community_id"]
+        for cluster in split_clusters
+    ] == [0, 0, 0, 1, 1, 2]
+    assert [
+        node.additional_properties["previous_community_id"]
+        for cluster in split_clusters
+        for node in cluster
+    ] == [0] * 6 + [1] * 4 + [2] * 3
+    assert [
+        node.additional_properties["cluster_no"]
+        for cluster in split_clusters
+        for node in cluster
+    ] == [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5]
+
+    assert [
+        cluster.additional_properties["splitted_community_id"]
+        for cluster in clusters
+    ] == [[0, 1, 2], [3, 4], [5]]
+    assert [
+        node.additional_properties["splitted_community_id"]
+        for cluster in clusters
+        for node in cluster
+    ] == [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5]
+    assert all(
+        original_node is not split_node
+        for original_cluster, split_cluster in zip(clusters, split_clusters)
+        for original_node, split_node in zip(original_cluster, split_cluster)
+    )
+
+    status = str(split_clusters)
+    assert "cluster communities found" in status
+    assert "algorithm: louvain" in status
+    assert "resolution: 1.5" in status
+    assert "threshold: 1e-06" in status
+    assert "seed: 7" in status
+
+
+def test_find_cluster_communities_overwrites_source_split_metadata(monkeypatch):
+    clusters = _clusters_for_community_splitting()
+
+    monkeypatch.setattr(
+        clustering_module.community,
+        "louvain_communities",
+        lambda cluster, **kwargs: [{node} for node in cluster],
+    )
+    clusters.find_cluster_communities(algorithm="louvain")
+
+    monkeypatch.setattr(
+        clustering_module.community,
+        "louvain_communities",
+        lambda cluster, **kwargs: [set(cluster)],
+    )
+    clusters.find_cluster_communities(algorithm="louvain", resolution=2)
+
+    assert [
+        cluster.additional_properties["splitted_community_id"]
+        for cluster in clusters
+    ] == [[0], [1], [2]]
+    assert {
+        node.additional_properties["splitted_community_id"]
+        for cluster in clusters
+        for node in cluster
+    } == {0, 1, 2}
+
+
+def test_find_cluster_communities_skips_small_clusters_with_default_leiden():
+    clusters = Clusters()
+    cluster = Cluster()
+    cluster.id = 4
+    nodes = [
+        Node(index, "TGTGCT", "CASS", "TRBV1", "TRBJ1", "sample", 0.1, 1)
+        for index in range(3)
+    ]
+    cluster.add_nodes_from(nodes)
+    clusters.clusters = [cluster]
+
+    split_clusters = clusters.find_cluster_communities()
+
+    assert len(split_clusters) == 1
+    assert split_clusters[0].id == 0
+    assert split_clusters[0].additional_properties["previous_community_id"] == 4
+
+
+def test_deprecated_community_methods_return_new_clusters(monkeypatch):
+    clusters = _clusters_for_community_splitting()
+    monkeypatch.setattr(
+        clustering_module.community,
+        "louvain_communities",
+        lambda cluster, **kwargs: [set(cluster)],
+    )
+
+    with pytest.warns(DeprecationWarning, match="find_cluster_communities_louvain"):
+        result = clusters.find_cluster_communities_louvain()
+
+    assert isinstance(result, Clusters)
+    assert len(result) == 3
+
+
+def test_find_cluster_communities_rejects_unknown_algorithm():
+    clusters = _clusters_for_community_splitting()
+
+    with pytest.raises(ValueError, match="Unknown algorithm"):
+        clusters.find_cluster_communities(algorithm="infomap")

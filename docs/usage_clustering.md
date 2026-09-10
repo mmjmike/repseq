@@ -444,9 +444,21 @@ def calc_cluster_clones_percent(cluster):
 
 ## Community detection
 
+Split branchy clusters into independently numbered community clusters with Leiden
+(the default) or Louvain:
+
 ```py
-communities_louvain = clustering.find_cluster_communities_louvain(clusters, resolution=1, threshold=1e-07, seed=1)
+community_clusters = clusters.find_cluster_communities(
+    algorithm="leiden",
+    resolution=1,
+    seed=1,
+)
 ```
+
+Clusters with fewer than four nodes are copied without community detection. The
+returned clusters and nodes store `previous_community_id`, while the source
+clusters and nodes store `splitted_community_id` for coloring and comparison.
+Calling the method again overwrites `splitted_community_id` on the source object.
 
 <br>
 
