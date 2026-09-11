@@ -1392,12 +1392,20 @@ def _calculate_method_p_values(task, target_values, background_values):
     raise RuntimeError(f"Unsupported method reached calculation: {method}")
 
 
+def _scipy_p_value(result):
+    if hasattr(result, "pvalue"):
+        return float(result.pvalue)
+    return float(result[1])
+
+
 def _mann_whitney_p_value(target, background, alternative):
-    p_value = scipy.stats.mannwhitneyu(
-        target,
-        background,
-        alternative=alternative,
-    ).pvalue
+    p_value = _scipy_p_value(
+        scipy.stats.mannwhitneyu(
+            target,
+            background,
+            alternative=alternative,
+        )
+    )
     return 1.0 if np.isnan(p_value) else float(p_value)
 
 
@@ -1410,7 +1418,9 @@ def _fisher_presence_p_values(target_values, background_values, threshold, alter
             [target_present, len(target) - target_present],
             [background_present, len(background) - background_present],
         ]
-        p_values.append(scipy.stats.fisher_exact(table, alternative=alternative).pvalue)
+        p_values.append(
+            _scipy_p_value(scipy.stats.fisher_exact(table, alternative=alternative))
+        )
     return np.asarray(p_values)
 
 
@@ -1425,7 +1435,9 @@ def _fisher_count_p_values(task, target_values, background_values, alternative):
             [target_count, int(round(target_totals - target_count))],
             [background_count, int(round(background_totals - background_count))],
         ]
-        p_values.append(scipy.stats.fisher_exact(table, alternative=alternative).pvalue)
+        p_values.append(
+            _scipy_p_value(scipy.stats.fisher_exact(table, alternative=alternative))
+        )
     return np.asarray(p_values)
 
 
@@ -1457,18 +1469,24 @@ def _hurdle_p_values(task, target_values, background_values, alternative):
             abundance_p.append(1.0)
         else:
             abundance_p.append(
-                scipy.stats.mannwhitneyu(
-                    target_log_cpm,
-                    background_log_cpm,
-                    alternative=alternative,
-                ).pvalue
+                _scipy_p_value(
+                    scipy.stats.mannwhitneyu(
+                        target_log_cpm,
+                        background_log_cpm,
+                        alternative=alternative,
+                    )
+                )
             )
     abundance_p = np.asarray(abundance_p)
     if task["hurdle_combine_method"] == "max":
         return np.maximum(presence_p, abundance_p)
     return np.array(
         [
-            scipy.stats.combine_pvalues([presence, abundance], method="fisher").pvalue
+            _scipy_p_value(
+                scipy.stats.combine_pvalues(
+                    [presence, abundance], method="fisher"
+                )
+            )
             for presence, abundance in zip(presence_p, abundance_p)
         ]
     )

@@ -3417,6 +3417,8 @@ def de_pairing(
         xticklabels=True,
         yticklabels=True,
     )
+    plotted_values = np.ma.masked_invalid(color_values.to_numpy(dtype=float))
+    grid.ax_heatmap.collections[0].set_array(plotted_values)
     grid.ax_heatmap.set_title("Chain pairing")
     grid.ax_heatmap.set_xlabel(pairing_matrix.columns.name or "Chain 1 feature")
     grid.ax_heatmap.set_ylabel(pairing_matrix.index.name or "Chain 2 feature")

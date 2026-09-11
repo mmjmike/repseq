@@ -809,6 +809,35 @@ def test_calc_statistics_supported_methods_return_standard_columns(method):
     assert result.loc[:1, "p_adj"].between(0, 1).all()
 
 
+@pytest.mark.parametrize("method", ["fisher", "fisher_count", "hurdle"])
+def test_calc_statistics_accepts_tuple_scipy_results(monkeypatch, method):
+    monkeypatch.setattr(
+        rsde.scipy.stats,
+        "fisher_exact",
+        lambda *args, **kwargs: (1.0, 0.25),
+    )
+    monkeypatch.setattr(
+        rsde.scipy.stats,
+        "mannwhitneyu",
+        lambda *args, **kwargs: (1.0, 0.5),
+    )
+    monkeypatch.setattr(
+        rsde.scipy.stats,
+        "combine_pvalues",
+        lambda *args, **kwargs: (1.0, 0.4),
+    )
+
+    result = rsde.calc_statistics(
+        _statistics_count_table(),
+        _two_group_metadata(),
+        method=method,
+        cpu=1,
+        verbose=False,
+    )
+
+    assert result.loc[:1, "p_val"].between(0, 1).all()
+
+
 def test_calc_statistics_ignores_parameters_for_other_methods():
     result = rsde.calc_statistics(
         _statistics_count_table(),
