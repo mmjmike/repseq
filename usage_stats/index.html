@@ -1,0 +1,3197 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../usage_mixcr/">
+      
+      
+        <link rel="next" href="../usage_intersections/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Stats - Repseq Library for Immune repertoire postanalysis</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#usage-calculating-basic-stats-for-a-clonoset" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Repseq Library for Immune repertoire postanalysis" class="md-header__button md-logo" aria-label="Repseq Library for Immune repertoire postanalysis" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Repseq Library for Immune repertoire postanalysis
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Stats
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6m0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4M7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="lime"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../modules/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Modules
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../usage_mixcr/" class="md-tabs__link">
+          
+  
+  
+  Usage
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../functions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Functions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/repseq/" class="md-tabs__link">
+          
+  
+  
+  Code Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Repseq Library for Immune repertoire postanalysis" class="md-nav__button md-logo" aria-label="Repseq Library for Immune repertoire postanalysis" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Repseq Library for Immune repertoire postanalysis
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Usage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage_mixcr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MiXCR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stats
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#working-with-clonosets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Working with clonosets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vdjtools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VDJtools
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-a-single-clonoset-into-pddataframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a single clonoset into pd.DataFrame
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#filtering-clonosets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtering clonosets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clonoset-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clonoset stats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cluster-properties-by-sample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster properties by sample
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rarefaction-curves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rarefaction curves
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clonotype-coverage-histograms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clonotype coverage histograms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom stats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plotting-statistics-in-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plotting statistics in Python
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage_intersections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intersections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage_beta/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Beta diversity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage_clustering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clustering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage_rsde/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differential enrichment (`rsde`)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage_diffexp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differential expression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Code Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../reference/repseq/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    repseq
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_1" id="__nav_6_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    repseq
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/analyzer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    analyzer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/bcr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bcr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/beta/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beta
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/clone_filter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    clone_filter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/clonoset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    clonoset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/clonosets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    clonosets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/clustering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    clustering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/clustering_old/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    clustering_old
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/common_functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    common_functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/constants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    constants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/diff_enrichment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    diff_enrichment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/diffexp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    diffexp
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/intersections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    intersections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    io
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/logo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    logo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/migec/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    migec
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/minnn/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    minnn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/mixcr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    mixcr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/pgen_calculation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pgen_calculation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/processing_stats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    processing_stats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/segment_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    segment_usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/slurm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    slurm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/stats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    stats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/tcrdist_clustering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tcrdist_clustering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/tcrdist_clusters_slurm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tcrdist_clusters_slurm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/repseq/vdjtools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    vdjtools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href=".." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../usage_mixcr/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Usage
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="usage-calculating-basic-stats-for-a-clonoset">Usage: calculating basic stats for a clonoset</h1>
+<p><a href="../functions/#stats">Stats</a> module allows to calculate various stats for all clonosets and for individual clonosets.</p>
+<h2 id="working-with-clonosets">Working with clonosets</h2>
+<p>To read all clonosets (.tsv format, MiXCR3/4 typical output names, VDJtools or Bioadaptive formats) in a directory or several directories, use <code>find_all_mixcr_clonosets</code>. </p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">repseq</span><span class="w"> </span><span class="kn">import</span> <span class="n">clonosets</span> <span class="k">as</span> <span class="n">cl</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">repseq</span><span class="w"> </span><span class="kn">import</span> <span class="n">stats</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">repseq</span><span class="w"> </span><span class="kn">import</span> <span class="n">clone_filter</span> <span class="k">as</span> <span class="n">clf</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">repseq</span><span class="w"> </span><span class="kn">import</span> <span class="n">io</span> <span class="k">as</span> <span class="n">repseqio</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">clonosets_dir_or_dirs</span> <span class="o">=</span> <span class="s1">'/home/user/sample/mixcr'</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">clonosets</span> <span class="o">=</span> <span class="n">cl</span><span class="o">.</span><span class="n">find_all_mixcr_clonosets</span><span class="p">(</span><span class="n">clonosets_dir_or_dirs</span><span class="p">)</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="s2">"sample_id"</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<p>Output table example:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;"></th>
+<th style="text-align: left;">sample_id</th>
+<th style="text-align: left;">chain</th>
+<th style="text-align: left;">filename</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">sample_1_nCD4_1_TRB</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: left;">/home/user/samples/mixcr/sample_1_nCD4_1_TRB.clones_TRB.tsv</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">sample_2_nCD4_1_TRB</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: left;">/home/user/samples/mixcr/sample_2_nCD4_1_TRB.clones_TRB.tsv</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">sample_3_nCD4_1_TRB</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: left;">/home/user/samples/mixcr/sample_3_nCD4_1_TRB.clones_TRB.tsv</td>
+</tr>
+</tbody>
+</table>
+<h2 id="vdjtools">VDJtools</h2>
+<p><br>To convert clonosets (in a form of a dataframe) to VDJtools format, use:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">repseqio</span><span class="o">.</span><span class="n">save_to_vdjtools</span><span class="p">(</span><span class="n">clonosets</span><span class="p">,</span> <span class="s2">"/home/user/samples/vdjtools_folder/"</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="reading-a-single-clonoset-into-pddataframe">Reading a single clonoset into pd.DataFrame</h2>
+<p><br>To read a single clonoset in a tab-separated format (.tsv, .txt, .tsv.gz or .zip (reads the first file)) format, use <code>read_clonoset</code> function from <code>io</code> module:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">clonoset_df</span> <span class="o">=</span> <span class="n">repseqio</span><span class="o">.</span><span class="n">read_clonoset</span><span class="p">(</span><span class="n">path_to_clonoset</span><span class="p">)</span>
+</code></pre></div></p>
+<h2 id="filtering-clonosets">Filtering clonosets</h2>
+<p>Filter is a special object, that may be used as a setup for Postanalysis. You can easily create or change it and put as an argument to other functions for individual clonoset or multi-clonoset metrics.  For <code>functionality</code>, possible values are: </p>
+<ul>
+<li><code>a</code> - any (default). No clones are filtered out.</li>
+<li><code>f</code> - only functional. Those not having stop codons and frameshifts in CDR3 regions, or having non-empty values in CDR3 amino-acid sequence.</li>
+<li><code>n</code> - only-nonfunctional - opposite to <code>f</code> - functional.</li>
+</ul>
+<p><br> Other commonly used parameters:</p>
+<ul>
+<li>Using <code>seed</code> is highly advised when using top and downsample filters. Setting a specific value ensures the reproducibility as these filters use <a href="https://en.wikipedia.org/wiki/Pseudorandom_number_generator">pseudorandom number generation</a>.</li>
+<li>With <code>by_umi</code> = True, Filter() uses counts based on UMI if the corresponding columns are present; otherwise, counts are based on reads.</li>
+<li><code>mix_tails</code> = True is recommended for top filter, as sorting with identical counts may not be random.</li>
+</ul>
+<p><br>To see all possible parameters and their description, visit clone_filter <a href="../functions/#clone_filter">module description</a>.</p>
+<p><br>Most commonly used filters:</p>
+<ul>
+<li>
+<p>by functionality: only functional clones (no frameshifts and stops), counts by UMI
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">func_filter</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">functionality</span><span class="o">=</span><span class="s2">"f"</span><span class="p">,</span> <span class="n">by_umi</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>by functionality, takes top clonotypes by UMI count. <code>Seed</code> parameter is used for reproducibility
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">top_filter</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">functionality</span><span class="o">=</span><span class="s2">"f"</span><span class="p">,</span> <span class="n">top</span><span class="o">=</span><span class="mi">4000</span><span class="p">,</span> <span class="n">by_umi</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">mix_tails</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>by functionality, count by UMI, randomly samples a clonoset down to 15000 UMI 
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">downsample_filter</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">functionality</span><span class="o">=</span><span class="s2">"f"</span><span class="p">,</span> <span class="n">downsample</span><span class="o">=</span><span class="mi">15000</span><span class="p">,</span> <span class="n">by_umi</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>by functionality, all clonotypes with UMI count less than <code>count_threshold</code> will be filtered out
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">count_threshold_filter</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">functionality</span><span class="o">=</span><span class="s2">"f"</span><span class="p">,</span> <span class="n">count_threshold</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">by_umi</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div></p>
+</li>
+</ul>
+<h3 id="white-list-and-black-list-clonotype-rules">White-list and black-list clonotype rules</h3>
+<p><code>white_list</code> keeps only matching clonotypes. <code>black_list</code> removes matching
+clonotypes. If both are provided, <code>white_list</code> is applied first and
+<code>black_list</code> second.</p>
+<p>Rules can use the old tuple syntax:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># exact CDR3 amino-acid sequence</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[(</span><span class="s2">"CASSLGQETQYF"</span><span class="p">,)])</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># exact CDR3 amino-acid sequence + V</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[(</span><span class="s2">"CASSLGQETQYF"</span><span class="p">,</span> <span class="s2">"TRBV7-8"</span><span class="p">)])</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="c1"># exact CDR3 amino-acid sequence + V + J</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[(</span><span class="s2">"CASSLGQETQYF"</span><span class="p">,</span> <span class="s2">"TRBV7-8"</span><span class="p">,</span> <span class="s2">"TRBJ2-5"</span><span class="p">)])</span>
+</code></pre></div>
+<p>Tuple positions can be ignored with <code>None</code> or an empty string. The positions are
+always interpreted as <code>(cdr3aa, v, j)</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># only exact V</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">"TRBV7-8"</span><span class="p">)])</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># exact V + J, any CDR3 amino-acid sequence</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">"TRBV7-8"</span><span class="p">,</span> <span class="s2">"TRBJ2-5"</span><span class="p">)])</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># exact CDR3 amino-acid sequence + J, any V</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[(</span><span class="s2">"CASSLGQETQYF"</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"TRBJ2-5"</span><span class="p">)])</span>
+</code></pre></div>
+<p>New dictionary rules are more flexible. Keys are clonoset columns such as
+<code>cdr3aa</code>, <code>cdr3nt</code>, <code>v</code>, <code>d</code>, <code>j</code>, <code>c</code>, <code>count</code>, or <code>freq</code>. Conditions inside
+one dictionary are combined with AND; separate dictionaries in the list are
+combined with OR.</p>
+<p>Exact V segment:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[{</span><span class="s2">"v"</span><span class="p">:</span> <span class="s2">"TRBV7-8"</span><span class="p">}])</span>
+</code></pre></div>
+<p>Several exact V segments:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[{</span><span class="s2">"v"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"TRBV7-8"</span><span class="p">,</span> <span class="s2">"TRBV7-3"</span><span class="p">]}])</span>
+</code></pre></div>
+<p>V family by substring:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[{</span><span class="s2">"v"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"contains"</span><span class="p">:</span> <span class="s2">"TRBV7"</span><span class="p">}}])</span>
+</code></pre></div>
+<p>Wildcard matching:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[{</span><span class="s2">"v"</span><span class="p">:</span> <span class="s2">"TRBV7*"</span><span class="p">}])</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[{</span><span class="s2">"cdr3aa"</span><span class="p">:</span> <span class="s2">"CASS*QYF"</span><span class="p">}])</span>
+</code></pre></div>
+<p>Regular expressions and PSI-BLAST-like bracket expressions:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[{</span><span class="s2">"cdr3aa"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"regex"</span><span class="p">:</span> <span class="sa">r</span><span class="s2">"CASS[A-Z]{2,5}QYF"</span><span class="p">}}])</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[{</span><span class="s2">"cdr3aa"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"pattern"</span><span class="p">:</span> <span class="sa">r</span><span class="s2">"CASS[ST]G[DE]QYF"</span><span class="p">}}])</span>
+</code></pre></div>
+<p>Combined CDR3 nucleotide + V:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[{</span><span class="s2">"cdr3nt"</span><span class="p">:</span> <span class="s2">"TGTGCCAGCAGC"</span><span class="p">,</span> <span class="s2">"v"</span><span class="p">:</span> <span class="s2">"TRBV7-8"</span><span class="p">}])</span>
+</code></pre></div>
+<p>Combined CDR3 amino-acid + V + J:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">white_list</span><span class="o">=</span><span class="p">[{</span><span class="s2">"cdr3aa"</span><span class="p">:</span> <span class="s2">"CASSLGQETQYF"</span><span class="p">,</span> <span class="s2">"v"</span><span class="p">:</span> <span class="s2">"TRBV7-8"</span><span class="p">,</span> <span class="s2">"j"</span><span class="p">:</span> <span class="s2">"TRBJ2-5"</span><span class="p">}])</span>
+</code></pre></div>
+<p>V family plus CDR3 amino-acid pattern:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    <span class="n">white_list</span><span class="o">=</span><span class="p">[</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>        <span class="p">{</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>            <span class="s2">"v"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"contains"</span><span class="p">:</span> <span class="s2">"TRBV7"</span><span class="p">},</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>            <span class="s2">"cdr3aa"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"regex"</span><span class="p">:</span> <span class="sa">r</span><span class="s2">"CASS.*QYF"</span><span class="p">},</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>        <span class="p">}</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>    <span class="p">]</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="p">)</span>
+</code></pre></div>
+<p>Black-list rules use the same syntax:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">black_list</span><span class="o">=</span><span class="p">[{</span><span class="s2">"v"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"contains"</span><span class="p">:</span> <span class="s2">"TRBV7"</span><span class="p">}}])</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">black_list</span><span class="o">=</span><span class="p">[{</span><span class="s2">"cdr3aa"</span><span class="p">:</span> <span class="s2">"CASS*"</span><span class="p">}])</span>
+</code></pre></div>
+<p><br> Filtering a clonoset:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">filtered_clonoset_df</span> <span class="o">=</span> <span class="n">top_filter</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">clonoset_df</span><span class="p">)</span>
+</code></pre></div></p>
+<h2 id="clonoset-stats">Clonoset stats</h2>
+<p>Calc stats for clonoset size in clones, reads and UMIs</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">clonoset_stats</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">calc_clonoset_stats</span><span class="p">(</span><span class="n">clonosets</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;"></th>
+<th style="text-align: left;">sample_id</th>
+<th style="text-align: left;">chain</th>
+<th style="text-align: right;">clones</th>
+<th style="text-align: right;">clones_func</th>
+<th style="text-align: right;">clones_func_singletons</th>
+<th style="text-align: right;">clones_func_non_singletons</th>
+<th style="text-align: right;">clones_nonfunc</th>
+<th style="text-align: right;">clones_nonfunc_freq</th>
+<th style="text-align: right;">reads</th>
+<th style="text-align: right;">reads_func</th>
+<th style="text-align: right;">reads_nonfunc</th>
+<th style="text-align: right;">reads_nonfunc_freq</th>
+<th style="text-align: right;">umi</th>
+<th style="text-align: right;">umi_func</th>
+<th style="text-align: right;">umi_nonfunc</th>
+<th style="text-align: right;">umi_nonfunc_freq</th>
+<th style="text-align: right;">reads_per_umi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">sample1_nCD4_1_TRB</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: right;">145012</td>
+<td style="text-align: right;">135644</td>
+<td style="text-align: right;">49523</td>
+<td style="text-align: right;">86121</td>
+<td style="text-align: right;">9368</td>
+<td style="text-align: right;">0.0646016</td>
+<td style="text-align: right;">1566949</td>
+<td style="text-align: right;">1509856</td>
+<td style="text-align: right;">57093</td>
+<td style="text-align: right;">0.0364358</td>
+<td style="text-align: right;">349587</td>
+<td style="text-align: right;">337223</td>
+<td style="text-align: right;">12364</td>
+<td style="text-align: right;">0.0353674</td>
+<td style="text-align: right;">4.48</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">sample2_nCD4_1_TRB</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: right;">134150</td>
+<td style="text-align: right;">126556</td>
+<td style="text-align: right;">48485</td>
+<td style="text-align: right;">78071</td>
+<td style="text-align: right;">7594</td>
+<td style="text-align: right;">0.0566083</td>
+<td style="text-align: right;">772217</td>
+<td style="text-align: right;">746989</td>
+<td style="text-align: right;">25228</td>
+<td style="text-align: right;">0.0326696</td>
+<td style="text-align: right;">312575</td>
+<td style="text-align: right;">302754</td>
+<td style="text-align: right;">9821</td>
+<td style="text-align: right;">0.0314197</td>
+<td style="text-align: right;">2.47</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">sample3_nCD4_1_TRB</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: right;">68965</td>
+<td style="text-align: right;">64585</td>
+<td style="text-align: right;">24802</td>
+<td style="text-align: right;">39783</td>
+<td style="text-align: right;">4380</td>
+<td style="text-align: right;">0.0635105</td>
+<td style="text-align: right;">793340</td>
+<td style="text-align: right;">766721</td>
+<td style="text-align: right;">26619</td>
+<td style="text-align: right;">0.0335531</td>
+<td style="text-align: right;">163789</td>
+<td style="text-align: right;">158403</td>
+<td style="text-align: right;">5386</td>
+<td style="text-align: right;">0.0328838</td>
+<td style="text-align: right;">4.84</td>
+</tr>
+</tbody>
+</table>
+<p>Plot the result with <code>rsplot.clonoset_stats</code>. Without grouping or custom
+properties, reads, clones, and available UMI counts are shown as overlaid bars:
+the lighter total is behind an equal-width, darker functional count. Labels
+above the bars use
+<code>total(functional)</code> notation. <code>reads_per_umi</code> is shown as an ordinary bar plot.
+If every UMI value is missing, the UMI panel is omitted; if only some are
+missing, only samples with UMI values appear in that panel.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">clonoset_stats</span><span class="p">(</span><span class="n">clonoset_stats</span><span class="p">)</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">clonoset_stats</span><span class="p">(</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>    <span class="n">clonoset_stats</span><span class="p">,</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>    <span class="n">split</span><span class="o">=</span><span class="p">[</span><span class="s2">"tissue"</span><span class="p">,</span> <span class="s2">"sex"</span><span class="p">],</span>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="p">)</span>
+</code></pre></div>
+<p>With a group, the function uses the standard statistics boxplots and fixes all
+y-axis lower limits at zero. The default properties are <code>reads</code>,
+<code>reads_per_umi</code> when that column is present,
+<code>clones_func</code>, and <code>umi_func</code> when it contains at least one value. Passing
+<code>properties</code> also selects the standard statistics plotting behavior.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">clonoset_stats</span><span class="p">(</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>    <span class="n">clonoset_stats</span><span class="p">,</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>    <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">,</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="p">)</span>
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">clonoset_stats</span><span class="p">(</span>
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>    <span class="n">clonoset_stats</span><span class="p">,</span>
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>    <span class="n">properties</span><span class="o">=</span><span class="p">[</span><span class="s2">"reads_func"</span><span class="p">,</span> <span class="s2">"clones_func"</span><span class="p">],</span>
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a><span class="p">)</span>
+</code></pre></div>
+<p><br>Calculating CDR3 properties. In this example, only functional clonotypes (=no frameshifts or stops) are used.</p>
+<p>basic stats for CDR3 regions. CDR3 amino acid sequence properties (both full sequence and central 5-residue sequence (closer to N-term in case of even length))</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">func_filter</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">functionality</span><span class="o">=</span><span class="s2">"f"</span><span class="p">,</span> <span class="n">by_umi</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="n">cdr3_properties</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">calc_cdr3_properties</span><span class="p">(</span><span class="n">clonosets</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="n">func_filter</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;"></th>
+<th style="text-align: left;">sample_id</th>
+<th style="text-align: left;">chain</th>
+<th style="text-align: right;">mean_cdr3nt_len</th>
+<th style="text-align: right;">mean_insert_size</th>
+<th style="text-align: right;">zero_insert_freq</th>
+<th style="text-align: right;">mean_frequency</th>
+<th style="text-align: right;">cdr3_5_hydropathy</th>
+<th style="text-align: right;">cdr3_full_hydropathy</th>
+<th style="text-align: right;">cdr3_5_charge</th>
+<th style="text-align: right;">cdr3_full_charge</th>
+<th style="text-align: right;">cdr3_5_polarity</th>
+<th style="text-align: right;">cdr3_full_polarity</th>
+<th style="text-align: right;">cdr3_5_volume</th>
+<th style="text-align: right;">cdr3_full_volume</th>
+<th style="text-align: right;">cdr3_5_strength</th>
+<th style="text-align: right;">cdr3_full_strength</th>
+<th style="text-align: right;">cdr3_5_mjenergy</th>
+<th style="text-align: right;">cdr3_full_mjenergy</th>
+<th style="text-align: right;">cdr3_5_kf1</th>
+<th style="text-align: right;">cdr3_full_kf1</th>
+<th style="text-align: right;">cdr3_5_kf2</th>
+<th style="text-align: right;">cdr3_full_kf2</th>
+<th style="text-align: right;">cdr3_5_kf3</th>
+<th style="text-align: right;">cdr3_full_kf3</th>
+<th style="text-align: right;">cdr3_5_kf4</th>
+<th style="text-align: right;">cdr3_full_kf4</th>
+<th style="text-align: right;">cdr3_5_kf5</th>
+<th style="text-align: right;">cdr3_full_kf5</th>
+<th style="text-align: right;">cdr3_5_kf6</th>
+<th style="text-align: right;">cdr3_full_kf6</th>
+<th style="text-align: right;">cdr3_5_kf7</th>
+<th style="text-align: right;">cdr3_full_kf7</th>
+<th style="text-align: right;">cdr3_5_kf8</th>
+<th style="text-align: right;">cdr3_full_kf8</th>
+<th style="text-align: right;">cdr3_5_kf9</th>
+<th style="text-align: right;">cdr3_full_kf9</th>
+<th style="text-align: right;">cdr3_5_kf10</th>
+<th style="text-align: right;">cdr3_full_kf10</th>
+<th style="text-align: right;">cdr3_5_rim</th>
+<th style="text-align: right;">cdr3_full_rim</th>
+<th style="text-align: right;">cdr3_5_surface</th>
+<th style="text-align: right;">cdr3_full_surface</th>
+<th style="text-align: right;">cdr3_5_turn</th>
+<th style="text-align: right;">cdr3_full_turn</th>
+<th style="text-align: right;">cdr3_5_alpha</th>
+<th style="text-align: right;">cdr3_full_alpha</th>
+<th style="text-align: right;">cdr3_5_beta</th>
+<th style="text-align: right;">cdr3_full_beta</th>
+<th style="text-align: right;">cdr3_5_core</th>
+<th style="text-align: right;">cdr3_full_core</th>
+<th style="text-align: right;">cdr3_5_disorder</th>
+<th style="text-align: right;">cdr3_full_disorder</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">sample1_nCD4_1_TRB</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: right;">43.1311</td>
+<td style="text-align: right;">5.91418</td>
+<td style="text-align: right;">0.0669883</td>
+<td style="text-align: right;">7.37224e-06</td>
+<td style="text-align: right;">-3.6533</td>
+<td style="text-align: right;">-3.49631</td>
+<td style="text-align: right;">0.145473</td>
+<td style="text-align: right;">-0.25535</td>
+<td style="text-align: right;">2.47028</td>
+<td style="text-align: right;">7.38906</td>
+<td style="text-align: right;">457.085</td>
+<td style="text-align: right;">1393.35</td>
+<td style="text-align: right;">0.929842</td>
+<td style="text-align: right;">4.54233</td>
+<td style="text-align: right;">-14.1225</td>
+<td style="text-align: right;">-44.0132</td>
+<td style="text-align: right;">1.87336</td>
+<td style="text-align: right;">1.88425</td>
+<td style="text-align: right;">-2.91408</td>
+<td style="text-align: right;">-5.49689</td>
+<td style="text-align: right;">0.0863277</td>
+<td style="text-align: right;">-0.583377</td>
+<td style="text-align: right;">0.899116</td>
+<td style="text-align: right;">-0.293989</td>
+<td style="text-align: right;">-1.00823</td>
+<td style="text-align: right;">-2.86921</td>
+<td style="text-align: right;">-1.18772</td>
+<td style="text-align: right;">-1.7715</td>
+<td style="text-align: right;">0.94773</td>
+<td style="text-align: right;">0.770087</td>
+<td style="text-align: right;">1.27514</td>
+<td style="text-align: right;">0.193953</td>
+<td style="text-align: right;">-1.9049</td>
+<td style="text-align: right;">-0.106618</td>
+<td style="text-align: right;">0.368452</td>
+<td style="text-align: right;">-1.06328</td>
+<td style="text-align: right;">0.306982</td>
+<td style="text-align: right;">0.767234</td>
+<td style="text-align: right;">0.310197</td>
+<td style="text-align: right;">0.797021</td>
+<td style="text-align: right;">5.81511</td>
+<td style="text-align: right;">14.9261</td>
+<td style="text-align: right;">4.4949</td>
+<td style="text-align: right;">14.1549</td>
+<td style="text-align: right;">4.83404</td>
+<td style="text-align: right;">14.1038</td>
+<td style="text-align: right;">0.290491</td>
+<td style="text-align: right;">0.776406</td>
+<td style="text-align: right;">2.31293</td>
+<td style="text-align: right;">2.60787</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">sample2_nCD4_1_TRB</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: right;">42.6894</td>
+<td style="text-align: right;">5.45495</td>
+<td style="text-align: right;">0.0937428</td>
+<td style="text-align: right;">7.90164e-06</td>
+<td style="text-align: right;">-3.63854</td>
+<td style="text-align: right;">-3.7497</td>
+<td style="text-align: right;">-0.070658</td>
+<td style="text-align: right;">-0.65764</td>
+<td style="text-align: right;">2.52354</td>
+<td style="text-align: right;">7.43611</td>
+<td style="text-align: right;">453.382</td>
+<td style="text-align: right;">1376.69</td>
+<td style="text-align: right;">0.954769</td>
+<td style="text-align: right;">4.53017</td>
+<td style="text-align: right;">-14.1263</td>
+<td style="text-align: right;">-43.5042</td>
+<td style="text-align: right;">1.95697</td>
+<td style="text-align: right;">1.73002</td>
+<td style="text-align: right;">-2.96411</td>
+<td style="text-align: right;">-5.37987</td>
+<td style="text-align: right;">-0.189644</td>
+<td style="text-align: right;">-1.12346</td>
+<td style="text-align: right;">0.76061</td>
+<td style="text-align: right;">-0.362696</td>
+<td style="text-align: right;">-0.959487</td>
+<td style="text-align: right;">-2.87697</td>
+<td style="text-align: right;">-1.19542</td>
+<td style="text-align: right;">-1.66914</td>
+<td style="text-align: right;">0.654523</td>
+<td style="text-align: right;">0.440107</td>
+<td style="text-align: right;">1.30386</td>
+<td style="text-align: right;">0.341753</td>
+<td style="text-align: right;">-1.90955</td>
+<td style="text-align: right;">-0.0793168</td>
+<td style="text-align: right;">0.297878</td>
+<td style="text-align: right;">-1.35161</td>
+<td style="text-align: right;">0.306715</td>
+<td style="text-align: right;">0.760597</td>
+<td style="text-align: right;">0.310945</td>
+<td style="text-align: right;">0.791057</td>
+<td style="text-align: right;">5.87189</td>
+<td style="text-align: right;">14.8052</td>
+<td style="text-align: right;">4.49732</td>
+<td style="text-align: right;">14.0927</td>
+<td style="text-align: right;">4.81489</td>
+<td style="text-align: right;">13.9093</td>
+<td style="text-align: right;">0.289834</td>
+<td style="text-align: right;">0.766072</td>
+<td style="text-align: right;">2.2879</td>
+<td style="text-align: right;">2.64048</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">sample3_nCD4_1_TRB</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: right;">43.1306</td>
+<td style="text-align: right;">5.53264</td>
+<td style="text-align: right;">0.109455</td>
+<td style="text-align: right;">1.54835e-05</td>
+<td style="text-align: right;">-3.5389</td>
+<td style="text-align: right;">-3.36705</td>
+<td style="text-align: right;">0.226643</td>
+<td style="text-align: right;">-0.13198</td>
+<td style="text-align: right;">2.45753</td>
+<td style="text-align: right;">7.38413</td>
+<td style="text-align: right;">463.875</td>
+<td style="text-align: right;">1401.24</td>
+<td style="text-align: right;">1.01215</td>
+<td style="text-align: right;">4.64907</td>
+<td style="text-align: right;">-14.3082</td>
+<td style="text-align: right;">-44.2336</td>
+<td style="text-align: right;">1.88087</td>
+<td style="text-align: right;">1.95313</td>
+<td style="text-align: right;">-2.68089</td>
+<td style="text-align: right;">-5.22143</td>
+<td style="text-align: right;">0.141751</td>
+<td style="text-align: right;">-0.455098</td>
+<td style="text-align: right;">0.772542</td>
+<td style="text-align: right;">-0.446082</td>
+<td style="text-align: right;">-1.0089</td>
+<td style="text-align: right;">-2.85593</td>
+<td style="text-align: right;">-1.24996</td>
+<td style="text-align: right;">-1.84142</td>
+<td style="text-align: right;">0.968762</td>
+<td style="text-align: right;">0.771571</td>
+<td style="text-align: right;">1.23777</td>
+<td style="text-align: right;">0.206734</td>
+<td style="text-align: right;">-1.78501</td>
+<td style="text-align: right;">0.0142436</td>
+<td style="text-align: right;">0.431144</td>
+<td style="text-align: right;">-1.00567</td>
+<td style="text-align: right;">0.302192</td>
+<td style="text-align: right;">0.761093</td>
+<td style="text-align: right;">0.305975</td>
+<td style="text-align: right;">0.791293</td>
+<td style="text-align: right;">5.76219</td>
+<td style="text-align: right;">14.8705</td>
+<td style="text-align: right;">4.50163</td>
+<td style="text-align: right;">14.148</td>
+<td style="text-align: right;">4.8573</td>
+<td style="text-align: right;">14.1363</td>
+<td style="text-align: right;">0.29094</td>
+<td style="text-align: right;">0.777235</td>
+<td style="text-align: right;">2.11711</td>
+<td style="text-align: right;">2.3694</td>
+</tr>
+</tbody>
+</table>
+<p><br>Calculating <a href="https://mixcr.com/mixcr/reference/mixcr-postanalysis/#diversity-measures">diversity</a> stats. Here, a top_n filter is applied.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">diversity_stats</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">calc_diversity_stats</span><span class="p">(</span><span class="n">clonosets</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="n">downsample_filter</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">123</span><span class="p">)</span>
+</code></pre></div>
+<p>The first diversity columns are kept in this order for backwards-compatible
+summary tables: <code>diversity</code>, <code>norm_shannon_wiener</code>, <code>clonality</code>,
+<code>shannon_wiener</code>, <code>chao1</code>. Additional richness, evenness, and dominance
+metrics are appended after them.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">metric</th>
+<th style="text-align: left;">description</th>
+<th style="text-align: left;">formula</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>diversity</code></td>
+<td style="text-align: left;">Observed richness; number of clonotypes with non-zero count.</td>
+<td style="text-align: left;"><code>S_obs</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>norm_shannon_wiener</code></td>
+<td style="text-align: left;">Normalized Shannon-Wiener evenness.</td>
+<td style="text-align: left;"><code>H / ln(S_obs)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>clonality</code></td>
+<td style="text-align: left;">Shannon-based clonality. Values near 1 indicate dominance by few clonotypes.</td>
+<td style="text-align: left;"><code>1 - H / ln(S_obs)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>shannon_wiener</code></td>
+<td style="text-align: left;">Shannon-Wiener entropy.</td>
+<td style="text-align: left;"><code>H = -sum(p_i ln p_i)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>chao1</code></td>
+<td style="text-align: left;">Bias-corrected Chao1 richness estimator.</td>
+<td style="text-align: left;"><code>S_obs + f1 * (f1 - 1) / (2 * (f2 + 1))</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>richness</code></td>
+<td style="text-align: left;">Alias of observed richness.</td>
+<td style="text-align: left;"><code>S_obs</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ace</code></td>
+<td style="text-align: left;">Abundance-based Coverage Estimator using rare clonotypes with count &lt;= 10.</td>
+<td style="text-align: left;"><code>S_abund + S_rare / C_ACE + f1 * gamma_ACE^2 / C_ACE</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>goods_coverage</code></td>
+<td style="text-align: left;">Good's coverage, estimated sampled repertoire coverage.</td>
+<td style="text-align: left;"><code>1 - f1 / N</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>d50</code></td>
+<td style="text-align: left;">Fraction of clonotypes needed to account for at least 50% of counts.</td>
+<td style="text-align: left;"><code>min(k: sum_{i=1..k} n_i &gt;= N/2) / S_obs</code>, counts sorted descending</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>simpson</code></td>
+<td style="text-align: left;">Simpson dominance index.</td>
+<td style="text-align: left;"><code>sum(p_i^2)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>inverse_simpson</code></td>
+<td style="text-align: left;">Effective diversity from Simpson index.</td>
+<td style="text-align: left;"><code>1 / sum(p_i^2)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>gini_simpson</code></td>
+<td style="text-align: left;">Gini-Simpson diversity index.</td>
+<td style="text-align: left;"><code>1 - sum(p_i^2)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>berger_parker</code></td>
+<td style="text-align: left;">Berger-Parker dominance index.</td>
+<td style="text-align: left;"><code>max(p_i)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>gini_coefficient</code></td>
+<td style="text-align: left;">Inequality of clonotype counts.</td>
+<td style="text-align: left;"><code>(2 * sum(i * n_i)) / (S_obs * N) - (S_obs + 1) / S_obs</code>, counts sorted ascending</td>
+</tr>
+</tbody>
+</table>
+<p>Here <code>n_i</code> is a clonotype count, <code>p_i = n_i / N</code>, <code>N = sum(n_i)</code>,
+<code>S_obs</code> is observed richness, <code>f1</code> is the number of singleton clonotypes, and
+<code>f2</code> is the number of doubletons.</p>
+<h2 id="cluster-properties-by-sample">Cluster properties by sample</h2>
+<p><code>stats.cluster_properties</code> clusters every clonoset independently and summarizes
+the distribution of cluster sizes. The optional <code>cl_filter</code> is applied before
+clustering. <code>min_cluster_size</code> removes smaller clusters before calculating the
+mean and diversity metrics; its default value of 2 excludes single-node
+clusters.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">cluster_stats</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">cluster_properties</span><span class="p">(</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>    <span class="n">clonosets</span><span class="p">,</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>    <span class="n">cl_filter</span><span class="o">=</span><span class="n">func_filter</span><span class="p">,</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>    <span class="n">overlap_type</span><span class="o">=</span><span class="s2">"aaVJ"</span><span class="p">,</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>    <span class="n">mismatches</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>    <span class="n">min_cluster_size</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="p">)</span>
+</code></pre></div>
+<p>The result contains <code>mean_cluster_size</code> and the same diversity columns returned
+by <code>stats.calc_diversity_stats</code>. Here the diversity input values are retained
+cluster sizes in nodes rather than clonotype counts. For example, clusters with
+3, 3, 2, and 2 nodes have <code>mean_cluster_size=2.5</code> and <code>diversity=4</code>. Samples
+without any cluster reaching <code>min_cluster_size</code> have a missing mean, zero
+diversity, and the standard empty-input diversity values.</p>
+<p>Plot the table with <code>rsplot.cluster_properties</code>. Its default panels are
+<code>mean_cluster_size</code>, <code>diversity</code>, and <code>norm_shannon_wiener</code>; metadata grouping,
+splitting, palettes, and custom <code>properties</code> use the standard statistics plot
+interface.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">cluster_properties</span><span class="p">(</span><span class="n">cluster_stats</span><span class="p">)</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">cluster_properties</span><span class="p">(</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>    <span class="n">cluster_stats</span><span class="p">,</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>    <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">,</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="p">)</span>
+</code></pre></div>
+<h2 id="rarefaction-curves">Rarefaction curves</h2>
+<p><code>stats.calc_rarefaction_points</code> calculates observed clonotype diversity after
+repeated count downsampling. <code>cl_filter</code> is applied first, so all rarefaction
+depths refer to the filtered repertoire. The default three iterations use
+distinct deterministic seeds derived from <code>seed=0</code>.</p>
+<p>Depths are spaced by half an order of magnitude: 32, 100, 316, 1000, 3162,
+and so on. Only depths below the filtered total count are downsampled. The final
+point is always the full filtered count and its exact observed diversity. For a
+sample with fewer than 32 counts, only that final point is returned.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="n">rarefaction</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">calc_rarefaction_points</span><span class="p">(</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>    <span class="n">sample_df</span><span class="o">=</span><span class="n">clonosets</span><span class="p">,</span>
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>    <span class="n">cl_filter</span><span class="o">=</span><span class="n">func_filter</span><span class="p">,</span>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>    <span class="n">iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>    <span class="n">cpu</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="p">)</span>
+</code></pre></div>
+<p>The output is a long table with <code>sample_id</code>, optional <code>chain</code>,
+<code>rarefaction_depth</code>, and <code>diversity</code> columns:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">sample_id</th>
+<th style="text-align: left;">chain</th>
+<th style="text-align: right;">rarefaction_depth</th>
+<th style="text-align: right;">diversity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">sample1</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">24.7</td>
+</tr>
+<tr>
+<td style="text-align: left;">sample1</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: right;">100</td>
+<td style="text-align: right;">61.3</td>
+</tr>
+<tr>
+<td style="text-align: left;">sample1</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: right;">316</td>
+<td style="text-align: right;">142.0</td>
+</tr>
+<tr>
+<td style="text-align: left;">sample1</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">286.0</td>
+</tr>
+</tbody>
+</table>
+<p>Plot the result with <code>rsplot.rarefaction_curve</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">repseq</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot</span> <span class="k">as</span> <span class="n">rsplot</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">rsplot</span><span class="o">.</span><span class="n">rarefaction_curve</span><span class="p">(</span><span class="n">rarefaction</span><span class="p">)</span>
+</code></pre></div>
+<p>The x-axis is logarithmic by default. The legend is placed to the right of the
+plot. For up to 20 curves, the default uses a fixed high-contrast categorical
+palette rather than a gradient; pass <code>palette=</code> to override it. When one
+<code>sample_id</code> has several unique chains, curves are labeled as <code>sample_id(chain)</code>,
+for example <code>ucb_ntreg(TRA)</code> and <code>ucb_ntreg(TRB)</code>. Set <code>log_x=False</code> for a
+linear x-axis.</p>
+<h2 id="clonotype-coverage-histograms">Clonotype coverage histograms</h2>
+<p><code>stats.clonotypes_coverage</code> groups clonotypes by half-order count bins. Bin
+labels are upper bounds (<code>1</code>, <code>3</code>, <code>10</code>, <code>32</code>, <code>100</code>, <code>316</code>, ...); the first
+bin contains counts zero and one. By
+default, <code>value</code> is the number of clonotypes in each bin; set <code>by_counts=True</code>
+to sum clonotype counts instead. Missing sample/bin combinations are returned
+as zeroes.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="n">coverage</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">clonotypes_coverage</span><span class="p">(</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>    <span class="n">sample_df</span><span class="o">=</span><span class="n">clonosets</span><span class="p">,</span>
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>    <span class="n">cl_filter</span><span class="o">=</span><span class="n">func_filter</span><span class="p">,</span>
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>    <span class="n">by_counts</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>    <span class="n">cpu</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a><span class="p">)</span>
+</code></pre></div>
+<p>The output columns are <code>sample_id</code>, optional <code>chain</code>, <code>bin</code>, and <code>value</code>.
+Plot all samples as lines with equally spaced numeric bin labels on the
+<code>Clonotype size</code> x-axis:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="n">grid</span> <span class="o">=</span> <span class="n">rsplot</span><span class="o">.</span><span class="n">clonotypes_coverage</span><span class="p">(</span><span class="n">coverage</span><span class="p">)</span>
+</code></pre></div>
+<p>Metadata can split the combined plot by one or two variables. Grouping is not
+available for this plot type.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="n">grid</span> <span class="o">=</span> <span class="n">rsplot</span><span class="o">.</span><span class="n">clonotypes_coverage</span><span class="p">(</span>
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>    <span class="n">coverage</span><span class="p">,</span>
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>    <span class="n">split</span><span class="o">=</span><span class="p">[</span><span class="s2">"condition"</span><span class="p">,</span> <span class="s2">"chain_group"</span><span class="p">],</span>
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="p">)</span>
+</code></pre></div>
+<p>Set <code>separate=True</code> for grey barplots faceted by sample. By default, each panel
+drops zero-valued bins above both <code>100</code> and its highest non-zero bin. Set
+<code>trim_high_zero_bins=False</code> to retain them. Metadata, grouping, and splitting
+are ignored in separate mode.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="n">grid</span> <span class="o">=</span> <span class="n">rsplot</span><span class="o">.</span><span class="n">clonotypes_coverage</span><span class="p">(</span><span class="n">coverage</span><span class="p">,</span> <span class="n">separate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<p><br>Calculating convergence for each clonoset in <code>clonosets_df</code>. For the
+most honest comparison, use equal downsampling across samples; this is preferred
+to top-N filtering and much preferred to calculations without normalization.
+The output includes:</p>
+<ul>
+<li><code>convergence</code>: unique CDR3 nucleotide sequences divided by unique CDR3 amino-acid sequences.</li>
+<li><code>convergence_v</code>: unique CDR3 nucleotide + V combinations divided by unique CDR3 amino-acid + V combinations.</li>
+<li><code>convergence_vj</code>: unique CDR3 nucleotide + V + J combinations divided by unique CDR3 amino-acid + V + J combinations.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="n">convergence</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">calc_convergence</span><span class="p">(</span><span class="n">clonosets</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="n">top_filter</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;"></th>
+<th style="text-align: left;">sample_id</th>
+<th style="text-align: left;">chain</th>
+<th style="text-align: right;">convergence</th>
+<th style="text-align: right;">convergence_v</th>
+<th style="text-align: right;">convergence_vj</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">sample1_nCD4_1_TRB</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: right;">1.01114</td>
+<td style="text-align: right;">1.01001</td>
+<td style="text-align: right;">1.00851</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">sample2_nCD4_1_TRB</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: right;">1.03426</td>
+<td style="text-align: right;">1.03084</td>
+<td style="text-align: right;">1.02803</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">sample3_nCD4_1_TRB</td>
+<td style="text-align: left;">TRB</td>
+<td style="text-align: right;">1.02362</td>
+<td style="text-align: right;">1.02115</td>
+<td style="text-align: right;">1.01972</td>
+</tr>
+</tbody>
+</table>
+<p><br>Segment usage (combined frequency of segments) can be calculated for V/J/C-segments. All possible options are ["v", "j", "c", "vj", "vlen", "vjlen"]. <code>vj</code> - usage of combinations of <code>v</code> and <code>j</code> segments. <code>vlen</code> and <code>vjlen</code> options also take the length of amimo acid CDR3 length into account and calculate usage for particular combination.</p>
+<p>The resulting dataframe can be in either <code>long</code> or <code>wide</code> format:</p>
+<ul>
+<li><code>long</code> - basic V/J/C usage has <code>sample_id</code>, <code>chain</code>, <code>&lt;segment_type&gt;</code>, and
+  <code>usage</code>. V-J usage additionally has string <code>v</code>, <code>j</code>, and <code>vj</code> columns, where
+  <code>vj</code> is <code>v|j</code>. V-J-length usage additionally has string <code>v</code>, <code>j</code>, <code>vjlen</code>, and
+  integer <code>len</code> columns, where <code>vjlen</code> is <code>v|j|len</code>.</li>
+<li><code>wide</code> - the number of rows equals the number of input clonosets. Segment or
+  combination identifiers are string column names; V-J and V-J-length names use
+  the same <code>|</code> separator.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="n">v_usage</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">calc_segment_usage</span><span class="p">(</span><span class="n">clonosets</span><span class="p">,</span> <span class="n">segment</span><span class="o">=</span><span class="s2">"v"</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="n">func_filter</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="s2">"long"</span><span class="p">)</span>
+</code></pre></div>
+<p><br>CDR3 length distributions can be calculated for amino-acid or nucleotide
+sequences. By default, clonotype frequencies are summed; set
+<code>count_by_freq=False</code> to sum counts instead.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="n">cdr3_lengths</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">cdr3_length_distributions</span><span class="p">(</span>
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>    <span class="n">clonosets</span><span class="p">,</span>
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>    <span class="n">cl_filter</span><span class="o">=</span><span class="n">func_filter</span><span class="p">,</span>
+<a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>    <span class="n">seq_type</span><span class="o">=</span><span class="s2">"aa"</span><span class="p">,</span>
+<a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a>    <span class="n">table</span><span class="o">=</span><span class="s2">"long"</span><span class="p">,</span>
+<a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a>    <span class="n">cpu</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-34-7" name="__codelineno-34-7" href="#__codelineno-34-7"></a><span class="p">)</span>
+</code></pre></div>
+<h2 id="custom-stats">Custom stats</h2>
+<p>Stats module has a special function <code>generic_calculation</code> which performs multiple individual clonoset statistic calculation. It runs all individual clonoset calculations in parallel.</p>
+<p><strong>Instruction</strong>:</p>
+<ul>
+<li>First, create a <code>function_name_cl</code> which performs individual clonoset calculation;</li>
+<li>Create a main wrapper function named <code>function_name</code>, which passes <code>function_name_cl</code> and <code>clonosets_df</code> to <code>generic_calculation</code>.</li>
+</ul>
+<p>In this example, Crohn's-associated invariant T cells (CAITs) are identified across clonosets.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>
+<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">find_caits</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a>    <span class="n">df</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">generic_calculation</span><span class="p">(</span><span class="n">clonosets_df</span><span class="p">,</span> <span class="n">find_caits_cl</span><span class="p">,</span> <span class="n">clonoset_filter</span><span class="o">=</span><span class="n">cl_filter</span><span class="p">,</span> <span class="n">program_name</span><span class="o">=</span><span class="s2">"Find CAITs"</span><span class="p">)</span>
+<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a>    <span class="k">return</span> <span class="n">df</span>
+<a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a>
+<a id="__codelineno-35-7" name="__codelineno-35-7" href="#__codelineno-35-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">find_caits_cl</span><span class="p">(</span><span class="n">clonoset_in</span><span class="p">,</span> <span class="n">colnames</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<a id="__codelineno-35-8" name="__codelineno-35-8" href="#__codelineno-35-8"></a>    <span class="n">clonoset</span> <span class="o">=</span> <span class="n">clonoset_in</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<a id="__codelineno-35-9" name="__codelineno-35-9" href="#__codelineno-35-9"></a>
+<a id="__codelineno-35-10" name="__codelineno-35-10" href="#__codelineno-35-10"></a>    <span class="c1"># find colnames for freq, count, v, j and so on</span>
+<a id="__codelineno-35-11" name="__codelineno-35-11" href="#__codelineno-35-11"></a>    <span class="k">if</span> <span class="n">colnames</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-35-12" name="__codelineno-35-12" href="#__codelineno-35-12"></a>        <span class="n">colnames</span> <span class="o">=</span> <span class="n">cl</span><span class="o">.</span><span class="n">get_column_names_from_clonoset</span><span class="p">(</span><span class="n">clonoset</span><span class="p">)</span>
+<a id="__codelineno-35-13" name="__codelineno-35-13" href="#__codelineno-35-13"></a>
+<a id="__codelineno-35-14" name="__codelineno-35-14" href="#__codelineno-35-14"></a>    <span class="c1"># create a motif to search for</span>
+<a id="__codelineno-35-15" name="__codelineno-35-15" href="#__codelineno-35-15"></a>    <span class="n">cait_motif</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">'CVV[A-Z]</span><span class="si">{2}</span><span class="s1">A[A-Z]</span><span class="si">{1}</span><span class="s1">GGSYIPTF'</span><span class="p">)</span>
+<a id="__codelineno-35-16" name="__codelineno-35-16" href="#__codelineno-35-16"></a>    <span class="n">trav</span> <span class="o">=</span> <span class="s2">"TRAV12-1"</span>
+<a id="__codelineno-35-17" name="__codelineno-35-17" href="#__codelineno-35-17"></a>    <span class="n">traj</span> <span class="o">=</span> <span class="s2">"TRAJ6"</span>
+<a id="__codelineno-35-18" name="__codelineno-35-18" href="#__codelineno-35-18"></a>
+<a id="__codelineno-35-19" name="__codelineno-35-19" href="#__codelineno-35-19"></a>    <span class="c1"># perform calculation of motif abundance</span>
+<a id="__codelineno-35-20" name="__codelineno-35-20" href="#__codelineno-35-20"></a>    <span class="n">clonoset</span><span class="p">[</span><span class="s2">"cait_cdr3aa"</span><span class="p">]</span> <span class="o">=</span> <span class="n">clonoset</span><span class="p">[</span><span class="n">colnames</span><span class="p">[</span><span class="s2">"cdr3aa_column"</span><span class="p">]]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">cait_motif</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+<a id="__codelineno-35-21" name="__codelineno-35-21" href="#__codelineno-35-21"></a>
+<a id="__codelineno-35-22" name="__codelineno-35-22" href="#__codelineno-35-22"></a>    <span class="n">clonoset</span> <span class="o">=</span> <span class="n">clonoset</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">clonoset</span><span class="p">[</span><span class="n">colnames</span><span class="p">[</span><span class="s2">"v_column"</span><span class="p">]]</span> <span class="o">==</span> <span class="n">trav</span><span class="p">]</span>
+<a id="__codelineno-35-23" name="__codelineno-35-23" href="#__codelineno-35-23"></a>    <span class="n">trav_freq</span> <span class="o">=</span> <span class="n">clonoset</span><span class="p">[</span><span class="n">colnames</span><span class="p">[</span><span class="s2">"fraction_column"</span><span class="p">]]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+<a id="__codelineno-35-24" name="__codelineno-35-24" href="#__codelineno-35-24"></a>
+<a id="__codelineno-35-25" name="__codelineno-35-25" href="#__codelineno-35-25"></a>    <span class="n">clonoset</span> <span class="o">=</span> <span class="n">clonoset</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">clonoset</span><span class="p">[</span><span class="n">colnames</span><span class="p">[</span><span class="s2">"j_column"</span><span class="p">]]</span> <span class="o">==</span> <span class="n">traj</span><span class="p">]</span>
+<a id="__codelineno-35-26" name="__codelineno-35-26" href="#__codelineno-35-26"></a>    <span class="n">trav_traj_freq</span> <span class="o">=</span> <span class="n">clonoset</span><span class="p">[</span><span class="n">colnames</span><span class="p">[</span><span class="s2">"fraction_column"</span><span class="p">]]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+<a id="__codelineno-35-27" name="__codelineno-35-27" href="#__codelineno-35-27"></a>
+<a id="__codelineno-35-28" name="__codelineno-35-28" href="#__codelineno-35-28"></a>    <span class="n">clonoset</span> <span class="o">=</span> <span class="n">clonoset</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">clonoset</span><span class="p">[</span><span class="s2">"cait_cdr3aa"</span><span class="p">]]</span>
+<a id="__codelineno-35-29" name="__codelineno-35-29" href="#__codelineno-35-29"></a>    <span class="n">cait_freq</span> <span class="o">=</span> <span class="n">clonoset</span><span class="p">[</span><span class="n">colnames</span><span class="p">[</span><span class="s2">"fraction_column"</span><span class="p">]]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+<a id="__codelineno-35-30" name="__codelineno-35-30" href="#__codelineno-35-30"></a>    <span class="n">cait_clonotypes</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">clonoset</span><span class="p">)</span>
+<a id="__codelineno-35-31" name="__codelineno-35-31" href="#__codelineno-35-31"></a>
+<a id="__codelineno-35-32" name="__codelineno-35-32" href="#__codelineno-35-32"></a>    <span class="c1"># save it to dictionary</span>
+<a id="__codelineno-35-33" name="__codelineno-35-33" href="#__codelineno-35-33"></a>    <span class="n">result_dict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"cait_clonotypes"</span><span class="p">:</span> <span class="n">cait_clonotypes</span><span class="p">,</span>
+<a id="__codelineno-35-34" name="__codelineno-35-34" href="#__codelineno-35-34"></a>                   <span class="s2">"cait_freq"</span><span class="p">:</span> <span class="n">cait_freq</span><span class="p">,</span>
+<a id="__codelineno-35-35" name="__codelineno-35-35" href="#__codelineno-35-35"></a>                   <span class="s2">"trav12_1_freq"</span><span class="p">:</span> <span class="n">trav_freq</span><span class="p">,</span>
+<a id="__codelineno-35-36" name="__codelineno-35-36" href="#__codelineno-35-36"></a>                   <span class="s2">"v12_1_j6_freq"</span><span class="p">:</span> <span class="n">trav_traj_freq</span><span class="p">}</span>
+<a id="__codelineno-35-37" name="__codelineno-35-37" href="#__codelineno-35-37"></a>
+<a id="__codelineno-35-38" name="__codelineno-35-38" href="#__codelineno-35-38"></a>    <span class="k">return</span> <span class="n">result_dict</span>
+<a id="__codelineno-35-39" name="__codelineno-35-39" href="#__codelineno-35-39"></a>
+<a id="__codelineno-35-40" name="__codelineno-35-40" href="#__codelineno-35-40"></a><span class="n">tra_clonosets</span> <span class="o">=</span> <span class="n">cl</span><span class="o">.</span><span class="n">find_all_mixcr_clonosets</span><span class="p">(</span><span class="s2">"/projects/cdr3_common/repseq_demo/custom_stats_clonosets/"</span><span class="p">)</span>
+<a id="__codelineno-35-41" name="__codelineno-35-41" href="#__codelineno-35-41"></a><span class="n">clonoset_caits</span> <span class="o">=</span> <span class="n">find_caits</span><span class="p">(</span><span class="n">tra_clonosets</span><span class="p">,</span> <span class="n">cl_filter</span><span class="o">=</span><span class="n">func_filter</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;"></th>
+<th style="text-align: left;">sample_id</th>
+<th style="text-align: left;">chain</th>
+<th style="text-align: right;">cait_clonotypes</th>
+<th style="text-align: right;">cait_freq</th>
+<th style="text-align: right;">trav12_1_freq</th>
+<th style="text-align: right;">v12_1_j6_freq</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">sample1_nCD4_1_TRB</td>
+<td style="text-align: left;">TRA</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">7.93676e-05</td>
+<td style="text-align: right;">0.0382234</td>
+<td style="text-align: right;">0.00144449</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">sample2_nCD4_1_TRB</td>
+<td style="text-align: left;">TRA</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">3.55821e-05</td>
+<td style="text-align: right;">0.0360803</td>
+<td style="text-align: right;">0.00170794</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">sample3_nCD4_1_TRB</td>
+<td style="text-align: left;">TRA</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">0.000124894</td>
+<td style="text-align: right;">0.0386671</td>
+<td style="text-align: right;">0.002348</td>
+</tr>
+</tbody>
+</table>
+<h2 id="plotting-statistics-in-python">Plotting statistics in Python</h2>
+<p>The <code>plot</code> module provides matplotlib/seaborn wrappers for common statistics
+tables. Import it as:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">repseq</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot</span> <span class="k">as</span> <span class="n">rsplot</span>
+</code></pre></div>
+<p>Each plotting function takes a statistics table and, optionally, a metadata
+table. Metadata must contain <code>sample_id</code>; if both tables contain <code>chain</code>, the
+merge uses <code>sample_id</code> + <code>chain</code>. Grouping and split columns can come from the
+metadata table or directly from the statistics table when metadata has already
+been merged by the user. If metadata contains fewer samples than the statistics
+table, a warning is shown and only the matched subset is plotted.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">diversity_stats</span><span class="p">(</span>
+<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a>    <span class="n">diversity_stats</span><span class="p">,</span>
+<a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a>    <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">,</span>
+<a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a><span class="p">)</span>
+</code></pre></div>
+<p>If <code>group</code> is not provided, each sample is drawn as a separate bar. If one
+grouping column is provided, the plot uses that column on the x-axis and draws
+boxplots with jittered sample points. If two grouping columns are provided, the
+first column is used on the x-axis and the second column is used for color.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">cdr3aa_stats</span><span class="p">(</span>
+<a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>    <span class="n">cdr3_properties</span><span class="p">,</span>
+<a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a>    <span class="n">group</span><span class="o">=</span><span class="p">[</span><span class="s2">"experimental_group"</span><span class="p">,</span> <span class="s2">"subset"</span><span class="p">],</span>
+<a id="__codelineno-38-5" name="__codelineno-38-5" href="#__codelineno-38-5"></a><span class="p">)</span>
+</code></pre></div>
+<p>Use <code>split</code> to create panels. One split column creates one set of panels; two
+split columns are combined into interaction panels.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">diversity_stats</span><span class="p">(</span>
+<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>    <span class="n">diversity_stats</span><span class="p">,</span>
+<a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a>    <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">,</span>
+<a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a>    <span class="n">split</span><span class="o">=</span><span class="s2">"chain"</span><span class="p">,</span>
+<a id="__codelineno-39-6" name="__codelineno-39-6" href="#__codelineno-39-6"></a><span class="p">)</span>
+<a id="__codelineno-39-7" name="__codelineno-39-7" href="#__codelineno-39-7"></a>
+<a id="__codelineno-39-8" name="__codelineno-39-8" href="#__codelineno-39-8"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">cdr3aa_stats</span><span class="p">(</span>
+<a id="__codelineno-39-9" name="__codelineno-39-9" href="#__codelineno-39-9"></a>    <span class="n">cdr3_properties</span><span class="p">,</span>
+<a id="__codelineno-39-10" name="__codelineno-39-10" href="#__codelineno-39-10"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-39-11" name="__codelineno-39-11" href="#__codelineno-39-11"></a>    <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">,</span>
+<a id="__codelineno-39-12" name="__codelineno-39-12" href="#__codelineno-39-12"></a>    <span class="n">split</span><span class="o">=</span><span class="p">[</span><span class="s2">"chain"</span><span class="p">,</span> <span class="s2">"subset"</span><span class="p">],</span>
+<a id="__codelineno-39-13" name="__codelineno-39-13" href="#__codelineno-39-13"></a><span class="p">)</span>
+</code></pre></div>
+<p>Default property panels are provided for CDR3 amino-acid properties, diversity
+statistics, convergence, processing, and clonoset statistics. You can add any
+numeric column to a statistics table and select it with <code>properties</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">convergence</span><span class="p">(</span><span class="n">convergence</span><span class="p">,</span> <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">)</span>
+<a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>
+<a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">diversity_stats</span><span class="p">(</span>
+<a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a>    <span class="n">diversity_stats</span><span class="p">,</span>
+<a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-40-6" name="__codelineno-40-6" href="#__codelineno-40-6"></a>    <span class="n">properties</span><span class="o">=</span><span class="p">[</span><span class="s2">"diversity"</span><span class="p">,</span> <span class="s2">"chao1"</span><span class="p">,</span> <span class="s2">"berger_parker"</span><span class="p">],</span>
+<a id="__codelineno-40-7" name="__codelineno-40-7" href="#__codelineno-40-7"></a>    <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">,</span>
+<a id="__codelineno-40-8" name="__codelineno-40-8" href="#__codelineno-40-8"></a><span class="p">)</span>
+</code></pre></div>
+<p>Ordered pandas categorical columns in metadata keep their order in the x-axis,
+color legend, and split panels.</p>
+<h3 id="plotting-cdr3-length-distributions">Plotting CDR3 length distributions</h3>
+<p><code>rsplot.cdr3_length_distributions</code> accepts the long or wide table returned by
+<code>stats.cdr3_length_distributions</code>. Each panel is a bar plot with CDR3 length on
+the x-axis and frequency or count on the y-axis. Chain values, when present,
+are placed in separate panels.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="n">cdr3_lengths</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">cdr3_length_distributions</span><span class="p">(</span>
+<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>    <span class="n">clonosets</span><span class="p">,</span>
+<a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>    <span class="n">cl_filter</span><span class="o">=</span><span class="n">func_filter</span><span class="p">,</span>
+<a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a>    <span class="n">table</span><span class="o">=</span><span class="s2">"long"</span><span class="p">,</span>
+<a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a><span class="p">)</span>
+<a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a>
+<a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">cdr3_length_distributions</span><span class="p">(</span><span class="n">cdr3_lengths</span><span class="p">)</span>
+</code></pre></div>
+<p>One metadata column can group samples, and up to two metadata columns can split
+the figure into panels. Grouped bars show the sample mean without error bars.
+As in categorical segment-usage plots, at most ten samples or groups are shown.
+Ordered categorical metadata controls group and panel order.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">cdr3_length_distributions</span><span class="p">(</span>
+<a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>    <span class="n">cdr3_lengths</span><span class="p">,</span>
+<a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-42-4" name="__codelineno-42-4" href="#__codelineno-42-4"></a>    <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">,</span>
+<a id="__codelineno-42-5" name="__codelineno-42-5" href="#__codelineno-42-5"></a>    <span class="n">split</span><span class="o">=</span><span class="p">[</span><span class="s2">"tissue"</span><span class="p">,</span> <span class="s2">"sex"</span><span class="p">],</span>
+<a id="__codelineno-42-6" name="__codelineno-42-6" href="#__codelineno-42-6"></a><span class="p">)</span>
+</code></pre></div>
+<h3 id="plotting-segment-usage">Plotting segment usage</h3>
+<p><code>rsplot.segment_usage</code> accepts both the long and wide tables returned by
+<code>stats.calc_segment_usage</code>. It detects V, J, or C usage from the table and
+separates chains into independent panels. Generic long tables with a <code>segment</code>
+or <code>gene</code> column and a <code>usage</code>, <code>value</code>, <code>freq</code>, <code>frequency</code>, or <code>count</code> column
+are accepted as well.</p>
+<p>The default heatmap places segments in columns and samples in rows. Each chain
+has its own segment and sample axes. One metadata column can be used to split
+each chain into additional rows.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a><span class="n">v_usage</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">calc_segment_usage</span><span class="p">(</span>
+<a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>    <span class="n">clonosets</span><span class="p">,</span>
+<a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a>    <span class="n">segment</span><span class="o">=</span><span class="s2">"v"</span><span class="p">,</span>
+<a id="__codelineno-43-4" name="__codelineno-43-4" href="#__codelineno-43-4"></a>    <span class="n">cl_filter</span><span class="o">=</span><span class="n">func_filter</span><span class="p">,</span>
+<a id="__codelineno-43-5" name="__codelineno-43-5" href="#__codelineno-43-5"></a>    <span class="n">table</span><span class="o">=</span><span class="s2">"long"</span><span class="p">,</span>
+<a id="__codelineno-43-6" name="__codelineno-43-6" href="#__codelineno-43-6"></a><span class="p">)</span>
+<a id="__codelineno-43-7" name="__codelineno-43-7" href="#__codelineno-43-7"></a>
+<a id="__codelineno-43-8" name="__codelineno-43-8" href="#__codelineno-43-8"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">segment_usage</span><span class="p">(</span><span class="n">v_usage</span><span class="p">)</span>
+<a id="__codelineno-43-9" name="__codelineno-43-9" href="#__codelineno-43-9"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">segment_usage</span><span class="p">(</span><span class="n">v_usage</span><span class="p">,</span> <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s2">"tissue"</span><span class="p">)</span>
+</code></pre></div>
+<p>Heatmaps accept up to three metadata grouping columns. These are displayed as
+vertical sample-annotation strips, and samples are hierarchically clustered by
+their segment-usage profiles. Ordered categorical metadata controls annotation
+colors and legend order.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">segment_usage</span><span class="p">(</span>
+<a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>    <span class="n">v_usage</span><span class="p">,</span>
+<a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a>    <span class="n">group</span><span class="o">=</span><span class="p">[</span><span class="s2">"experimental_group"</span><span class="p">,</span> <span class="s2">"tissue"</span><span class="p">,</span> <span class="s2">"sex"</span><span class="p">],</span>
+<a id="__codelineno-44-5" name="__codelineno-44-5" href="#__codelineno-44-5"></a><span class="p">)</span>
+</code></pre></div>
+<p>Usage heatmaps use the default R <code>pheatmap</code> blue-to-red <code>RdYlBu</code> palette.
+Pass any Matplotlib-compatible <code>cmap</code> to override it. Annotation legends
+show category values only; the metadata column names remain above the annotation
+strips.</p>
+<p>Use <code>plot_type="barplot"</code> for bars. Without a group, each sample is a separate
+series. With one metadata group, the bars show the group mean with sample
+standard-deviation error bars.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">segment_usage</span><span class="p">(</span>
+<a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>    <span class="n">v_usage</span><span class="p">,</span>
+<a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a>    <span class="n">plot_type</span><span class="o">=</span><span class="s2">"barplot"</span><span class="p">,</span>
+<a id="__codelineno-45-5" name="__codelineno-45-5" href="#__codelineno-45-5"></a>    <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">,</span>
+<a id="__codelineno-45-6" name="__codelineno-45-6" href="#__codelineno-45-6"></a><span class="p">)</span>
+</code></pre></div>
+<p>Use <code>plot_type="boxplot"</code> with one metadata group for boxplots and
+deterministically jittered sample points. The jitter changes only horizontal
+positions; measured values are not modified. Set <code>seed</code> to change the jitter
+layout. An ungrouped boxplot falls back to a sample barplot. Categorical plots
+are limited to ten group or sample series; above this limit the function warns
+and does not create a figure.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">segment_usage</span><span class="p">(</span>
+<a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>    <span class="n">v_usage</span><span class="p">,</span>
+<a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a>    <span class="n">plot_type</span><span class="o">=</span><span class="s2">"boxplot"</span><span class="p">,</span>
+<a id="__codelineno-46-5" name="__codelineno-46-5" href="#__codelineno-46-5"></a>    <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">,</span>
+<a id="__codelineno-46-6" name="__codelineno-46-6" href="#__codelineno-46-6"></a>    <span class="n">split</span><span class="o">=</span><span class="s2">"tissue"</span><span class="p">,</span>
+<a id="__codelineno-46-7" name="__codelineno-46-7" href="#__codelineno-46-7"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
+<a id="__codelineno-46-8" name="__codelineno-46-8" href="#__codelineno-46-8"></a><span class="p">)</span>
+</code></pre></div>
+<p>Set <code>combine_families=True</code> to sum segment usages within each sample before
+plotting segment families. V and J genes are grouped by their numeric family
+(for example, <code>TRBV7-2</code> and <code>TRBV7-3</code> become <code>TRBV7</code>). C genes are grouped by
+isotype, so variants such as <code>IGHG1</code> and <code>IGHG2</code> are plotted together as
+<code>IGHG</code>. Undefined segments represented by <code>.</code> are retained and labeled <code>NA</code>.
+This option applies to heatmaps, barplots, and boxplots.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">segment_usage</span><span class="p">(</span>
+<a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a>    <span class="n">v_usage</span><span class="p">,</span>
+<a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>    <span class="n">plot_type</span><span class="o">=</span><span class="s2">"barplot"</span><span class="p">,</span>
+<a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a>    <span class="n">combine_families</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-47-5" name="__codelineno-47-5" href="#__codelineno-47-5"></a><span class="p">)</span>
+</code></pre></div>
+<p>Segment labels are ordered by receptor system, chain and gene type, followed by
+numeric family, alphabetic subfamily, numeric segment, dual designation,
+subsegment, and allele. AIRR/MiXCR multi-calls use the first gene call for
+sorting. This gives natural orders such as <code>TRBV2</code>, <code>TRBV7-3</code>, <code>TRBV7-8</code>,
+<code>TRBV12-3-1</code>, <code>TRBV12-3-2</code>. IGH constant isotypes and the <code>IGHD</code> constant-gene
+versus <code>IGHD3-10</code> D-segment ambiguity are handled explicitly.</p>
+<h3 id="plotting-isotype-fractions-and-counts">Plotting isotype fractions and counts</h3>
+<p><code>rsplot.isotype_fraction</code> accepts long or wide C-segment output from
+<code>stats.calc_segment_usage(segment="c")</code> and draws one horizontal stacked bar
+per sample. Values are normalized within each sample. The y-axis uses
+<code>sample_id</code> by default; pass <code>metadata</code> and <code>label</code> to use a metadata column
+whose values are non-missing and unique across all plotted samples.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a><span class="n">c_usage</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">calc_segment_usage</span><span class="p">(</span>
+<a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a>    <span class="n">clonosets</span><span class="p">,</span>
+<a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a>    <span class="n">segment</span><span class="o">=</span><span class="s2">"c"</span><span class="p">,</span>
+<a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a>    <span class="n">cl_filter</span><span class="o">=</span><span class="n">func_filter</span><span class="p">,</span>
+<a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a><span class="p">)</span>
+<a id="__codelineno-48-6" name="__codelineno-48-6" href="#__codelineno-48-6"></a>
+<a id="__codelineno-48-7" name="__codelineno-48-7" href="#__codelineno-48-7"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">isotype_fraction</span><span class="p">(</span><span class="n">c_usage</span><span class="p">)</span>
+<a id="__codelineno-48-8" name="__codelineno-48-8" href="#__codelineno-48-8"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">isotype_fraction</span><span class="p">(</span><span class="n">c_usage</span><span class="p">,</span> <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"display_name"</span><span class="p">)</span>
+</code></pre></div>
+<p>Isotypes are ordered from right to left as IgM, IgD, IgG variants, IgA
+variants, IgE, and NA. IgM uses red tones, IgD orange, IgG green, IgA blue,
+IgE purple, and NA grey. Undefined (<code>.</code>), <code>IGHGP</code>, and <code>IGHEP1</code> calls are
+shown as NA. MiXCR hinge records such as <code>IGHG2B_hinge</code> are combined with the
+corresponding constant gene.</p>
+<p>Set <code>combine_families=True</code> to combine organism-specific variants into IgM,
+IgD, IgG, IgA, IgE, and NA. Each family then uses its most saturated color.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">isotype_fraction</span><span class="p">(</span><span class="n">c_usage</span><span class="p">,</span> <span class="n">combine_families</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<p><code>rsplot.isotype_count</code> uses the same layout, labels, recoding, order, and
+palette without normalizing the values. Use it with C-segment usage calculated
+with <code>by_count=True</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a><span class="n">c_counts</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">calc_segment_usage</span><span class="p">(</span>
+<a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a>    <span class="n">clonosets</span><span class="p">,</span>
+<a id="__codelineno-50-3" name="__codelineno-50-3" href="#__codelineno-50-3"></a>    <span class="n">segment</span><span class="o">=</span><span class="s2">"c"</span><span class="p">,</span>
+<a id="__codelineno-50-4" name="__codelineno-50-4" href="#__codelineno-50-4"></a>    <span class="n">cl_filter</span><span class="o">=</span><span class="n">func_filter</span><span class="p">,</span>
+<a id="__codelineno-50-5" name="__codelineno-50-5" href="#__codelineno-50-5"></a>    <span class="n">by_count</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-50-6" name="__codelineno-50-6" href="#__codelineno-50-6"></a><span class="p">)</span>
+<a id="__codelineno-50-7" name="__codelineno-50-7" href="#__codelineno-50-7"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">isotype_count</span><span class="p">(</span><span class="n">c_counts</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="plotting-v-j-usage">Plotting V-J usage</h3>
+<p><code>rsplot.vj_usage</code> accepts long or wide output from
+<code>stats.calc_segment_usage(segment="vj")</code>. Long tables may contain only the
+pipe-delimited <code>vj</code> identifier and usage, only separate <code>v</code> and <code>j</code> columns and
+usage, or both representations. V segments are placed on the x-axis, J
+segments on the y-axis, and marker area represents usage. Larger markers are
+drawn first, behind smaller markers. Samples or groups use different fill
+colors with black marker borders and stable radial offsets around each V-J
+position.</p>
+<p>When present, <code>vj</code> is the pipe-delimited identifier <code>v|j</code>; optional <code>v</code> and
+<code>j</code> columns are checked against it. Wide tables use the same pipe-delimited
+identifiers as column names. Tuple identifiers are not supported.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a><span class="n">vj</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">calc_segment_usage</span><span class="p">(</span>
+<a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a>    <span class="n">clonosets</span><span class="p">,</span>
+<a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a>    <span class="n">segment</span><span class="o">=</span><span class="s2">"vj"</span><span class="p">,</span>
+<a id="__codelineno-51-4" name="__codelineno-51-4" href="#__codelineno-51-4"></a>    <span class="n">cl_filter</span><span class="o">=</span><span class="n">func_filter</span><span class="p">,</span>
+<a id="__codelineno-51-5" name="__codelineno-51-5" href="#__codelineno-51-5"></a>    <span class="n">table</span><span class="o">=</span><span class="s2">"long"</span><span class="p">,</span>
+<a id="__codelineno-51-6" name="__codelineno-51-6" href="#__codelineno-51-6"></a><span class="p">)</span>
+<a id="__codelineno-51-7" name="__codelineno-51-7" href="#__codelineno-51-7"></a>
+<a id="__codelineno-51-8" name="__codelineno-51-8" href="#__codelineno-51-8"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">vj_usage</span><span class="p">(</span><span class="n">vj</span><span class="p">)</span>
+<a id="__codelineno-51-9" name="__codelineno-51-9" href="#__codelineno-51-9"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">vj_usage</span><span class="p">(</span><span class="n">vj</span><span class="p">,</span> <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">)</span>
+</code></pre></div>
+<p>Without <code>group</code>, each marker represents one sample. With one group column, it
+represents the mean usage among samples in that group. At most eight samples or
+eight group levels can be plotted. One or two metadata <code>split</code> columns can be
+used; the first creates facet rows and the second creates columns. Chains are
+always placed in separate rows.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">vj_usage</span><span class="p">(</span>
+<a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a>    <span class="n">vj</span><span class="p">,</span>
+<a id="__codelineno-52-3" name="__codelineno-52-3" href="#__codelineno-52-3"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-52-4" name="__codelineno-52-4" href="#__codelineno-52-4"></a>    <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">,</span>
+<a id="__codelineno-52-5" name="__codelineno-52-5" href="#__codelineno-52-5"></a>    <span class="n">split</span><span class="o">=</span><span class="p">[</span><span class="s2">"tissue"</span><span class="p">,</span> <span class="s2">"batch"</span><span class="p">],</span>
+<a id="__codelineno-52-6" name="__codelineno-52-6" href="#__codelineno-52-6"></a>    <span class="n">size_range</span><span class="o">=</span><span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="mi">800</span><span class="p">),</span>
+<a id="__codelineno-52-7" name="__codelineno-52-7" href="#__codelineno-52-7"></a><span class="p">)</span>
+</code></pre></div>
+<p>Set <code>combine_families=True</code> to sum usage within each sample by V and J family
+before plotting. For example, combinations using <code>TRBV7-2</code> or <code>TRBV7-3</code> and
+<code>TRBJ2-1</code> or <code>TRBJ2-2</code> are combined under <code>TRBV7</code> and <code>TRBJ2</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">vj_usage</span><span class="p">(</span><span class="n">vj</span><span class="p">,</span> <span class="n">combine_families</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="comparing-v-j-length-usage">Comparing V-J-length usage</h3>
+<p><code>rsplot.vjlen_usage</code> compares exactly two samples, or the means of exactly two
+groups, in every panel. It accepts long or wide output from
+<code>stats.calc_segment_usage(segment="vjlen")</code>. The first sample or group is the
+x-axis and the second is the y-axis. The input table must contain exactly one
+chain.</p>
+<p>Long tables may contain the pipe-delimited <code>vjlen</code> identifier and usage without
+redundant component columns, separate <code>v</code>, <code>j</code>, and integer <code>len</code> columns with
+usage, or both representations. Here <code>vjlen</code> is <code>v|j|len</code>. Wide tables use
+<code>v|j|len</code> as their string column names. Tuple identifiers are not supported.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a><span class="n">vjlen</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">calc_segment_usage</span><span class="p">(</span>
+<a id="__codelineno-54-2" name="__codelineno-54-2" href="#__codelineno-54-2"></a>    <span class="n">clonosets</span><span class="p">,</span>
+<a id="__codelineno-54-3" name="__codelineno-54-3" href="#__codelineno-54-3"></a>    <span class="n">segment</span><span class="o">=</span><span class="s2">"vjlen"</span><span class="p">,</span>
+<a id="__codelineno-54-4" name="__codelineno-54-4" href="#__codelineno-54-4"></a>    <span class="n">cl_filter</span><span class="o">=</span><span class="n">func_filter</span><span class="p">,</span>
+<a id="__codelineno-54-5" name="__codelineno-54-5" href="#__codelineno-54-5"></a>    <span class="n">table</span><span class="o">=</span><span class="s2">"long"</span><span class="p">,</span>
+<a id="__codelineno-54-6" name="__codelineno-54-6" href="#__codelineno-54-6"></a><span class="p">)</span>
+<a id="__codelineno-54-7" name="__codelineno-54-7" href="#__codelineno-54-7"></a>
+<a id="__codelineno-54-8" name="__codelineno-54-8" href="#__codelineno-54-8"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">vjlen_usage</span><span class="p">(</span><span class="n">vjlen</span><span class="p">)</span>
+<a id="__codelineno-54-9" name="__codelineno-54-9" href="#__codelineno-54-9"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">vjlen_usage</span><span class="p">(</span>
+<a id="__codelineno-54-10" name="__codelineno-54-10" href="#__codelineno-54-10"></a>    <span class="n">vjlen</span><span class="p">,</span>
+<a id="__codelineno-54-11" name="__codelineno-54-11" href="#__codelineno-54-11"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-54-12" name="__codelineno-54-12" href="#__codelineno-54-12"></a>    <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">,</span>
+<a id="__codelineno-54-13" name="__codelineno-54-13" href="#__codelineno-54-13"></a><span class="p">)</span>
+</code></pre></div>
+<p>Markers have red fill, black borders, and default opacity <code>0.6</code>. Set
+<code>log_scale=True</code> for logarithmic axes. In log mode, zero values are placed one
+decade below the smallest positive value in that panel so combinations found
+on only one side remain visible.</p>
+<p>Set <code>labels=True</code> to label isolated points. Labels use compact forms such as
+<code>V12-1|J1-2|15</code>; crowded points are left unlabeled, and <code>max_labels</code> limits the
+number in each panel.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">vjlen_usage</span><span class="p">(</span>
+<a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a>    <span class="n">vjlen</span><span class="p">,</span>
+<a id="__codelineno-55-3" name="__codelineno-55-3" href="#__codelineno-55-3"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-55-4" name="__codelineno-55-4" href="#__codelineno-55-4"></a>    <span class="n">group</span><span class="o">=</span><span class="s2">"experimental_group"</span><span class="p">,</span>
+<a id="__codelineno-55-5" name="__codelineno-55-5" href="#__codelineno-55-5"></a>    <span class="n">split</span><span class="o">=</span><span class="p">[</span><span class="s2">"tissue"</span><span class="p">,</span> <span class="s2">"batch"</span><span class="p">],</span>
+<a id="__codelineno-55-6" name="__codelineno-55-6" href="#__codelineno-55-6"></a>    <span class="n">log_scale</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-55-7" name="__codelineno-55-7" href="#__codelineno-55-7"></a>    <span class="n">labels</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-55-8" name="__codelineno-55-8" href="#__codelineno-55-8"></a>    <span class="n">max_labels</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+<a id="__codelineno-55-9" name="__codelineno-55-9" href="#__codelineno-55-9"></a><span class="p">)</span>
+</code></pre></div>
+<p>Set <code>combine_families=True</code> to sum usage within each sample by V family, J
+family, and CDR3 length. Different lengths remain separate points, and optional
+labels use the combined family names.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a><span class="n">rsplot</span><span class="o">.</span><span class="n">vjlen_usage</span><span class="p">(</span><span class="n">vjlen</span><span class="p">,</span> <span class="n">combine_families</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<p>Up to two ordered categorical split columns are supported. The first defines
+facet rows and the second facet columns. Every resulting panel is validated to
+contain exactly two samples or two observed group levels.</p>
+<details class="info">
+<summary>Convergence visualization</summary>
+<p>Calculated stats can be visualized in Jupyter notebook using %%R cell magic. 
+<img alt="convergence" src="../images_docs/convergence.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a><span class="o">%</span><span class="n">load_ext</span> <span class="n">rpy2</span><span class="o">.</span><span class="n">ipython</span>
+<a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a><span class="o">%%</span><span class="n">R</span> <span class="o">-</span><span class="n">i</span> <span class="n">convergence</span><span class="p">,</span><span class="n">metadata</span> <span class="o">-</span><span class="n">w</span> <span class="mi">400</span> <span class="o">-</span><span class="n">h</span> <span class="mi">300</span>
+<a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a>
+<a id="__codelineno-57-4" name="__codelineno-57-4" href="#__codelineno-57-4"></a><span class="n">params_order</span> <span class="o">&lt;-</span> <span class="n">c</span><span class="p">(</span><span class="s2">"convergence"</span><span class="p">)</span>
+<a id="__codelineno-57-5" name="__codelineno-57-5" href="#__codelineno-57-5"></a>
+<a id="__codelineno-57-6" name="__codelineno-57-6" href="#__codelineno-57-6"></a><span class="n">convergence</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-57-7" name="__codelineno-57-7" href="#__codelineno-57-7"></a>    <span class="n">merge</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-57-8" name="__codelineno-57-8" href="#__codelineno-57-8"></a>    <span class="n">select</span><span class="p">(</span><span class="n">sample_id</span><span class="p">,</span> <span class="n">experimental_group</span><span class="p">,</span> <span class="n">subset</span><span class="p">,</span> <span class="n">convergence</span><span class="p">)</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-57-9" name="__codelineno-57-9" href="#__codelineno-57-9"></a>    <span class="n">pivot_longer</span><span class="p">(</span><span class="o">-</span><span class="n">c</span><span class="p">(</span><span class="n">sample_id</span><span class="p">,</span> <span class="n">experimental_group</span><span class="p">,</span> <span class="n">subset</span><span class="p">),</span> <span class="n">names_to</span><span class="o">=</span><span class="s2">"parameter"</span><span class="p">,</span> <span class="n">values_to</span><span class="o">=</span><span class="s2">"value"</span><span class="p">)</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-57-10" name="__codelineno-57-10" href="#__codelineno-57-10"></a>    <span class="n">mutate</span><span class="p">(</span><span class="n">experimental_group</span><span class="o">=</span><span class="n">factor</span><span class="p">(</span><span class="n">experimental_group</span><span class="p">,</span> <span class="n">group_order</span><span class="p">))</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-57-11" name="__codelineno-57-11" href="#__codelineno-57-11"></a>    <span class="n">mutate</span><span class="p">(</span><span class="n">parameter</span><span class="o">=</span><span class="n">factor</span><span class="p">(</span><span class="n">parameter</span><span class="p">,</span> <span class="n">params_order</span><span class="p">))</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-57-12" name="__codelineno-57-12" href="#__codelineno-57-12"></a>    <span class="n">ggplot</span><span class="p">(</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">experimental_group</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">value</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">experimental_group</span><span class="p">))</span> <span class="o">+</span>
+<a id="__codelineno-57-13" name="__codelineno-57-13" href="#__codelineno-57-13"></a>        <span class="n">geom_boxplot</span><span class="p">(</span><span class="n">outlier</span><span class="o">.</span><span class="n">shape</span><span class="o">=</span><span class="n">NA</span><span class="p">)</span><span class="o">+</span>
+<a id="__codelineno-57-14" name="__codelineno-57-14" href="#__codelineno-57-14"></a>        <span class="n">geom_jitter</span><span class="p">()</span><span class="o">+</span>
+<a id="__codelineno-57-15" name="__codelineno-57-15" href="#__codelineno-57-15"></a>        <span class="n">facet_wrap</span><span class="p">(</span><span class="nb">vars</span><span class="p">(</span><span class="n">parameter</span><span class="p">),</span> <span class="n">scales</span><span class="o">=</span><span class="s2">"free_y"</span><span class="p">)</span><span class="o">+</span>
+<a id="__codelineno-57-16" name="__codelineno-57-16" href="#__codelineno-57-16"></a>        <span class="n">scale_color_manual</span><span class="p">(</span><span class="n">values</span><span class="o">=</span><span class="n">colors_6_groups</span><span class="p">)</span> <span class="o">+</span> 
+<a id="__codelineno-57-17" name="__codelineno-57-17" href="#__codelineno-57-17"></a>        <span class="n">boxplot_theme</span><span class="o">+</span>
+<a id="__codelineno-57-18" name="__codelineno-57-18" href="#__codelineno-57-18"></a>        <span class="n">theme</span><span class="p">(</span><span class="n">legend</span><span class="o">.</span><span class="n">position</span><span class="o">=</span><span class="s2">"none"</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<details class="info">
+<summary>Diversity visualization</summary>
+<p>Calculated stats can be visualized in Jupyter notebook using %%R cell magic. 
+<img alt="diversity" src="../images_docs/diversity.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a><span class="o">%</span><span class="n">load_ext</span> <span class="n">rpy2</span><span class="o">.</span><span class="n">ipython</span>
+<a id="__codelineno-58-2" name="__codelineno-58-2" href="#__codelineno-58-2"></a><span class="o">%%</span><span class="n">R</span> <span class="o">-</span><span class="n">i</span> <span class="n">diversity_stats</span><span class="p">,</span><span class="n">metadata</span> <span class="o">-</span><span class="n">w</span> <span class="mi">900</span> <span class="o">-</span><span class="n">h</span> <span class="mi">300</span>
+<a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a>
+<a id="__codelineno-58-4" name="__codelineno-58-4" href="#__codelineno-58-4"></a><span class="n">params_order</span> <span class="o">&lt;-</span> <span class="n">c</span><span class="p">(</span><span class="s2">"diversity"</span><span class="p">,</span> <span class="s2">"norm_shannon_wiener"</span><span class="p">,</span> <span class="s2">"chao1"</span><span class="p">)</span>
+<a id="__codelineno-58-5" name="__codelineno-58-5" href="#__codelineno-58-5"></a>
+<a id="__codelineno-58-6" name="__codelineno-58-6" href="#__codelineno-58-6"></a><span class="n">diversity_stats</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-58-7" name="__codelineno-58-7" href="#__codelineno-58-7"></a>    <span class="n">merge</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-58-8" name="__codelineno-58-8" href="#__codelineno-58-8"></a>    <span class="n">select</span><span class="p">(</span><span class="n">sample_id</span><span class="p">,</span> <span class="n">experimental_group</span><span class="p">,</span> <span class="n">subset</span><span class="p">,</span> <span class="n">diversity</span><span class="p">,</span> <span class="n">norm_shannon_wiener</span><span class="p">,</span> <span class="n">chao1</span><span class="p">)</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-58-9" name="__codelineno-58-9" href="#__codelineno-58-9"></a>    <span class="n">pivot_longer</span><span class="p">(</span><span class="o">-</span><span class="n">c</span><span class="p">(</span><span class="n">sample_id</span><span class="p">,</span> <span class="n">experimental_group</span><span class="p">,</span> <span class="n">subset</span><span class="p">),</span> <span class="n">names_to</span><span class="o">=</span><span class="s2">"parameter"</span><span class="p">,</span> <span class="n">values_to</span><span class="o">=</span><span class="s2">"value"</span><span class="p">)</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-58-10" name="__codelineno-58-10" href="#__codelineno-58-10"></a>    <span class="n">mutate</span><span class="p">(</span><span class="n">experimental_group</span><span class="o">=</span><span class="n">factor</span><span class="p">(</span><span class="n">experimental_group</span><span class="p">,</span> <span class="n">group_order</span><span class="p">))</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-58-11" name="__codelineno-58-11" href="#__codelineno-58-11"></a>    <span class="n">mutate</span><span class="p">(</span><span class="n">parameter</span><span class="o">=</span><span class="n">factor</span><span class="p">(</span><span class="n">parameter</span><span class="p">,</span> <span class="n">params_order</span><span class="p">))</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-58-12" name="__codelineno-58-12" href="#__codelineno-58-12"></a>    <span class="n">ggplot</span><span class="p">(</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">experimental_group</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">value</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">experimental_group</span><span class="p">))</span> <span class="o">+</span>
+<a id="__codelineno-58-13" name="__codelineno-58-13" href="#__codelineno-58-13"></a>        <span class="n">geom_boxplot</span><span class="p">(</span><span class="n">outlier</span><span class="o">.</span><span class="n">shape</span><span class="o">=</span><span class="n">NA</span><span class="p">)</span><span class="o">+</span>
+<a id="__codelineno-58-14" name="__codelineno-58-14" href="#__codelineno-58-14"></a>        <span class="n">geom_jitter</span><span class="p">()</span><span class="o">+</span>
+<a id="__codelineno-58-15" name="__codelineno-58-15" href="#__codelineno-58-15"></a>        <span class="n">facet_wrap</span><span class="p">(</span><span class="nb">vars</span><span class="p">(</span><span class="n">parameter</span><span class="p">),</span> <span class="n">scales</span><span class="o">=</span><span class="s2">"free_y"</span><span class="p">)</span><span class="o">+</span>
+<a id="__codelineno-58-16" name="__codelineno-58-16" href="#__codelineno-58-16"></a>        <span class="n">scale_color_manual</span><span class="p">(</span><span class="n">values</span><span class="o">=</span><span class="n">colors_6_groups</span><span class="p">)</span> <span class="o">+</span> 
+<a id="__codelineno-58-17" name="__codelineno-58-17" href="#__codelineno-58-17"></a>        <span class="n">boxplot_theme</span><span class="o">+</span>
+<a id="__codelineno-58-18" name="__codelineno-58-18" href="#__codelineno-58-18"></a>        <span class="n">theme</span><span class="p">(</span><span class="n">legend</span><span class="o">.</span><span class="n">position</span><span class="o">=</span><span class="s2">"none"</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<details class="info">
+<summary>CDR3 properties visualization</summary>
+<p>Calculated stats can be visualized in Jupyter notebook using %%R cell magic. 
+<img alt="cdr3_properties" src="../images_docs/cdr3_properties.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a><span class="o">%</span><span class="n">load_ext</span> <span class="n">rpy2</span><span class="o">.</span><span class="n">ipython</span>
+<a id="__codelineno-59-2" name="__codelineno-59-2" href="#__codelineno-59-2"></a><span class="o">%%</span><span class="n">R</span> <span class="o">-</span><span class="n">i</span> <span class="n">cdr3_properties</span><span class="p">,</span><span class="n">metadata</span> <span class="o">-</span><span class="n">w</span> <span class="mi">900</span> <span class="o">-</span><span class="n">h</span> <span class="mi">500</span>
+<a id="__codelineno-59-3" name="__codelineno-59-3" href="#__codelineno-59-3"></a>
+<a id="__codelineno-59-4" name="__codelineno-59-4" href="#__codelineno-59-4"></a><span class="n">params_order</span> <span class="o">&lt;-</span> <span class="n">c</span><span class="p">(</span><span class="s2">"mean_cdr3nt_len"</span><span class="p">,</span> <span class="s2">"mean_insert_size"</span><span class="p">,</span> <span class="s2">"zero_insert_freq"</span><span class="p">,</span> <span class="s2">"cdr3_5_charge"</span><span class="p">,</span> <span class="s2">"cdr3_5_kf4"</span><span class="p">)</span>
+<a id="__codelineno-59-5" name="__codelineno-59-5" href="#__codelineno-59-5"></a>
+<a id="__codelineno-59-6" name="__codelineno-59-6" href="#__codelineno-59-6"></a><span class="n">cdr3_properties</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-59-7" name="__codelineno-59-7" href="#__codelineno-59-7"></a>    <span class="n">merge</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-59-8" name="__codelineno-59-8" href="#__codelineno-59-8"></a>    <span class="n">select</span><span class="p">(</span><span class="n">sample_id</span><span class="p">,</span> <span class="n">experimental_group</span><span class="p">,</span> <span class="n">subset</span><span class="p">,</span> <span class="n">mean_cdr3nt_len</span><span class="p">,</span> <span class="n">mean_insert_size</span><span class="p">,</span> <span class="n">zero_insert_freq</span><span class="p">,</span> <span class="n">cdr3_5_charge</span><span class="p">,</span> <span class="n">cdr3_5_kf4</span><span class="p">)</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-59-9" name="__codelineno-59-9" href="#__codelineno-59-9"></a>    <span class="n">pivot_longer</span><span class="p">(</span><span class="o">-</span><span class="n">c</span><span class="p">(</span><span class="n">sample_id</span><span class="p">,</span> <span class="n">experimental_group</span><span class="p">,</span> <span class="n">subset</span><span class="p">),</span> <span class="n">names_to</span><span class="o">=</span><span class="s2">"parameter"</span><span class="p">,</span> <span class="n">values_to</span><span class="o">=</span><span class="s2">"value"</span><span class="p">)</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-59-10" name="__codelineno-59-10" href="#__codelineno-59-10"></a>    <span class="n">mutate</span><span class="p">(</span><span class="n">experimental_group</span><span class="o">=</span><span class="n">factor</span><span class="p">(</span><span class="n">experimental_group</span><span class="p">,</span> <span class="n">group_order</span><span class="p">))</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-59-11" name="__codelineno-59-11" href="#__codelineno-59-11"></a>    <span class="n">mutate</span><span class="p">(</span><span class="n">parameter</span><span class="o">=</span><span class="n">factor</span><span class="p">(</span><span class="n">parameter</span><span class="p">,</span> <span class="n">params_order</span><span class="p">))</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-59-12" name="__codelineno-59-12" href="#__codelineno-59-12"></a>    <span class="n">ggplot</span><span class="p">(</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">experimental_group</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">value</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">experimental_group</span><span class="p">))</span> <span class="o">+</span>
+<a id="__codelineno-59-13" name="__codelineno-59-13" href="#__codelineno-59-13"></a>        <span class="n">geom_boxplot</span><span class="p">(</span><span class="n">outlier</span><span class="o">.</span><span class="n">shape</span><span class="o">=</span><span class="n">NA</span><span class="p">)</span><span class="o">+</span>
+<a id="__codelineno-59-14" name="__codelineno-59-14" href="#__codelineno-59-14"></a>        <span class="n">geom_jitter</span><span class="p">()</span><span class="o">+</span>
+<a id="__codelineno-59-15" name="__codelineno-59-15" href="#__codelineno-59-15"></a>        <span class="n">facet_wrap</span><span class="p">(</span><span class="nb">vars</span><span class="p">(</span><span class="n">parameter</span><span class="p">),</span> <span class="n">scales</span><span class="o">=</span><span class="s2">"free_y"</span><span class="p">)</span><span class="o">+</span>
+<a id="__codelineno-59-16" name="__codelineno-59-16" href="#__codelineno-59-16"></a>        <span class="n">scale_color_manual</span><span class="p">(</span><span class="n">values</span><span class="o">=</span><span class="n">colors_6_groups</span><span class="p">)</span> <span class="o">+</span> 
+<a id="__codelineno-59-17" name="__codelineno-59-17" href="#__codelineno-59-17"></a>        <span class="n">boxplot_theme</span><span class="o">+</span>
+<a id="__codelineno-59-18" name="__codelineno-59-18" href="#__codelineno-59-18"></a>        <span class="n">theme</span><span class="p">(</span><span class="n">legend</span><span class="o">.</span><span class="n">position</span><span class="o">=</span><span class="s2">"none"</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<details class="info">
+<summary>V-segment usage visualization</summary>
+<p>Calculated stats can be visualized in Jupyter notebook using %%R cell magic. 
+<img alt="v_segment" src="../images_docs/v_usage.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a><span class="o">%</span><span class="n">load_ext</span> <span class="n">rpy2</span><span class="o">.</span><span class="n">ipython</span>
+<a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a><span class="o">%%</span><span class="n">R</span> <span class="o">-</span><span class="n">i</span> <span class="n">v_usage</span><span class="p">,</span><span class="n">metadata</span> <span class="o">-</span><span class="n">w</span> <span class="mi">1200</span> <span class="o">-</span><span class="n">h</span> <span class="mi">600</span>
+<a id="__codelineno-60-3" name="__codelineno-60-3" href="#__codelineno-60-3"></a>
+<a id="__codelineno-60-4" name="__codelineno-60-4" href="#__codelineno-60-4"></a><span class="n">v_usage_order</span> <span class="o">&lt;-</span> <span class="n">v_usage</span> <span class="o">%&gt;%</span> <span class="n">select</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">distinct</span><span class="p">()</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-60-5" name="__codelineno-60-5" href="#__codelineno-60-5"></a>  <span class="n">separate</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">into</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s2">"f"</span><span class="p">,</span> <span class="s2">"l"</span><span class="p">),</span> <span class="n">remove</span> <span class="o">=</span> <span class="n">F</span><span class="p">,</span> <span class="n">convert</span> <span class="o">=</span> <span class="n">T</span><span class="p">)</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-60-6" name="__codelineno-60-6" href="#__codelineno-60-6"></a>  <span class="n">separate</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">into</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s2">"s"</span><span class="p">,</span> <span class="s2">"n"</span><span class="p">),</span> <span class="n">remove</span> <span class="o">=</span> <span class="n">T</span><span class="p">,</span> <span class="n">convert</span> <span class="o">=</span> <span class="n">T</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">"V"</span><span class="p">)</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-60-7" name="__codelineno-60-7" href="#__codelineno-60-7"></a>  <span class="n">arrange</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="n">l</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">pull</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+<a id="__codelineno-60-8" name="__codelineno-60-8" href="#__codelineno-60-8"></a>
+<a id="__codelineno-60-9" name="__codelineno-60-9" href="#__codelineno-60-9"></a><span class="n">v_usage</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-60-10" name="__codelineno-60-10" href="#__codelineno-60-10"></a>    <span class="n">merge</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-60-11" name="__codelineno-60-11" href="#__codelineno-60-11"></a>    <span class="n">mutate</span><span class="p">(</span><span class="n">v</span><span class="o">=</span><span class="n">factor</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">v_usage_order</span><span class="p">))</span> <span class="o">%&gt;%</span>
+<a id="__codelineno-60-12" name="__codelineno-60-12" href="#__codelineno-60-12"></a>    <span class="n">ggplot</span><span class="p">(</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">v</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">usage</span><span class="p">,</span> <span class="n">fill</span><span class="o">=</span><span class="n">experimental_group</span><span class="p">))</span> <span class="o">+</span>
+<a id="__codelineno-60-13" name="__codelineno-60-13" href="#__codelineno-60-13"></a>        <span class="n">stat_summary</span><span class="p">(</span><span class="n">fun</span><span class="o">.</span><span class="n">data</span><span class="o">=</span><span class="n">mean_se</span><span class="p">,</span> <span class="n">geom</span><span class="o">=</span><span class="s2">"errorbar"</span><span class="p">,</span> <span class="n">position</span><span class="o">=</span><span class="s2">"dodge"</span><span class="p">)</span><span class="o">+</span>
+<a id="__codelineno-60-14" name="__codelineno-60-14" href="#__codelineno-60-14"></a>        <span class="n">stat_summary</span><span class="p">(</span><span class="n">fun</span><span class="o">=</span><span class="n">mean</span><span class="p">,</span> <span class="n">geom</span><span class="o">=</span><span class="s2">"col"</span><span class="p">,</span> <span class="n">position</span><span class="o">=</span><span class="s2">"dodge"</span><span class="p">)</span><span class="o">+</span>
+<a id="__codelineno-60-15" name="__codelineno-60-15" href="#__codelineno-60-15"></a>        <span class="n">theme_bw</span><span class="p">()</span><span class="o">+</span>
+<a id="__codelineno-60-16" name="__codelineno-60-16" href="#__codelineno-60-16"></a>        <span class="n">theme</span><span class="p">(</span>
+<a id="__codelineno-60-17" name="__codelineno-60-17" href="#__codelineno-60-17"></a>            <span class="n">text</span> <span class="o">=</span> <span class="n">element_text</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">14</span><span class="p">),</span>
+<a id="__codelineno-60-18" name="__codelineno-60-18" href="#__codelineno-60-18"></a>          <span class="n">axis</span><span class="o">.</span><span class="n">text</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">element_text</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span><span class="n">angle</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">vjust</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">hjust</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+<a id="__codelineno-60-19" name="__codelineno-60-19" href="#__codelineno-60-19"></a>          <span class="n">axis</span><span class="o">.</span><span class="n">text</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">element_text</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">14</span><span class="p">),</span>
+<a id="__codelineno-60-20" name="__codelineno-60-20" href="#__codelineno-60-20"></a>          <span class="n">axis</span><span class="o">.</span><span class="n">title</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">element_blank</span><span class="p">(),</span>
+<a id="__codelineno-60-21" name="__codelineno-60-21" href="#__codelineno-60-21"></a>          <span class="n">plot</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">element_text</span><span class="p">(</span><span class="n">hjust</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">),</span>
+<a id="__codelineno-60-22" name="__codelineno-60-22" href="#__codelineno-60-22"></a>          <span class="n">panel</span><span class="o">.</span><span class="n">grid</span> <span class="o">=</span> <span class="n">element_blank</span><span class="p">(),</span>
+<a id="__codelineno-60-23" name="__codelineno-60-23" href="#__codelineno-60-23"></a>          <span class="n">legend</span><span class="o">.</span><span class="n">position</span> <span class="o">=</span> <span class="s2">"bottom"</span>
+<a id="__codelineno-60-24" name="__codelineno-60-24" href="#__codelineno-60-24"></a>        <span class="p">)</span><span class="o">+</span>
+<a id="__codelineno-60-25" name="__codelineno-60-25" href="#__codelineno-60-25"></a>        <span class="n">ggtitle</span><span class="p">(</span><span class="s2">"nCD4 V-usage"</span><span class="p">)</span><span class="o">+</span>
+<a id="__codelineno-60-26" name="__codelineno-60-26" href="#__codelineno-60-26"></a>        <span class="n">scale_fill_manual</span><span class="p">(</span><span class="n">values</span> <span class="o">=</span> <span class="n">colors_6_groups</span><span class="p">)</span>
+</code></pre></div>
+</details>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      &copy; 2023 <a href="https://github.com/mmjmike" target="_blank" rel="noopener">Mikhail Myshkin</a>
+
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/mmjmike" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M202.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1M496 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2m-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3m-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.path", "toc.integrate", "navigation.top", "search.suggest", "search.highlight", "content.tabs.link", "content.code.annotation", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
