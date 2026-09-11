@@ -206,6 +206,22 @@ def test_plot_stats_uses_group_and_split_columns_from_stats_table():
     assert two_groups.fig.legends[0]._loc == 8
 
 
+def test_plot_stats_passes_an_explicit_color_to_ungrouped_bars(monkeypatch):
+    original_barplot = rsplot.sns.barplot
+    seen_colors = []
+
+    def compatible_barplot(*args, **kwargs):
+        seen_colors.append(kwargs.get("color"))
+        return original_barplot(*args, **kwargs)
+
+    monkeypatch.setattr(rsplot.sns, "barplot", compatible_barplot)
+
+    rsplot.diversity_stats(_stats_df(), properties=["diversity"])
+
+    assert seen_colors
+    assert all(color is not None for color in seen_colors)
+
+
 def test_plot_stats_preserves_ordered_group_categories():
     metadata = pd.DataFrame(
         [

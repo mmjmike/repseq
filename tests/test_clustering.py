@@ -1166,11 +1166,23 @@ def test_calc_pgen_adds_node_properties_and_skips_unfamiliar_v_genes(
     assert clusters.state_parameters["node_pgen_calculated"]["cpu"] == 1
 
 
-def test_plot_cluster_infers_continuous_numeric_colors_and_greys_missing():
+def test_plot_cluster_infers_continuous_numeric_colors_and_greys_missing(monkeypatch):
     clusters = _clusters_with_two_samples()
     nodes = list(clusters[0])
     for node, score in zip(nodes, [0.0, 10.0, None]):
         node.additional_properties["score"] = score
+    original_draw_nodes = clustering_module.nx.draw_networkx_nodes
+    drawn_colors = []
+
+    def capture_node_colors(*args, **kwargs):
+        drawn_colors.append(kwargs["node_color"])
+        return original_draw_nodes(*args, **kwargs)
+
+    monkeypatch.setattr(
+        clustering_module.nx,
+        "draw_networkx_nodes",
+        capture_node_colors,
+    )
 
     figure = clusters.plot_cluster(
         0,
@@ -1184,6 +1196,8 @@ def test_plot_cluster_infers_continuous_numeric_colors_and_greys_missing():
     assert np.allclose(facecolors[0], to_rgba("#000000"))
     assert np.allclose(facecolors[1], to_rgba("#FF0000"))
     assert np.allclose(facecolors[2], to_rgba("#D3D3D3"))
+    assert drawn_colors[0].shape == (3, 4)
+    assert drawn_colors[0].dtype == float
     assert figure.axes[-1].get_xlabel() == "score"
     assert not figure.legends
     plt.close(figure)

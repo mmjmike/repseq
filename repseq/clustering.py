@@ -1743,20 +1743,31 @@ class Clusters(list):
                     if shape is None or shape_values[node] == shape_level
                 ]
                 if resolved_color_mode == "continuous":
-                    node_colors = [
-                        _MISSING_NODE_COLOR
-                        if color_values[node] is None
-                        else continuous_color_map(
-                            color_normalizer(color_values[node])
-                        )
-                        for node in nodes_for_shape
-                    ]
+                    node_colors = np.asarray(
+                        [
+                            to_rgba(_MISSING_NODE_COLOR)
+                            if color_values[node] is None
+                            else to_rgba(
+                                continuous_color_map(
+                                    color_normalizer(color_values[node])
+                                )
+                            )
+                            for node in nodes_for_shape
+                        ],
+                        dtype=float,
+                    )
                 else:
-                    node_colors = [
-                        color_map[color_values[node]] if color is not None
-                        else color_map[None]
-                        for node in nodes_for_shape
-                    ]
+                    node_colors = np.asarray(
+                        [
+                            to_rgba(
+                                color_map[color_values[node]]
+                                if color is not None
+                                else color_map[None]
+                            )
+                            for node in nodes_for_shape
+                        ],
+                        dtype=float,
+                    )
                 nx.draw_networkx_nodes(
                     cluster,
                     positions,

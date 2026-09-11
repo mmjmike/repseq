@@ -528,6 +528,7 @@ def _draw_category_panel(
             x=x_column,
             y="value",
             order=order,
+            color=sns.color_palette()[0],
             errorbar=None,
             ax=ax,
         )
