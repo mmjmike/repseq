@@ -99,6 +99,12 @@ def test_beta_mds_draws_groups_centroids_spokes_and_dispersion():
         "control",
         "treated",
     }
+    assert fig.legends[0]._loc == 8
+    for sample_points, centroid in zip(axis.collections[::2], axis.collections[1::2]):
+        np.testing.assert_allclose(
+            centroid.get_facecolors()[0], sample_points.get_facecolors()[0]
+        )
+        assert centroid.get_edgecolors().size == 0
 
 
 def test_beta_mds_supports_two_ordered_splits_and_one_group_maximum():
@@ -191,6 +197,13 @@ def test_plot_stats_uses_group_and_split_columns_from_stats_table():
         "treated | b1",
         "control | b2",
     ]
+
+    two_groups = rsplot.diversity_stats(
+        stats_df,
+        properties=["diversity"],
+        group=["condition", "batch"],
+    )
+    assert two_groups.fig.legends[0]._loc == 8
 
 
 def test_plot_stats_preserves_ordered_group_categories():
@@ -558,6 +571,7 @@ def test_clonoset_stats_default_overlays_total_and_functional_bars():
         "sample1"
     ]
     assert [text.get_text() for text in axes["Umi"].texts] == ["50(40)"]
+    assert grid.fig.legends[0]._loc == 8
 
 
 def test_clonoset_stats_skips_umi_panel_when_all_values_are_missing():
@@ -1222,6 +1236,7 @@ def test_segment_usage_heatmap_supports_three_ordered_annotations():
     assert "control" in legend_labels
     assert "treated" in legend_labels
     assert all(":" not in label for label in legend_labels)
+    assert fig.legends[0]._loc == 8
 
 
 def test_segment_usage_split_order_is_preserved_in_rows():
@@ -1306,6 +1321,7 @@ def test_cdr3_length_distributions_plots_long_sample_frequencies():
         [patch.get_height() for patch in ax.patches],
         [0.2, 0.8, 0.4, 0.6],
     )
+    assert fig.legends[0]._loc == 8
     assert fig.number not in plt.get_fignums()
 
 
@@ -1485,6 +1501,7 @@ def test_vj_usage_draws_largest_black_edged_dots_first_and_repels_series():
     assert list(sizes) == sorted(sizes, reverse=True)
     assert np.allclose(collection.get_edgecolors()[0], to_rgba("black"))
     assert any(not np.isclose(value, round(value)) for value in offsets.ravel())
+    assert fig.legends[0]._loc == 8
     assert fig.number not in plt.get_fignums()
 
 
@@ -2001,9 +2018,7 @@ def test_de_heatmap_groups_interleaved_samples_and_matches_annotation_colors():
         show_values=True,
     )
 
-    heatmap = next(
-        ax for ax in fig.axes if ax.get_title() == "Differential enrichment"
-    )
+    heatmap = next(ax for ax in fig.axes if ax.get_ylabel() == "feature")
     row_annotation = next(
         ax for ax in fig.axes if [tick.get_text() for tick in ax.get_xticklabels()] == ["Enriched in"]
     )
@@ -2040,6 +2055,11 @@ def test_de_heatmap_groups_interleaved_samples_and_matches_annotation_colors():
     }
     assert any(ax.get_ylabel() == "log10(Count)" for ax in fig.axes)
     assert [text.get_text() for text in fig.legends[0].get_texts()] == ["A", "B"]
+    assert heatmap.get_title() == ""
+    colorbar = next(ax for ax in fig.axes if ax.get_ylabel() == "log10(Count)")
+    assert colorbar.get_position().x0 > heatmap.get_position().x1
+    assert fig.legends[0]._loc == 2
+    assert fig.legends[0].get_bbox_to_anchor()._bbox.x0 > heatmap.get_position().x1
 
 
 def test_de_heatmap_preserves_samples_when_groups_are_already_contiguous():
@@ -2052,9 +2072,7 @@ def test_de_heatmap_preserves_samples_when_groups_are_already_contiguous():
         metadata,
         show_values=False,
     )
-    heatmap = next(
-        ax for ax in fig.axes if ax.get_title() == "Differential enrichment"
-    )
+    heatmap = next(ax for ax in fig.axes if ax.get_ylabel() == "feature")
 
     assert [tick.get_text() for tick in heatmap.get_xticklabels()] == [
         "b1",
@@ -2097,9 +2115,7 @@ def test_de_heatmap_uses_only_features_passing_available_filter_column(
     ] = None
 
     fig = rsplot.de_heatmap(statistics_table, metadata, show_values=False)
-    heatmap = next(
-        ax for ax in fig.axes if ax.get_title() == "Differential enrichment"
-    )
+    heatmap = next(ax for ax in fig.axes if ax.get_ylabel() == "feature")
 
     assert [tick.get_text() for tick in heatmap.get_yticklabels()] == [
         expected_feature
@@ -2112,9 +2128,7 @@ def test_de_heatmap_combines_prefilter_and_postfilter_pass_columns():
     statistics_table["postfilter_pass"] = [True, False]
 
     fig = rsplot.de_heatmap(statistics_table, metadata, show_values=False)
-    heatmap = next(
-        ax for ax in fig.axes if ax.get_title() == "Differential enrichment"
-    )
+    heatmap = next(ax for ax in fig.axes if ax.get_ylabel() == "feature")
 
     assert [tick.get_text() for tick in heatmap.get_yticklabels()] == [
         "feature_a"

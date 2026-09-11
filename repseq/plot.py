@@ -597,7 +597,7 @@ def _draw_category_panel(
 
 def _deduplicate_legend(grid, hue_column):
     if hue_column is None:
-        return
+        return False
     handles = []
     labels = []
     for ax in grid.axes.flat:
@@ -613,11 +613,12 @@ def _deduplicate_legend(grid, hue_column):
             handles,
             labels,
             title=_caption(hue_column),
-            loc="upper center",
+            loc="lower center",
             ncol=min(max(1, len(labels)), 5),
             frameon=False,
         )
-        grid.fig.subplots_adjust(top=0.9)
+        return True
+    return False
 
 
 def plot_stats(
@@ -727,11 +728,13 @@ def plot_stats(
     else:
         grid.axes.flat[0].set_title(_caption(properties[0]))
 
-    _deduplicate_legend(grid, hue_column if len(group_columns) == 2 else None)
+    has_legend = _deduplicate_legend(
+        grid, hue_column if len(group_columns) == 2 else None
+    )
     if zero_bottom:
         for ax in grid.axes.flat:
             ax.set_ylim(bottom=0)
-    grid.tight_layout()
+    grid.tight_layout(rect=(0, 0.12, 1, 1) if has_legend else None)
     return grid
 
 
@@ -946,11 +949,11 @@ def _plot_default_clonoset_stats(
     ]
     grid.fig.legend(
         handles=handles,
-        loc="upper center",
+        loc="lower center",
         ncol=2,
         frameon=False,
     )
-    grid.fig.tight_layout(rect=(0, 0, 1, 0.92))
+    grid.fig.tight_layout(rect=(0, 0.12, 1, 1))
     return grid
 
 
@@ -1387,7 +1390,7 @@ def _add_figure_legend(fig, axes, title):
             handles,
             labels,
             title=title,
-            loc="upper center",
+            loc="lower center",
             ncol=min(5, len(labels)),
             frameon=False,
         )
@@ -1532,7 +1535,7 @@ def _categorical_segment_usage_plot(
         axes,
         _caption(group_column) if group_column else "Sample",
     )
-    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    fig.tight_layout(rect=(0, 0.12, 1, 1))
     return fig
 
 
@@ -1676,11 +1679,12 @@ def _heatmap_segment_usage_plot(
         fig.legend(
             unique_handles.values(),
             unique_handles.keys(),
-            loc="upper center",
+            loc="lower center",
             ncol=min(5, len(unique_handles)),
             frameon=False,
         )
-        fig.subplots_adjust(top=0.93)
+        legend_rows = int(np.ceil(len(unique_handles) / 5))
+        fig.subplots_adjust(bottom=min(0.55, 0.32 + 0.08 * legend_rows))
     return fig
 
 
@@ -2001,7 +2005,7 @@ def cdr3_length_distributions(
         axes,
         _caption(group_column) if group_column else "Sample",
     )
-    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    fig.tight_layout(rect=(0, 0.12, 1, 1))
     plt.close(fig)
     return fig
 
@@ -2482,11 +2486,11 @@ def vj_usage(
     fig.legend(
         handles=legend_handles,
         title=_caption(series_column) if grouped else "Sample",
-        loc="upper center",
+        loc="lower center",
         ncol=min(8, len(legend_handles)),
         frameon=False,
     )
-    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    fig.tight_layout(rect=(0, 0.12, 1, 1))
     return _close_and_return(fig)
 
 
@@ -3095,7 +3099,6 @@ def de_heatmap(
         xticklabels=True,
         yticklabels=True,
     )
-    grid.ax_heatmap.set_title("Differential enrichment")
     grid.ax_heatmap.set_xlabel("Sample")
     grid.ax_heatmap.set_ylabel(str(feature_column))
     grid.ax_heatmap.tick_params(axis="x", labelrotation=90)
@@ -3143,14 +3146,16 @@ def de_heatmap(
         for group in color_levels
     ]
     if handles:
+        grid.fig.subplots_adjust(right=0.78)
+        grid.cax.set_position([0.84, 0.18, 0.025, 0.48])
         grid.fig.legend(
             handles=handles,
             title="Group",
-            loc="upper center",
-            ncol=min(4, len(handles)),
+            loc="upper left",
+            bbox_to_anchor=(0.82, 0.95),
+            ncol=1,
             frameon=False,
         )
-        grid.fig.subplots_adjust(top=0.9)
     return _close_and_return(grid.fig)
 
 
@@ -3268,9 +3273,9 @@ def beta_mds(
                     [centroid[0]],
                     [centroid[1]],
                     marker="X",
-                    facecolor="white",
-                    edgecolor=color,
-                    linewidth=1.5,
+                    color=color,
+                    edgecolor="none",
+                    linewidth=0,
                     s=100,
                     zorder=4,
                 )
@@ -3294,10 +3299,10 @@ def beta_mds(
         fig.legend(
             handles=handles,
             title=_caption(group_column),
-            loc="upper center",
+            loc="lower center",
             ncol=len(handles),
         )
-        fig.tight_layout(rect=(0, 0, 1, 0.9))
+        fig.tight_layout(rect=(0, 0.12, 1, 1))
     else:
         fig.tight_layout()
     return _close_and_return(fig)
