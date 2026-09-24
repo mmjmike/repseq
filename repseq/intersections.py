@@ -9,7 +9,7 @@ from scipy.stats import binom, poisson
 
 
 
-from .common_functions import (print_progress_bar, run_parallel_calculation, overlap_type_to_flags,
+from .common_functions import (run_parallel_calculation, overlap_type_to_flags,
                                jaccard_index, bray_curtis_dissimilarity, jensen_shannon_divergence,
                                overlap_type_uses_sequence)
 from .io import read_clonoset
@@ -288,7 +288,7 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
             `overlap_type`: `cdr3aa` or `cdr3nt` for sequence-based overlap types, `v` when V is used,
             and `j` when J is used. `VJlen` requires `cdr3aa`, `v`, and `j`; CDR3 length is derived
             from `cdr3aa`.
-        cpu (int, optional): number of worker processes used for feature counting.
+        cpu (int, optional): number of worker processes used for clonoset preparation and feature counting.
         verbose (bool): print setup and progress messages.
     
     Returns:
@@ -306,7 +306,7 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
         custom_clonotypes = _clonotypes_from_custom_dataframe(custom_clonotypes_df, overlap_type)
     clonoset_dicts = convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=cl_filter,
                                                         overlap_type=overlap_type, by_freq=by_freq,
-                                                        strict=not bool(effective_mismatches))
+                                                        strict=not bool(effective_mismatches), cpu=cpu)
     sample_ids = clonosets_df["sample_id"].tolist()
     unique_clonotypes = custom_clonotypes
     if unique_clonotypes is None:
@@ -1085,27 +1085,26 @@ def prepare_clonotypes_dfs_for_intersections(clonosets_df, clonosets_df2, cl_fil
     return clonoset_lists, samples_total, two_dataframes, sample_list, sample_list2
 
 
-def convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True, strict=False):
-    clonoset_dicts = {}
-    len_vj_format=not strict
-    
+def convert_clonosets_to_compact_dicts(clonosets_df, cl_filter=None, overlap_type="aaV", by_freq=True, strict=False, cpu=None):
     if cl_filter is None:
         cl_filter = Filter()
 
-    samples_total = len(clonosets_df)
-    samples_read = 0
-    print_progress_bar(samples_read, samples_total, "Reading clonosets")
-    for i, r in clonosets_df.sort_values(by="sample_id").iterrows():
-        filename = r["filename"]
-        sample_id = r["sample_id"]
-        clonoset = read_clonoset(filename)
-        clonoset = cl_filter.apply(clonoset)
-        cl_dict = prepare_clonoset_for_intersection(clonoset, overlap_type=overlap_type,
-                                                    by_freq=by_freq, len_vj_format=len_vj_format)
-        samples_read += 1
-        print_progress_bar(samples_read, samples_total, "Reading clonosets")
-        clonoset_dicts[sample_id] = cl_dict
-    return clonoset_dicts
+    tasks = []
+    for _, row in clonosets_df.sort_values(by="sample_id").iterrows():
+        tasks.append((row["sample_id"], row["filename"], cl_filter, overlap_type, by_freq, not strict))
+
+    results = run_parallel_calculation(
+        _prepare_clonoset_for_intersection_task, tasks, "Reading clonosets", object_name="clonosets", cpu=cpu,
+    )
+    return dict(results)
+
+
+def _prepare_clonoset_for_intersection_task(task):
+    sample_id, filename, cl_filter, overlap_type, by_freq, len_vj_format = task
+    clonoset = cl_filter.apply(read_clonoset(filename))
+    cl_dict = prepare_clonoset_for_intersection(clonoset, overlap_type=overlap_type,
+                                                by_freq=by_freq, len_vj_format=len_vj_format)
+    return sample_id, cl_dict
 
 
 #

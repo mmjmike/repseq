@@ -51,6 +51,49 @@ def _dummy_samples(sample_ids):
     )
 
 
+@pytest.mark.parametrize("strict, by_freq", [(True, False), (False, True)])
+def test_convert_clonosets_dispatches_one_task_per_sample(monkeypatch, strict, by_freq):
+    calls = []
+
+    class RecordingFilter:
+        def apply(self, clonoset):
+            calls.append(("filter", clonoset))
+            return f"filtered:{clonoset}"
+
+    def fake_prepare(clonoset, **kwargs):
+        calls.append(("prepare", clonoset, kwargs))
+        return {clonoset: 1}
+
+    def run_and_record(function, tasks, program_name, **kwargs):
+        assert function is intersections._prepare_clonoset_for_intersection_task
+        assert program_name == "Reading clonosets"
+        assert kwargs["cpu"] == 2
+        assert kwargs["object_name"] == "clonosets"
+        assert [task[0] for task in tasks] == ["s1", "s2"]
+        return [function(task) for task in tasks]
+
+    monkeypatch.setattr(intersections, "read_clonoset", lambda filename: filename)
+    monkeypatch.setattr(intersections, "prepare_clonoset_for_intersection", fake_prepare)
+    monkeypatch.setattr(intersections, "run_parallel_calculation", run_and_record)
+
+    result = intersections.convert_clonosets_to_compact_dicts(
+        _dummy_samples(["s2", "s1"]), cl_filter=RecordingFilter(), overlap_type="ntV",
+        by_freq=by_freq, strict=strict, cpu=2,
+    )
+
+    assert list(result) == ["s1", "s2"]
+    assert result == {
+        "s1": {"filtered:s1.tsv": 1},
+        "s2": {"filtered:s2.tsv": 1},
+    }
+    assert calls == [
+        ("filter", "s1.tsv"),
+        ("prepare", "filtered:s1.tsv", {"overlap_type": "ntV", "by_freq": by_freq, "len_vj_format": not strict}),
+        ("filter", "s2.tsv"),
+        ("prepare", "filtered:s2.tsv", {"overlap_type": "ntV", "by_freq": by_freq, "len_vj_format": not strict}),
+    ]
+
+
 def test_similarity_frequency_is_directional_and_avoids_double_counting(monkeypatch):
     _mock_preparation(
         monkeypatch,
