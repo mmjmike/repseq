@@ -3,9 +3,10 @@ import numpy as np
 import os
 import re
 import warnings
+import copy
 from .io import read_clonoset
 from .clone_filter import Filter
-from .common_functions import get_column_names_from_clonoset
+from .common_functions import get_column_names_from_clonoset, run_parallel_calculation
 # import random
 
 
@@ -153,20 +154,27 @@ def filter_clonosets_by_sample_list(clonosets_df, samples_list):
     return clonosets_df
 
 
-def pool_clonotypes_from_clonosets_df(clonosets_df, cl_filter=None):
+def _pool_clonoset_worker(task):
+    sample_id, filename, cl_filter = task
+    clonoset = cl_filter.apply(read_clonoset(filename))
+    clonoset["sample_id"] = sample_id
+    return clonoset
+
+
+def pool_clonotypes_from_clonosets_df(clonosets_df, cl_filter=None, cpu=None):
+    """Pool filtered clonosets; cpu controls parallel sample workers."""
     
     if cl_filter is None:
         cl_filter = Filter()
     
-    clonotypes_dfs = []
-    
-    for index, row in clonosets_df.iterrows():
-        sample_id = row["sample_id"]
-        filename = row["filename"]
-        clonoset = read_clonoset(filename)
-        clonoset = cl_filter.apply(clonoset)
-        clonoset["sample_id"] = sample_id
-        clonotypes_dfs.append(clonoset)
+    tasks = [
+        (row["sample_id"], row["filename"], copy.copy(cl_filter))
+        for _, row in clonosets_df.iterrows()
+    ]
+    clonotypes_dfs = run_parallel_calculation(
+        _pool_clonoset_worker, tasks, "Pooling clonotypes",
+        object_name="samples", verbose=False, cpu=cpu,
+    )
 
     result_df = pd.concat(clonotypes_dfs).reset_index(drop=True)
 

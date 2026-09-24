@@ -1,6 +1,53 @@
 import warnings
 
+import pandas as pd
+import pytest
+
 from repseq import clonosets
+from repseq.clone_filter import Filter
+
+
+@pytest.mark.parametrize("cpu", [1, 2])
+def test_pool_clonotypes_reads_samples_in_order_with_filter_options(tmp_path, cpu):
+    samples = []
+    for sample_id, count in [("first", 2), ("second", 3)]:
+        filename = tmp_path / f"{sample_id}.tsv"
+        pd.DataFrame({
+            "count": [count], "freq": [1.0], "cdr3nt": ["TGT"],
+            "cdr3aa": ["C"], "v": ["TRBV1"], "j": ["TRBJ1"],
+            "extra": [sample_id],
+        }).to_csv(filename, sep="\t", index=False)
+        samples.append((sample_id, str(filename)))
+
+    result = clonosets.pool_clonotypes_from_clonosets_df(
+        pd.DataFrame(samples, columns=["sample_id", "filename"]),
+        cl_filter=Filter(convert=False), cpu=cpu,
+    )
+
+    assert result["sample_id"].tolist() == ["first", "second"]
+    assert result["extra"].tolist() == ["first", "second"]
+    assert result["count"].tolist() == [2, 3]
+
+
+def test_pool_clonotypes_passes_cpu_to_parallel_runner(monkeypatch):
+    calls = []
+
+    def fake_parallel(function, tasks, program_name, **kwargs):
+        calls.append((program_name, kwargs, len(tasks)))
+        return [function(task) for task in tasks]
+
+    monkeypatch.setattr(clonosets, "run_parallel_calculation", fake_parallel)
+    monkeypatch.setattr(
+        clonosets, "read_clonoset", lambda filename: pd.DataFrame({"count": [1]})
+    )
+    clonosets.pool_clonotypes_from_clonosets_df(
+        pd.DataFrame({"sample_id": ["sample"], "filename": ["sample.tsv"]}),
+        cl_filter=Filter(convert=False), cpu=3,
+    )
+
+    assert calls == [("Pooling clonotypes", {
+        "object_name": "samples", "verbose": False, "cpu": 3,
+    }, 1)]
 
 
 def test_find_all_mixcr_clonosets_finds_mixcr_exported_files(tmp_path):

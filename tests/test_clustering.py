@@ -809,7 +809,7 @@ def test_clonosets_df_read_tracks_filter_parameters(monkeypatch):
     cl_filter = Filter(count_threshold=2)
     clusters = Clusters()
     result = clusters.read_from_clonosets_df(
-        clonosets_df, cl_filter=cl_filter, verbose=False
+        clonosets_df, cl_filter=cl_filter, verbose=False, cpu=1
     )
     assert result is None
 
@@ -818,6 +818,56 @@ def test_clonosets_df_read_tracks_filter_parameters(monkeypatch):
     assert parameters["input_samples"] == 1
     assert parameters["filter"]["count_threshold"] == 2
     assert "count_threshold: 2" in str(clusters)
+
+
+def test_clonosets_df_read_passes_cpu_to_parallel_runner(monkeypatch):
+    calls = []
+
+    def fake_parallel(function, tasks, program_name, **kwargs):
+        calls.append((program_name, kwargs, len(tasks)))
+        return [function(task) for task in tasks]
+
+    monkeypatch.setattr(clustering_module, "run_parallel_calculation", fake_parallel)
+    monkeypatch.setattr(
+        clustering_module, "read_clonoset",
+        lambda filename: pd.DataFrame({
+            "count": [1], "freq": [1.0], "cdr3nt": ["TGT"],
+            "cdr3aa": ["C"], "v": ["TRBV1"], "j": ["TRBJ1"],
+        }),
+    )
+    clusters = Clusters()
+    clusters.read_from_clonosets_df(
+        pd.DataFrame({"sample_id": ["sample"], "filename": ["sample.tsv"]}),
+        cpu=3, verbose=False,
+    )
+
+    assert clusters.clonotypes["sample_id"].tolist() == ["sample"]
+    assert calls == [("Reading clonosets", {
+        "object_name": "samples", "verbose": False, "cpu": 3,
+    }, 1)]
+
+
+@pytest.mark.parametrize("cpu", [1, 2])
+def test_clonosets_df_read_in_parallel_preserves_sample_order(tmp_path, cpu):
+    samples = []
+    for sample_id, count in [("first", 2), ("second", 3)]:
+        filename = tmp_path / f"{sample_id}.tsv"
+        pd.DataFrame({
+            "count": [count], "freq": [1.0], "cdr3nt": ["TGT"],
+            "cdr3aa": ["C"], "v": ["TRBV1"], "j": ["TRBJ1"],
+            "extra": [sample_id],
+        }).to_csv(filename, sep="\t", index=False)
+        samples.append((sample_id, str(filename)))
+
+    clusters = Clusters()
+    clusters.read_from_clonosets_df(
+        pd.DataFrame(samples, columns=["sample_id", "filename"]),
+        cl_filter=Filter(convert=False), cpu=cpu, verbose=False,
+    )
+
+    assert clusters.clonotypes["sample_id"].tolist() == ["first", "second"]
+    assert clusters.clonotypes["extra"].tolist() == ["first", "second"]
+    assert clusters.clonotypes["count"].tolist() == [2, 3]
 
 
 def test_metadata_can_be_added_before_clustering_and_is_applied_later():

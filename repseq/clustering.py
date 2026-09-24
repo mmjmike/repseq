@@ -419,6 +419,13 @@ def _cluster_properties_worker(args):
     )
 
 
+def _read_clonoset_for_clustering_worker(task):
+    sample_id, filename, cl_filter = task
+    clonoset = cl_filter.apply(read_clonoset(filename))
+    clonoset["sample_id"] = sample_id
+    return clonoset
+
+
 def _intersect_clusters_with_clonoset_worker(args):
     (
         sample_id,
@@ -2145,8 +2152,12 @@ class Clusters(list):
         cl_filter=Filter(),
         verbose=True,
         verbosity=None,
+        cpu=None,
     ):
-        """Read and pool clonotypes described by a sample/file dataframe."""
+        """Read and pool clonotypes described by a sample/file dataframe.
+
+        ``cpu`` controls the number of parallel sample workers.
+        """
         verbose = self._resolve_verbosity(verbose, verbosity)
         if not isinstance(clonosets_df, pd.DataFrame):
             raise TypeError("clonosets_df must be a pandas DataFrame.")
@@ -2160,13 +2171,14 @@ class Clusters(list):
 
         self.cl_filter = cl_filter
         self.clonosets_df = clonosets_df.copy()
-        clonotypes_dfs = []
-        for _, row in clonosets_df.iterrows():
-            sample_id = row["sample_id"]
-            clonoset = read_clonoset(row["filename"])
-            clonoset = cl_filter.apply(clonoset)
-            clonoset["sample_id"] = sample_id
-            clonotypes_dfs.append(clonoset)
+        tasks = [
+            (row["sample_id"], row["filename"], copy.copy(cl_filter))
+            for _, row in clonosets_df.iterrows()
+        ]
+        clonotypes_dfs = run_parallel_calculation(
+            _read_clonoset_for_clustering_worker, tasks, "Reading clonosets",
+            object_name="samples", verbose=verbose, cpu=cpu,
+        )
 
         self.clonotypes = pd.concat(clonotypes_dfs).reset_index(drop=True)
         self.set_pooled(False)

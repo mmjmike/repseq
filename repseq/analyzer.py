@@ -393,7 +393,9 @@ class Analyzer:
             from . import clustering
 
             clusters = clustering.Clusters()
-            clusters.read_from_clonosets_df(samples, cl_filter=params["cl_filter"], verbose=verbose)
+            clusters.read_from_clonosets_df(
+                samples, cl_filter=params["cl_filter"], verbose=verbose, cpu=cpu
+            )
             clusters.create_clusters(
                 overlap_type=params["overlap_type"],
                 mismatches=params["mismatches"],

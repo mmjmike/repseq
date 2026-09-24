@@ -85,7 +85,7 @@ def test_sparse_analyzer_skips_incompatible_settings(monkeypatch, settings):
 def test_analyzer_exposes_clusters_for_each_chain(monkeypatch):
     class FakeClusters:
         def read_from_clonosets_df(self, *args, **kwargs):
-            pass
+            self.read_cpu = kwargs["cpu"]
 
         def create_clusters(self, *args, **kwargs):
             pass
@@ -95,13 +95,14 @@ def test_analyzer_exposes_clusters_for_each_chain(monkeypatch):
 
     fake_module = SimpleNamespace(Clusters=FakeClusters)
     monkeypatch.setitem(sys.modules, "repseq.clustering", fake_module)
-    analyzer = rsde.Analyzer(samples_df=_paired_samples(), clustering=True, verbose=False)
+    analyzer = rsde.Analyzer(samples_df=_paired_samples(), clustering=True, cpu=2, verbose=False)
     analyzer.run_count_table()
     first = analyzer.clusters("TRA")
     analyzer.select_chain("TRB")
     analyzer.run_count_table()
 
     assert isinstance(first, FakeClusters)
+    assert first.read_cpu == 2
     assert analyzer.clusters() is analyzer.clusters("TRB")
     assert analyzer.clusters("TRA") is first
     analyzer.update_parameters(clustering_TRA=False)
