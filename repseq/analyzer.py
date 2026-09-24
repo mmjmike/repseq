@@ -1,10 +1,12 @@
 """Stateful differential-enrichment analysis workflow."""
 
 from copy import deepcopy
+import warnings
 
 import pandas as pd
 
 from .clone_filter import Filter
+from .count_table import CountTable
 
 
 CHAIN_SPECIFIC_PARAMETERS = {
@@ -13,6 +15,7 @@ CHAIN_SPECIFIC_PARAMETERS = {
     "mismatches",
     "clustering",
     "count_by_freq",
+    "sparse",
     "min_samples",
     "min_count",
     "min_total_count",
@@ -32,7 +35,7 @@ CHAIN_SPECIFIC_PARAMETERS = {
     "sort",
 }
 KNOWN_CHAINS = {"TRA", "TRB", "TRG", "TRD", "TRAD", "IGH", "IGK", "IGL", "IGKL", "XCR"}
-COUNT_PARAMETERS = {"cl_filter", "overlap_type", "mismatches", "clustering", "count_by_freq"}
+COUNT_PARAMETERS = {"cl_filter", "overlap_type", "mismatches", "clustering", "count_by_freq", "sparse"}
 PREFILTER_PARAMETERS = {"min_samples", "min_count", "min_total_count"}
 STATISTICS_PARAMETERS = {
     "method",
@@ -75,6 +78,7 @@ def _default_parameters(default_sort_columns):
         "mismatches": 1,
         "clustering": False,
         "count_by_freq": False,
+        "sparse": False,
         "min_samples": 3,
         "min_count": 2,
         "min_total_count": 10,
@@ -152,6 +156,7 @@ class Analyzer:
         self._results = {}
         self._signatures = {}
         self._pairing_matrix = None
+        self._clusters = {}
         updates = dict(parameters or {})
         updates.update(kwargs)
         samples_df = updates.pop("samples_df", None)
@@ -299,10 +304,13 @@ class Analyzer:
         self._results = {chain: {stage: None for stage in STAGES} for chain in self._chains}
         self._signatures = {chain: {} for chain in self._chains}
         self._pairing_matrix = None
+        self._clusters = {chain: None for chain in self._chains}
 
     def _invalidate(self, stage_index, chains=None):
         targets = self._chains if chains is None else [chain for chain in chains if chain in self._chains]
         for chain in targets:
+            if stage_index == 0:
+                self._clusters[chain] = None
             for stage in STAGES[stage_index:]:
                 self._results[chain][stage] = None
                 self._signatures[chain].pop(stage, None)
@@ -347,8 +355,9 @@ class Analyzer:
         return done
 
     def _store(self, stage, table, signature, chain):
-        wrapped = _AnalyzerTable(table)
-        wrapped.attrs = table.attrs.copy()
+        wrapped = table if isinstance(table, CountTable) else _AnalyzerTable(table)
+        if not isinstance(table, CountTable):
+            wrapped.attrs = table.attrs.copy()
         wrapped._analyzer = self
         wrapped._result_name = stage
         self._results[chain][stage] = wrapped
@@ -365,6 +374,19 @@ class Analyzer:
         if self._already_done("count_table", signature, chain):
             return self._results[chain]["count_table"]
         params = {name: self._effective_parameter(name, chain) for name in COUNT_PARAMETERS}
+        if params["sparse"] and (params["clustering"] or params["count_by_freq"]):
+            incompatible = []
+            if params["clustering"]:
+                incompatible.append("clustering=True")
+            if params["count_by_freq"]:
+                incompatible.append("count_by_freq=True")
+            warnings.warn(
+                "sparse=True requires clustering=False and count_by_freq=False; "
+                f"incompatible setting(s): {', '.join(incompatible)}. "
+                "No count table was calculated. Change these settings or set sparse=False.",
+                UserWarning, stacklevel=2,
+            )
+            return None
         samples = self._branch_samples(chain)
         cpu, verbose = self._parameters["cpu"], self._parameters["verbose"]
         if params["clustering"]:
@@ -379,6 +401,7 @@ class Analyzer:
                 verbose=verbose,
             )
             table = clusters.to_count_table(by_freq=params["count_by_freq"])
+            self._clusters[chain] = clusters
         else:
             table = intersections.count_table(
                 samples,
@@ -388,7 +411,11 @@ class Analyzer:
                 by_freq=params["count_by_freq"],
                 cpu=cpu,
                 verbose=verbose,
+                sparse=params["sparse"],
             )
+            self._clusters[chain] = None
+        if table is None:
+            return None
         self._invalidate(1, chains=[chain])
         return self._store("count_table", table, signature, chain)
 
@@ -485,6 +512,10 @@ class Analyzer:
             return self._pairing_matrix
         first, second = self._chains
         table1, table2 = self._results[first]["postfiltered"], self._results[second]["postfiltered"]
+        if isinstance(table1, CountTable):
+            table1 = table1.to_pandas()
+        if isinstance(table2, CountTable):
+            table2 = table2.to_pandas()
         ids1 = table1.loc[table1[POSTFILTER_COLUMN], table1.columns[0]].tolist()
         ids2 = table2.loc[table2[POSTFILTER_COLUMN], table2.columns[0]].tolist()
         pairing_metadata = self._samples_df
@@ -565,11 +596,15 @@ class Analyzer:
                     print("\n" + "-" * 72)
                     print(f"STEP: {label.upper()} | CHAIN: {chain}")
                     print("-" * 72)
-                runner()
+                outcome = runner()
+                if label == "count table" and outcome is None:
+                    break
                 if verbose:
                     self._print_run_stage_summary(label, chain)
         self._active_chain = original_chain
-        if len(self._chains) == 2 and self._parameters["pair_chains"]:
+        if len(self._chains) == 2 and self._parameters["pair_chains"] and all(
+            self._results[chain]["postfiltered"] is not None for chain in self._chains
+        ):
             if verbose:
                 print("\n" + "=" * 72)
                 print("MERGING PARALLEL BRANCHES: CHAIN PAIRING")
@@ -621,6 +656,16 @@ class Analyzer:
     def count_table(self):
         return self._get_result("count_table")
 
+    def clusters(self, chain=None):
+        """Return the Clusters object for a clustered chain, if available."""
+        self._require_samples()
+        selected = chain or self._active_chain
+        if selected not in self._chains:
+            raise ValueError(f"Unknown chain {selected!r}; available chains: {self._chains}")
+        if self._clusters[selected] is None:
+            print(f"Clusters for chain {selected} have not been calculated yet.")
+        return self._clusters[selected]
+
     @property
     def prefiltered(self):
         return self._get_result("prefiltered")
@@ -660,6 +705,8 @@ class Analyzer:
             table = self._get_result("statistics_df", chain=selected)
         if table is None:
             return None
+        if isinstance(table, CountTable):
+            table = table.to_pandas()
         return de_volcano(
             table,
             by_mean_count=by_mean_count,
@@ -674,6 +721,8 @@ class Analyzer:
         table = self._get_result("postfiltered", chain=selected)
         if table is None:
             return None
+        if isinstance(table, CountTable):
+            table = table.to_pandas()
         return de_heatmap(table, self._branch_samples(selected), **kwargs)
 
     def plot_pairing(self, **kwargs):

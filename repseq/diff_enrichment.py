@@ -10,6 +10,7 @@ from statsmodels.tools.sm_exceptions import PerfectSeparationError
 from statsmodels.stats.multitest import multipletests
 
 from .common_functions import run_parallel_calculation
+from .count_table import CountTable
 
 
 PREFILTER_COLUMN = "prefilter_pass"
@@ -68,8 +69,8 @@ def prefilter(
 
     Parameters
     ----------
-    count_table : pandas.DataFrame
-        A wide feature-by-sample table, such as the output of
+    count_table : pandas.DataFrame or CountTable
+        A feature-by-sample table, such as the output of
         :func:`repseq.intersections.count_table`.
     min_samples : int, default 3
         Minimum number of numeric columns with values greater than or equal to
@@ -83,9 +84,9 @@ def prefilter(
 
     Returns
     -------
-    pandas.DataFrame
-        A copy of ``count_table`` with a boolean ``prefilter_pass`` column
-        inserted immediately before the first numeric column.
+    pandas.DataFrame or CountTable
+        A copy with a boolean ``prefilter_pass`` annotation before sample
+        columns. Sparse input remains sparse.
     """
     _validate_prefilter_arguments(
         count_table,
@@ -94,19 +95,30 @@ def prefilter(
         min_total_count=min_total_count,
     )
 
-    numeric_columns = list(count_table.select_dtypes(include="number").columns)
-    numeric_values = count_table[numeric_columns]
-    sample_threshold_pass = numeric_values.ge(min_count).sum(axis=1) >= min_samples
-    total_threshold_pass = numeric_values.sum(axis=1) >= min_total_count
-    prefilter_pass = sample_threshold_pass & total_threshold_pass
+    if isinstance(count_table, CountTable):
+        if min_count == 0:
+            sample_counts = np.full(len(count_table), len(count_table.sample_ids))
+        else:
+            sample_counts = np.asarray((count_table.matrix >= min_count).sum(axis=1)).ravel()
+        sample_threshold_pass = sample_counts >= min_samples
+        total_threshold_pass = np.asarray(count_table.matrix.sum(axis=1)).ravel() >= min_total_count
+        prefilter_pass = sample_threshold_pass & total_threshold_pass
+        result = count_table.copy()
+        result.features[PREFILTER_COLUMN] = prefilter_pass.astype(bool)
+    else:
+        numeric_columns = list(count_table.select_dtypes(include="number").columns)
+        numeric_values = count_table[numeric_columns]
+        sample_threshold_pass = numeric_values.ge(min_count).sum(axis=1) >= min_samples
+        total_threshold_pass = numeric_values.sum(axis=1) >= min_total_count
+        prefilter_pass = sample_threshold_pass & total_threshold_pass
 
-    result = count_table.copy()
-    insert_position = (
-        result.columns.get_loc(numeric_columns[0])
-        if numeric_columns
-        else len(result.columns)
-    )
-    result.insert(insert_position, PREFILTER_COLUMN, prefilter_pass.astype(bool))
+        result = count_table.copy()
+        insert_position = (
+            result.columns.get_loc(numeric_columns[0])
+            if numeric_columns
+            else len(result.columns)
+        )
+        result.insert(insert_position, PREFILTER_COLUMN, prefilter_pass.astype(bool))
 
     if verbose:
         passed_features = int(prefilter_pass.sum())
@@ -125,8 +137,8 @@ def _validate_prefilter_arguments(
     min_count,
     min_total_count,
 ):
-    if not isinstance(count_table, pd.DataFrame):
-        raise TypeError("count_table must be a pandas DataFrame")
+    if not isinstance(count_table, (pd.DataFrame, CountTable)):
+        raise TypeError("count_table must be a pandas DataFrame or CountTable")
     if PREFILTER_COLUMN in count_table.columns:
         raise ValueError(
             f"count_table already contains the reserved column {PREFILTER_COLUMN!r}"
@@ -166,7 +178,7 @@ def postfilter(
 
     Parameters
     ----------
-    statistics_table : pandas.DataFrame
+    statistics_table : pandas.DataFrame or CountTable
         A table returned by :func:`calc_statistics`.
     max_p_adj, max_p_val : real number, optional
         Strict maximum adjusted and raw p-values. ``None`` disables the
@@ -189,9 +201,9 @@ def postfilter(
 
     Returns
     -------
-    pandas.DataFrame
-        A copy of ``statistics_table`` with boolean ``postfilter_pass`` added
-        immediately before the original count-table columns.
+    pandas.DataFrame or CountTable
+        A copy with boolean ``postfilter_pass`` added before the original
+        count-table columns. Sparse input remains sparse.
     """
     selected_groups, excluded_groups = _validate_postfilter_arguments(
         statistics_table,
@@ -202,6 +214,10 @@ def postfilter(
         groups=groups,
         groups_exclude=groups_exclude,
     )
+    sparse_input = isinstance(statistics_table, CountTable)
+    if sparse_input:
+        sparse_table = statistics_table
+        statistics_table = sparse_table.features
     postfilter_pass = (
         statistics_table["mean_group_count"].ge(min_group_mean)
         & statistics_table["log2FC"].ge(min_logfc)
@@ -278,6 +294,13 @@ def postfilter(
                 f"Features passed postfilter: {passed} of {prefilter_passed} "
                 "prefilter-passing features"
             )
+    if sparse_input:
+        sparse_result = CountTable(
+            sparse_table.matrix[result.index.to_numpy(dtype=int)], result, sparse_table.sample_ids,
+        )
+        sparse_result.index = sparse_table.index.take(result.index.to_numpy(dtype=int))
+        sparse_result.attrs = sparse_table.attrs.copy()
+        return sparse_result
     return result
 
 
@@ -290,8 +313,8 @@ def _validate_postfilter_arguments(
     groups,
     groups_exclude,
 ):
-    if not isinstance(statistics_table, pd.DataFrame):
-        raise TypeError("statistics_table must be a pandas DataFrame")
+    if not isinstance(statistics_table, (pd.DataFrame, CountTable)):
+        raise TypeError("statistics_table must be a pandas DataFrame or CountTable")
     if POSTFILTER_COLUMN in statistics_table.columns:
         raise ValueError(
             "statistics_table already contains the reserved column "
@@ -385,8 +408,8 @@ def calc_statistics(
 
     Parameters
     ----------
-    count_table : pandas.DataFrame
-        Wide feature-by-sample count table.
+    count_table : pandas.DataFrame or CountTable
+        Feature-by-sample count table.
     samples_metadata : pandas.DataFrame
         Table containing unique ``sample_id`` values and their ``group``.
     feature_column : hashable, optional
@@ -431,10 +454,10 @@ def calc_statistics(
 
     Returns
     -------
-    pandas.DataFrame
+    pandas.DataFrame or CountTable
         The input table with ``enriched_in``, ``method``,
         ``mean_group_count``, ``log2FC``, ``p_val``, and ``p_adj`` inserted
-        before its numeric columns.
+        before its sample columns. Sparse input retains the CSR count matrix.
         If ``samples_metadata["group"]`` is categorical, ``enriched_in``
         uses the same categorical dtype.
     """
@@ -461,7 +484,18 @@ def calc_statistics(
         _print_statistics_setup(setup)
 
     sample_columns = setup["sample_columns"]
-    values = count_table[sample_columns].to_numpy(dtype=float)
+    sparse_input = isinstance(count_table, CountTable)
+    pass_mask = setup["pass_mask"]
+    passed_positions = np.flatnonzero(pass_mask)
+    if sparse_input:
+        sample_indices = [count_table.sample_ids.index(sample) for sample in sample_columns]
+        values = count_table.matrix[passed_positions][:, sample_indices].toarray().astype(float)
+        if not np.isfinite(count_table.matrix.data).all():
+            raise ValueError("Sample count columns must contain only finite values")
+        if (count_table.matrix.data < 0).any():
+            raise ValueError("Sample count columns must contain non-negative values")
+    else:
+        values = count_table[sample_columns].to_numpy(dtype=float)
     if not np.isfinite(values).all():
         raise ValueError("Sample count columns must contain only finite values")
     if (values < 0).any():
@@ -514,14 +548,12 @@ def calc_statistics(
         if (values > library_totals).any():
             raise ValueError("Feature counts cannot exceed their sample totals")
 
-    pass_mask = setup["pass_mask"]
-    passed_positions = np.flatnonzero(pass_mask)
     statistics = pd.DataFrame(
         columns=["_row_position", *STATISTICS_COLUMNS]
     )
     if len(passed_positions):
-        tested_values = effective_values[passed_positions]
-        original_tested_values = values[passed_positions]
+        tested_values = effective_values if sparse_input else effective_values[passed_positions]
+        original_tested_values = values if sparse_input else values[passed_positions]
         tasks = _build_statistics_tasks(
             tested_values=tested_values,
             original_tested_values=original_tested_values,
@@ -579,7 +611,7 @@ def calc_statistics(
     if verbose:
         print("Assembling the final differential enrichment output table.")
     result = _assemble_statistics_output(
-        count_table,
+        count_table.features if sparse_input else count_table,
         statistics,
         pass_mask=pass_mask,
         simplify=simplify,
@@ -587,6 +619,11 @@ def calc_statistics(
     group_dtype = samples_metadata["group"].dtype
     if isinstance(group_dtype, pd.CategoricalDtype):
         result["enriched_in"] = result["enriched_in"].astype(group_dtype)
+    if sparse_input:
+        positions = result.index.to_numpy(dtype=int)
+        result = CountTable(count_table.matrix[positions], result, count_table.sample_ids)
+        result.index = count_table.index.take(positions)
+        result.attrs = count_table.attrs.copy()
     result = _sort_output_table(result, sort)
     if verbose:
         print("Differential enrichment analysis finished successfully!")
@@ -597,9 +634,11 @@ def _sort_output_table(table, sort):
     if sort is None or sort is False:
         return table
     requested_columns = [sort] if isinstance(sort, str) else list(sort)
+    sparse_input = isinstance(table, CountTable)
+    sortable = table.features if sparse_input else table
     sort_columns = list(
         dict.fromkeys(
-            column for column in requested_columns if column in table.columns
+            column for column in requested_columns if column in sortable.columns
         )
     )
     if not sort_columns:
@@ -610,17 +649,35 @@ def _sort_output_table(table, sort):
         "mean_group_count",
         "log2FC",
     }
-    result = table.sort_values(
+    result = sortable.sort_values(
         sort_columns,
         ascending=[column not in descending_columns for column in sort_columns],
         kind="stable",
     )
+    if sparse_input:
+        sorted_table = CountTable(table.matrix[result.index.to_numpy(dtype=int)], result, table.sample_ids)
+        sorted_table.index = table.index.take(result.index.to_numpy(dtype=int))
+        sorted_table.attrs = table.attrs.copy()
+        return sorted_table
     result.attrs = table.attrs.copy()
     return result
 
 
 def simplify_statistics(statistics):
     """Keep the lowest-p-value group result for each tested feature row."""
+    if isinstance(statistics, CountTable):
+        feature_column = statistics.features.columns[0]
+        ranked = statistics.features.assign(
+            _row_position=np.arange(len(statistics)),
+            _p_sort=statistics.features["p_val"].fillna(np.inf),
+        ).sort_values([feature_column, "_p_sort"], kind="stable")
+        positions = ranked.drop_duplicates(feature_column, keep="first").sort_values(
+            "_row_position", kind="stable"
+        )["_row_position"].to_numpy(dtype=int)
+        result = CountTable(statistics.matrix[positions], statistics.features.iloc[positions], statistics.sample_ids)
+        result.index = statistics.index.take(positions)
+        result.attrs = statistics.attrs.copy()
+        return result
     ranked = statistics.assign(
         _p_sort=statistics["p_val"].fillna(np.inf)
     ).sort_values(["_row_position", "_p_sort"], kind="stable")
@@ -647,7 +704,7 @@ def pair_chains(
 
     Parameters
     ----------
-    count_table1, count_table2 : pandas.DataFrame
+    count_table1, count_table2 : pandas.DataFrame or CountTable
         Chain-specific tables returned by :func:`calc_statistics`.
     samples_metadata : pandas.DataFrame
         Metadata containing unique ``sample_id`` values and a ``sample`` value
@@ -669,6 +726,10 @@ def pair_chains(
         Score matrix with table-2 features on rows and table-1 features on
         columns.
     """
+    if isinstance(count_table1, CountTable):
+        count_table1 = count_table1.to_pandas()
+    if isinstance(count_table2, CountTable):
+        count_table2 = count_table2.to_pandas()
     method = _normalize_pair_chain_method(method)
     feature_column1, feature_column2 = _pair_chain_feature_columns(
         count_table1,
@@ -1019,8 +1080,8 @@ def _prepare_statistics_setup(
     feature_column,
     method,
 ):
-    if not isinstance(count_table, pd.DataFrame):
-        raise TypeError("count_table must be a pandas DataFrame")
+    if not isinstance(count_table, (pd.DataFrame, CountTable)):
+        raise TypeError("count_table must be a pandas DataFrame or CountTable")
     if not isinstance(samples_metadata, pd.DataFrame):
         raise TypeError("samples_metadata must be a pandas DataFrame")
     missing_metadata_columns = {
@@ -1043,17 +1104,14 @@ def _prepare_statistics_setup(
     feature_column = count_table.columns[0] if feature_column is None else feature_column
     if feature_column not in count_table.columns:
         raise ValueError(f"feature_column {feature_column!r} is not in count_table")
-    duplicated_features = count_table[feature_column].duplicated(keep=False)
+    feature_values = count_table[feature_column]
+    duplicated_features = feature_values.duplicated(keep=False)
     if duplicated_features.any():
-        duplicate_value = count_table.loc[duplicated_features, feature_column].iloc[0]
+        duplicate_value = feature_values.loc[duplicated_features].iloc[0]
         if pd.isna(duplicate_value):
-            duplicate_indices = count_table.index[
-                count_table[feature_column].isna()
-            ].tolist()
+            duplicate_indices = feature_values.index[feature_values.isna()].tolist()
         else:
-            duplicate_indices = count_table.index[
-                count_table[feature_column].eq(duplicate_value)
-            ].tolist()
+            duplicate_indices = feature_values.index[feature_values.eq(duplicate_value)].tolist()
         raise ValueError(
             f"Column {feature_column!r} was used as feature_column, but its values "
             f"are non-unique. Example duplicated value {duplicate_value!r} occurs "
@@ -1072,7 +1130,8 @@ def _prepare_statistics_setup(
             f"{duplicates}"
         )
 
-    numeric_columns = list(count_table.select_dtypes(include="number").columns)
+    numeric_columns = (list(count_table.sample_ids) if isinstance(count_table, CountTable)
+                       else list(count_table.select_dtypes(include="number").columns))
     numeric_sample_columns = [
         column for column in numeric_columns if column != feature_column
     ]
@@ -1245,6 +1304,9 @@ def _validate_statistics_parameters(
 
 def _resolve_sample_totals(count_table, sample_columns, sample_totals):
     if sample_totals is None:
+        if isinstance(count_table, CountTable):
+            indices = [count_table.sample_ids.index(sample) for sample in sample_columns]
+            return np.asarray(count_table.matrix[:, indices].sum(axis=0)).ravel().astype(float)
         return count_table[sample_columns].sum(axis=0).to_numpy(dtype=float)
     try:
         totals = pd.Series(sample_totals, dtype=float)

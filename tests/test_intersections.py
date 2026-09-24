@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from repseq import intersections
+from repseq.count_table import CountTable
 
 
 def _run_sequential(function, tasks, *args, **kwargs):
@@ -49,6 +50,39 @@ def _dummy_samples(sample_ids):
             for sample_id in sample_ids
         ]
     )
+
+
+def test_sparse_count_table_matches_dense_and_rejects_frequencies(monkeypatch):
+    dictionaries = {
+        "s1": {("AAA", "V1"): 3, ("BBB", "V2"): 1},
+        "s2": {("AAA", "V1"): 2},
+    }
+    monkeypatch.setattr(intersections, "convert_clonosets_to_compact_dicts", lambda *args, **kwargs: dictionaries)
+    samples = _dummy_samples(["s2", "s1"])
+    dense = intersections.count_table(samples, cpu=1, verbose=False)
+    sparse = intersections.count_table(samples, cpu=1, verbose=False, sparse=True)
+
+    assert isinstance(sparse, CountTable)
+    assert sparse.matrix.getformat() == "csr"
+    assert sparse.matrix.dtype == "int32"
+    assert sparse.sample_ids == ["s2", "s1"]
+    pd.testing.assert_frame_equal(sparse.to_pandas(), dense, check_dtype=False)
+
+    with pytest.warns(UserWarning, match="by_freq=False"):
+        assert intersections.count_table(samples, sparse=True, by_freq=True, verbose=False) is None
+
+
+def test_sparse_count_table_with_mismatches_matches_dense(monkeypatch):
+    monkeypatch.setattr(
+        intersections, "convert_clonosets_to_compact_dicts",
+        lambda *args, **kwargs: _sequence_clonoset_dicts(),
+    )
+    samples = _dummy_samples(["s1", "s2"])
+
+    dense = intersections.count_table(samples, mismatches=1, strict_presence=True, cpu=1, verbose=False)
+    sparse = intersections.count_table(samples, mismatches=1, strict_presence=True, cpu=1, verbose=False, sparse=True)
+
+    pd.testing.assert_frame_equal(sparse.to_pandas(), dense, check_dtype=False)
 
 
 @pytest.mark.parametrize("strict, by_freq", [(True, False), (False, True)])

@@ -317,6 +317,24 @@ analyzer.run_count_table(
 `mismatches` affects only clustering. The direct count-table path always uses
 exact matches.
 
+For large, mostly empty count tables, enable sparse storage without clustering
+or frequency counts:
+
+```py
+analyzer.update_parameters(sparse=True, clustering=False, count_by_freq=False)
+analyzer.run()
+counts = analyzer.count_table             # CountTable (CSR rows = features)
+wide_table = counts.to_pandas()            # materialize a pandas DataFrame
+filtered = analyzer.postfiltered           # CountTable with statistics in features
+```
+
+`CountTable.matrix` stores counts by feature and sample, `CountTable.features`
+stores feature annotations and analysis results, and `CountTable.sample_ids`
+defines the matrix's column order. Use `analyzer.count_table("TRA")` to select
+a chain. `sparse=True` with `clustering=True` or `count_by_freq=True` warns and
+skips the count-table stage. In clustering mode, `analyzer.clusters()` (or
+`analyzer.clusters("TRA")` for two chains) returns the cached `Clusters` object.
+
 ### Updating parameters and cache invalidation
 
 Use `update_parameters` with a dictionary or keyword arguments:

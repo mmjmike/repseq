@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import itertools
 import warnings
+from scipy.sparse import csr_matrix
 
 from statsmodels.stats.multitest import multipletests
 from scipy.stats import binom, poisson
@@ -13,6 +14,7 @@ from .common_functions import (run_parallel_calculation, overlap_type_to_flags,
                                jaccard_index, bray_curtis_dissimilarity, jensen_shannon_divergence,
                                overlap_type_uses_sequence)
 from .io import read_clonoset
+from .count_table import CountTable
 from .clonosets import get_column_names_from_clonoset, pool_clonotypes_from_clonosets_df
 from repseq.clone_filter import Filter
 
@@ -260,7 +262,7 @@ def similarity(
 
 
 def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, strict_presence=False,
-                by_freq=False, custom_clonotypes_df=None, cpu=None, verbose=True):
+                by_freq=False, custom_clonotypes_df=None, cpu=None, verbose=True, sparse=False):
     """
     Creates a table that shows how many times each unique clonotype appears across different clonosets. It processes a given dataset of clonotypes (clonosets_df) 
     and generates a frequency/count table based on a specified overlap type.
@@ -290,13 +292,18 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
             from `cdr3aa`.
         cpu (int, optional): number of worker processes used for clonoset preparation and feature counting.
         verbose (bool): print setup and progress messages.
+        sparse (bool): return a CountTable backed by a CSR matrix instead of a DataFrame.
     
     Returns:
-        df (pd.DataFrame): dataframe containing a pipe-delimited `clonotype` column, its component columns,
-            and one count or frequency column per sample.
+        pd.DataFrame or CountTable: A feature-by-sample table with a pipe-delimited
+            `clonotype` identifier and its components. With `sparse=True`, the
+            returned CountTable stores integer counts in a CSR matrix.
     """
 
     
+    if sparse and by_freq:
+        warnings.warn("sparse=True requires by_freq=False: frequencies cannot be stored as integer counts; no count table was calculated.", UserWarning, stacklevel=2)
+        return None
     if verbose:
         print("Creating clonotypes count table\n"+"-"*50)
         print(f"Overlap type: {overlap_type}")
@@ -318,13 +325,25 @@ def count_table(clonosets_df, cl_filter=None, overlap_type="aaV", mismatches=0, 
         tasks.append(task)
     
     results = run_parallel_calculation(
-        count_table_mp,
+        count_table_sparse_mp if sparse else count_table_mp,
         tasks,
         "Counting features",
         object_name="clonosets",
         verbose=verbose,
         cpu=cpu,
     )
+    if sparse:
+        row_indices, col_indices, values = [], [], []
+        for column_index, (positions, counts) in enumerate(results):
+            row_indices.extend(positions)
+            col_indices.extend([column_index] * len(positions))
+            values.extend(counts)
+        if any(not np.isfinite(value) or value < 0 or value != int(value) for value in values):
+            raise ValueError("Sparse count tables require non-negative integer counts")
+        dtype = np.int32 if not values or max(values) <= np.iinfo(np.int32).max else np.int64
+        matrix = csr_matrix((values, (row_indices, col_indices)), shape=(len(unique_clonotypes), len(sample_ids)), dtype=dtype)
+        features = format_clonotype_columns(pd.DataFrame({"clone": unique_clonotypes}), overlap_type)
+        return CountTable(matrix, features, sample_ids)
     result_dict = dict()
     for result in results:
         result_dict.update(result)
@@ -541,6 +560,16 @@ def count_table_mp(args):
 
         result.append(count)
     return {sample_id: result}
+
+
+def count_table_sparse_mp(args):
+    features, sample_id, clonoset_dict, mismatches, _ = args
+    if not mismatches:
+        positions = [index for index, feature in enumerate(features) if clonoset_dict.get(feature, 0)]
+        return positions, [clonoset_dict[features[index]] for index in positions]
+    counts = count_table_mp(args)[sample_id]
+    positions = [index for index, value in enumerate(counts) if value]
+    return positions, [counts[index] for index in positions]
 
 
 

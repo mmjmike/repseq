@@ -1,8 +1,12 @@
 import pandas as pd
 import pytest
+from scipy.sparse import csr_matrix
+from types import SimpleNamespace
+import sys
 
 import repseq.diff_enrichment as rsde
 from repseq import intersections
+from repseq.count_table import CountTable
 
 
 def _single_chain_samples():
@@ -36,6 +40,72 @@ def _count_table(sample_ids):
             **{sample_id: [3] for sample_id in sample_ids},
         }
     )
+
+
+def test_sparse_analyzer_runs_and_exposes_chain_results(monkeypatch):
+    def fake_count_table(samples_df, **kwargs):
+        assert kwargs["sparse"] is True
+        sample_ids = samples_df["sample_id"].tolist()
+        return CountTable(
+            csr_matrix([[3] * len(sample_ids)]),
+            pd.DataFrame({"clonotype": ["CASS|TRBV1"], "cdr3aa": ["CASS"], "v": ["TRBV1"]}),
+            sample_ids,
+        )
+
+    monkeypatch.setattr(intersections, "count_table", fake_count_table)
+    samples = pd.DataFrame({
+        "sample_id": ["a1", "a2", "b1", "b2"],
+        "filename": ["a1.tsv", "a2.tsv", "b1.tsv", "b2.tsv"],
+        "group": ["A", "A", "B", "B"],
+    })
+    analyzer = rsde.Analyzer(
+        samples_df=samples, sparse=True, cpu=1, verbose=False, min_samples=1, min_total_count=1,
+    )
+    analyzer.run()
+
+    assert isinstance(analyzer.count_table, CountTable)
+    assert analyzer.count_table("XCR") is analyzer.count_table
+    assert isinstance(analyzer.prefiltered, CountTable)
+    assert isinstance(analyzer.statistics_df, CountTable)
+    assert isinstance(analyzer.postfiltered, CountTable)
+    assert analyzer.postfiltered.matrix.shape == (1, 4)
+    assert "postfiltered" in repr(analyzer)
+
+
+@pytest.mark.parametrize("settings", [{"clustering": True}, {"count_by_freq": True}])
+def test_sparse_analyzer_skips_incompatible_settings(monkeypatch, settings):
+    monkeypatch.setattr(intersections, "count_table", lambda *args, **kwargs: pytest.fail("must not calculate"))
+    analyzer = rsde.Analyzer(samples_df=_single_chain_samples(), sparse=True, verbose=False, **settings)
+
+    with pytest.warns(UserWarning, match="clustering=False and count_by_freq=False"):
+        analyzer.run()
+    assert analyzer._results["XCR"]["count_table"] is None
+
+
+def test_analyzer_exposes_clusters_for_each_chain(monkeypatch):
+    class FakeClusters:
+        def read_from_clonosets_df(self, *args, **kwargs):
+            pass
+
+        def create_clusters(self, *args, **kwargs):
+            pass
+
+        def to_count_table(self, by_freq=False):
+            return _count_table(["a1", "a2"])
+
+    fake_module = SimpleNamespace(Clusters=FakeClusters)
+    monkeypatch.setitem(sys.modules, "repseq.clustering", fake_module)
+    analyzer = rsde.Analyzer(samples_df=_paired_samples(), clustering=True, verbose=False)
+    analyzer.run_count_table()
+    first = analyzer.clusters("TRA")
+    analyzer.select_chain("TRB")
+    analyzer.run_count_table()
+
+    assert isinstance(first, FakeClusters)
+    assert analyzer.clusters() is analyzer.clusters("TRB")
+    assert analyzer.clusters("TRA") is first
+    analyzer.update_parameters(clustering_TRA=False)
+    assert analyzer._clusters["TRA"] is None
 
 
 def test_analyzer_defaults_and_parameter_updates():

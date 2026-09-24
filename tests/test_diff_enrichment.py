@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
 import pytest
+from scipy.sparse import csr_matrix
 
 from repseq import diff_enrichment as rsde
+from repseq.count_table import CountTable
 
 
 def _count_table():
@@ -16,6 +18,76 @@ def _count_table():
             "sample3": [4, 0, 3, 6],
         }
     )
+
+
+def test_sparse_prefilter_statistics_and_postfilter_match_dense():
+    dense = _count_table()
+    dense["sample4"] = [3, 0, 3, 1]
+    sparse = CountTable(
+        csr_matrix(dense[["sample1", "sample2", "sample3", "sample4"]].to_numpy()),
+        dense[["clonotype", "cdr3aa", "v"]],
+        ["sample1", "sample2", "sample3", "sample4"],
+    )
+    metadata = pd.DataFrame({
+        "sample_id": ["sample1", "sample2", "sample3", "sample4"],
+        "group": ["A", "A", "B", "B"],
+    })
+
+    dense_pre = rsde.prefilter(dense, min_samples=1, min_count=2, min_total_count=3, verbose=False)
+    sparse_pre = rsde.prefilter(sparse, min_samples=1, min_count=2, min_total_count=3, verbose=False)
+    pd.testing.assert_frame_equal(sparse_pre.to_pandas(), dense_pre)
+    assert "prefilter_pass" not in sparse.features
+
+    dense_stats = rsde.calc_statistics(dense_pre, metadata, cpu=1, verbose=False)
+    sparse_stats = rsde.calc_statistics(sparse_pre, metadata, cpu=1, verbose=False)
+    pd.testing.assert_frame_equal(sparse_stats.to_pandas(), dense_stats)
+
+    dense_post = rsde.postfilter(dense_stats, verbose=False)
+    sparse_post = rsde.postfilter(sparse_stats, verbose=False)
+    pd.testing.assert_frame_equal(sparse_post.to_pandas(), dense_post)
+    assert sparse_post.matrix.getformat() == "csr"
+
+
+def test_sparse_unsimplified_statistics_preserve_repeated_feature_rows():
+    dense = _count_table()
+    dense["sample4"] = [3, 0, 3, 1]
+    dense["sample5"] = [0, 5, 0, 1]
+    dense["sample6"] = [1, 4, 0, 1]
+    sample_ids = [f"sample{index}" for index in range(1, 7)]
+    sparse = CountTable(csr_matrix(dense[sample_ids].to_numpy()), dense[["clonotype", "cdr3aa", "v"]], sample_ids)
+    metadata = pd.DataFrame({"sample_id": sample_ids, "group": ["A", "A", "B", "B", "C", "C"]})
+
+    dense_result = rsde.calc_statistics(dense, metadata, simplify=False, cpu=1, verbose=False)
+    sparse_result = rsde.calc_statistics(sparse, metadata, simplify=False, cpu=1, verbose=False)
+
+    assert len(sparse_result) == len(dense_result) == 12
+    pd.testing.assert_frame_equal(sparse_result.to_pandas(), dense_result)
+    simplified = rsde.simplify(sparse_result)
+    assert isinstance(simplified, CountTable)
+    assert len(simplified) == len(dense)
+
+
+def test_sparse_prefilter_counts_implicit_zeros_when_min_count_is_zero():
+    sparse = CountTable(
+        csr_matrix([[0, 0], [2, 0]]), pd.DataFrame({"clonotype": ["a", "b"]}), ["s1", "s2"],
+    )
+    result = rsde.prefilter(sparse, min_samples=2, min_count=0, min_total_count=0, verbose=False)
+    assert result["prefilter_pass"].tolist() == [True, True]
+
+
+def test_sparse_count_aware_statistics_use_all_sample_totals():
+    dense = _count_table()
+    dense["sample4"] = [3, 1, 3, 1]
+    sample_ids = ["sample1", "sample2", "sample3", "sample4"]
+    sparse = CountTable(csr_matrix(dense[sample_ids].to_numpy()), dense[["clonotype", "cdr3aa", "v"]], sample_ids)
+    metadata = pd.DataFrame({"sample_id": sample_ids, "group": ["A", "A", "B", "B"]})
+    dense = rsde.prefilter(dense, min_samples=2, min_count=2, min_total_count=4, verbose=False)
+    sparse = rsde.prefilter(sparse, min_samples=2, min_count=2, min_total_count=4, verbose=False)
+
+    expected = rsde.calc_statistics(dense, metadata, method="fisher_count", cpu=1, verbose=False)
+    result = rsde.calc_statistics(sparse, metadata, method="fisher_count", cpu=1, verbose=False)
+
+    pd.testing.assert_frame_equal(result.to_pandas(), expected)
 
 
 def test_prefilter_marks_rows_and_inserts_status_before_numeric_columns():
