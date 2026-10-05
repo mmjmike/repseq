@@ -1,9 +1,18 @@
 import numpy as np
 import pandas as pd
 import pytest
+from pathlib import Path
 
 from repseq import stats
 from repseq.clone_filter import Filter
+
+
+def test_aa_properties_path_is_relative_to_installed_package(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    assert stats.AA_PROPS_PATH == Path(stats.__file__).resolve().parent / "resourses" / "aa_property_table.txt"
+    assert "amino_acid" in pd.read_csv(stats.AA_PROPS_PATH, sep="\t", comment="#").columns
 
 
 def _write_clonoset(path, rows):
@@ -143,6 +152,50 @@ def test_generic_calculation_passes_cpu_to_parallel_runner(monkeypatch, tmp_path
 
     assert seen_cpu == [1]
     assert result.loc[0, "clones"] == 1
+
+
+def test_generic_calculation_random_iterations_are_distinct_and_reproducible(tmp_path, monkeypatch):
+    filename = tmp_path / "sample.tsv"
+    _write_clonoset(
+        filename,
+        [
+            {"count": 10, "freq": 0.25, "cdr3nt": "TGTGCC", "cdr3aa": amino_acid,
+             "v": "TRBV1", "d": ".", "j": "TRBJ1"}
+            for amino_acid in ("AAA", "BBB", "CCC", "DDD")
+        ],
+    )
+    clonosets = pd.DataFrame([{"sample_id": "sample1", "filename": str(filename)}])
+    clonoset_filter = Filter(downsample=8, seed=999)
+    observed_seeds = []
+    observed_counts = []
+    original_apply = Filter.apply
+
+    def record_seed(self, clonoset, colnames=None):
+        observed_seeds.append(self.seed)
+        return original_apply(self, clonoset, colnames=colnames)
+
+    def calculate_first_count(clonoset):
+        count = clonoset.loc[clonoset["cdr3aa"] == "AAA", "count"].sum()
+        observed_counts.append(count)
+        return {"first_count": count}
+
+    monkeypatch.setattr(Filter, "apply", record_seed)
+    results = [
+        stats.generic_calculation(
+            clonosets, calculate_first_count, clonoset_filter=clonoset_filter,
+            iterations=5, seed=41, verbose=False, cpu=1,
+        )
+        for _ in range(2)
+    ]
+
+    assert len(observed_seeds) == 10
+    assert all(isinstance(iteration_seed, int) for iteration_seed in observed_seeds)
+    assert len(set(observed_seeds[:5])) == 5
+    assert observed_seeds[:5] == observed_seeds[5:]
+    assert len(set(observed_counts[:5])) > 1
+    assert results[0].loc[0, "first_count"] == pytest.approx(np.mean(observed_counts[:5]))
+    pd.testing.assert_frame_equal(results[0], results[1])
+    assert clonoset_filter.seed == 999
 
 
 def test_cdr3_length_distributions_long_zero_fill_with_chain(tmp_path):

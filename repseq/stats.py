@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
 import random
-import os
 import math
+from pathlib import Path
 
 
 from .common_functions import (get_column_names_from_clonoset,
@@ -15,8 +15,7 @@ from .common_functions import (get_column_names_from_clonoset,
 from .io import read_clonoset
 from repseq.clone_filter import Filter
 
-REPSEQ_PATH = os.path.join(os.path.expanduser("~"), "soft", "repseq")
-AA_PROPS_PATH = os.path.join(REPSEQ_PATH, "repseq", "resourses", "aa_property_table.txt")
+AA_PROPS_PATH = Path(__file__).resolve().parent / "resourses" / "aa_property_table.txt"
 
 
 def calc_clonoset_stats(clonosets_df, cl_filter=None, verbose=True, cpu=None):
@@ -873,8 +872,9 @@ def generic_calculation(clonosets_df_in, calc_function, clonoset_filter=None, pr
         iterations (int): number of iterations to obtain mean values for calculations when
             random processes (downsampling/mix_tails) in clonoset filter are applied.
             Recommended to use 3-5 iterations.
-        seed (hashable): seed for random events (downsampling/mix_tails). It overrides the 
-            values, specified in `cl_filter`.
+        seed (int, float, str, bytes, or bytearray): seed for a local generator that
+            assigns distinct, reproducible integer seeds to the filter in each iteration.
+            It overrides the seed specified in `cl_filter`.
         drop_small_samples (bool): `True` - samples, that can't be downsampled or top-cropped
             because of lack of counts/clonotypes will be dropped before the calculation.
             `False` - small samples will be taken into account, but with fewer counts/clonotypes 
@@ -1042,16 +1042,23 @@ def perform_generic_calculation_mp(args):
     clonoset = read_clonoset(filename)
     colnames = get_column_names_from_clonoset(clonoset)
         
-    if random_filter and isinstance(seed, int):
-        random.seed(seed)
-      
+    iteration_rng = random.Random(seed) if random_filter and seed is not None else None
+    iteration_seeds = set()
+
     clonoset_result = {"sample_id": sample_id}
     clonoset_results = []
     filtered_clonosets = []
     
     for i in range(iterations):
         if clonoset_filter is not None:
-            filtered_clonoset = clonoset_filter.apply(clonoset, colnames=colnames)
+            iteration_filter = clonoset_filter.spawn()
+            if iteration_rng is not None:
+                iteration_seed = iteration_rng.getrandbits(64)
+                while iteration_seed in iteration_seeds:
+                    iteration_seed = iteration_rng.getrandbits(64)
+                iteration_seeds.add(iteration_seed)
+                iteration_filter.seed = iteration_seed
+            filtered_clonoset = iteration_filter.apply(clonoset, colnames=colnames)
         else:
             filtered_clonoset = clonoset
         filtered_clonosets.append(filtered_clonoset)
