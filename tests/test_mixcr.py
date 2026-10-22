@@ -7,6 +7,7 @@ import types
 import pandas as pd
 import pytest
 from matplotlib.axes import Axes
+from matplotlib.colors import to_rgb
 from matplotlib.figure import Figure
 
 from repseq import mixcr
@@ -597,7 +598,9 @@ def test_show_qc_plot_align_uses_two_legend_columns(tmp_path, monkeypatch):
         {"TRB": {"total": 80, "nonFunctional": 5, "hasStops": 2, "isOOF": 3}},
     )
     legend_calls = []
+    plotted_columns = []
     monkeypatch.setattr(mixcr.plt, "show", lambda: None)
+    monkeypatch.setattr(Axes, "barh", lambda *args, **kwargs: plotted_columns.append(kwargs["label"]))
 
     def fake_legend(*args, **kwargs):
         legend_calls.append(kwargs)
@@ -607,6 +610,52 @@ def test_show_qc_plot_align_uses_two_legend_columns(tmp_path, monkeypatch):
     mixcr.show_qc_plot(str(tmp_path), chart_type="align")
 
     assert legend_calls[-1]["ncol"] == 2
+    assert len(plotted_columns) == 10
+
+
+@pytest.mark.parametrize(
+    "overlap_reasons, expected_overlap",
+    [
+        ({"FailedAfterAOverlap": 3}, 3),
+        ({"FailedAfterOverlap": 3}, 3),
+        ({"FailedAfterAOverlap": 3, "FailedAfterOverlap": 2}, 5),
+    ],
+)
+def test_show_qc_plot_align_includes_new_reasons_and_colors(
+    tmp_path, monkeypatch, overlap_reasons, expected_overlap
+):
+    _write_align_report(tmp_path, "sample1", {})
+    report_path = tmp_path / "sample1.align.report.json"
+    report = json.loads(report_path.read_text())
+    report["notAlignedReasons"].update(overlap_reasons)
+    report["notAlignedReasons"]["SampleNotMatched"] = 2
+    report_path.write_text(json.dumps(report) + "\n")
+    plotted = {}
+    monkeypatch.setattr(mixcr.plt, "show", lambda: None)
+    monkeypatch.setattr(Figure, "legend", lambda *args, **kwargs: None)
+
+    def fake_barh(*args, **kwargs):
+        plotted[kwargs["label"]] = (kwargs["width"][0], kwargs["color"])
+
+    monkeypatch.setattr(Axes, "barh", fake_barh)
+
+    mixcr.show_qc_plot(str(tmp_path), chart_type="align", count_type="abs")
+
+    assert plotted["Overlap Fail"][0] == expected_overlap
+    assert plotted["No sample barcode"] == (2, "#808080")
+    assert plotted["No hits (not TCR/IG?)"][1] == "#fed470"
+    assert plotted["No J hits"][1] == "#d64470"
+    gradient = [
+        to_rgb(plotted[label][1])
+        for label in [
+            "No hits (not TCR/IG?)", "Overlap Fail", "No CDR3 parts",
+            "No V hits", "No J hits",
+        ]
+    ]
+    steps = [tuple(end - start for start, end in zip(first, second))
+             for first, second in zip(gradient, gradient[1:])]
+    for step in steps[1:]:
+        assert step == pytest.approx(steps[0])
 
 
 def test_show_qc_plot_chains_uses_chain_count_legend_columns(tmp_path, monkeypatch):

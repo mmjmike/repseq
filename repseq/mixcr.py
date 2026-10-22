@@ -1538,17 +1538,19 @@ def show_qc_plot(folder, chart_type='align', count_type='percent', output_file=N
             if chart_type == 'align':
                 align_data = json_report_contents['notAlignedReasons']
                 renaming_dict = {'NoHits': 'No hits (not TCR/IG?)',
+                                'FailedAfterAOverlap': 'Overlap Fail',
+                                'FailedAfterOverlap': 'Overlap Fail',
                                 'NoCDR3Parts': 'No CDR3 parts',
                                 'NoVHits': 'No V hits',
                                 'NoJHits': 'No J hits',
                                 'VAndJOnDifferentTargets': 'No target with both V and J',
                                 'LowTotalScore': 'Low total score',
                                 'NoBarcode': 'Absent barcode',
-                                'SampleNotMatched': 'Sample not matched',
+                                'SampleNotMatched': 'No sample barcode',
                                 }
                 align_df = {}
                 for old, new in renaming_dict.items():
-                    align_df[new] = [align_data.get(old, 0)]
+                    align_df.setdefault(new, [0])[0] += align_data.get(old, 0)
                 align_df['Successfully aligned'] = json_report_contents['aligned']
                 df_list.append(pd.DataFrame(align_df, index=[file[0]])) 
                 
@@ -1571,13 +1573,16 @@ def show_qc_plot(folder, chart_type='align', count_type='percent', output_file=N
     if chart_type == 'align':
         order = ['Successfully aligned', 
                  'No hits (not TCR/IG?)', 
+                 'Overlap Fail',
                  'No CDR3 parts', 
                  'No V hits', 
                  'No J hits', 
                  'No target with both V and J', 
                  'Low total score', 
-                 'Absent barcode'] 
-        colors = ['#3ecd8d', '#fed470', '#fda163', '#f36c5a', '#d64470', '#a03080', '#702084', '#451777']
+                 'Absent barcode',
+                 'No sample barcode']
+        colors = ['#3ecd8d', '#fed470', '#f4b070', '#ea8c70', '#e06870',
+                  '#d64470', '#a03080', '#702084', '#451777', '#808080']
         colormap = ListedColormap(colors=colors,
                                     name='mixcr')
     elif chart_type == 'chains':
