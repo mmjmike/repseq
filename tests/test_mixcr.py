@@ -582,6 +582,97 @@ def _write_align_report(folder, sample_id, chains):
     (folder / f"{sample_id}.align.report.json").write_text(json.dumps(report) + "\n")
 
 
+def _write_7genes_reports(folder, sample_id, total_reads, aligned_counts):
+    _write_align_report(folder, sample_id, {})
+    main_report_path = folder / f"{sample_id}.align.report.json"
+    main_report = json.loads(main_report_path.read_text())
+    main_report["totalReadsProcessed"] = total_reads
+    main_report["aligned"] = aligned_counts[0]
+    main_report_path.write_text(json.dumps(main_report) + "\n")
+    for rearrangement, aligned in zip(
+        mixcr.SEVEN_GENES_INCOMPLETE_REARRANGEMENTS, aligned_counts[1:]
+    ):
+        report_folder = folder / rearrangement
+        report_folder.mkdir(exist_ok=True)
+        (report_folder / f"{sample_id}.align.report.json").write_text(
+            json.dumps({"aligned": aligned}) + "\n"
+        )
+
+
+def test_extract_alignment_statistics_7genes_and_main_only(tmp_path):
+    _write_7genes_reports(tmp_path, "sample.v1", 100, [40, 10, 9, 8, 7, 6, 5, 4])
+
+    stats = mixcr.extract_alignment_statistics(tmp_path)
+
+    assert stats.index.tolist() == ["sample.v1"]
+    assert stats.loc["sample.v1", "main_aligned"] == 40
+    assert stats.loc["sample.v1", "DJ_TRB_aligned"] == 10
+    assert stats.loc["sample.v1", "CINTRON_KDE_IGK_aligned"] == 4
+    assert stats.loc["sample.v1", "total_aligned"] == 89
+    assert stats.loc["sample.v1", "not_aligned"] == 11
+
+    main_only = mixcr.extract_alignment_statistics(
+        tmp_path, list_of_incomplete_rearrangements=None
+    )
+    assert main_only.loc["sample.v1", "not_aligned"] == 60
+    assert main_only.loc["sample.v1", "total_aligned"] == 40
+
+
+@pytest.mark.parametrize("count_type,scale", [("abs", 1), ("percent", 2)])
+def test_show_7genes_ir_qc_counts_colors_and_order(tmp_path, monkeypatch, count_type, scale):
+    _write_7genes_reports(tmp_path, "alpha", 50, [20, 5, 4, 3, 2, 1, 0, 0])
+    _write_7genes_reports(tmp_path, "zeta", 100, [40, 10, 8, 6, 4, 2, 0, 0])
+    plotted = []
+    legends = []
+    monkeypatch.setattr(mixcr.plt, "show", lambda: None)
+
+    def capture_barh(*args, **kwargs):
+        plotted.append({**kwargs, "left": kwargs["left"].copy()})
+
+    monkeypatch.setattr(Axes, "barh", capture_barh)
+    monkeypatch.setattr(Figure, "legend", lambda *args, **kwargs: legends.append(kwargs))
+
+    mixcr.show_7genes_ir_qc(tmp_path, count_type=count_type)
+
+    assert len(plotted) == 9
+    assert plotted[0]["label"] == "Successfully aligned"
+    assert plotted[0]["color"] == "#3ecd8d"
+    assert plotted[0]["y"].tolist() == ["zeta", "alpha"]
+    assert plotted[0]["width"].tolist() == [40, 20 * scale]
+    assert plotted[1]["label"] == "DJ TRB"
+    assert plotted[1]["color"] == "#4e79a7"
+    assert plotted[1]["left"].tolist() == [40, 20 * scale]
+    assert plotted[-1]["label"] == "No hits (not TCR/IG/Incomplete?)"
+    assert plotted[-1]["color"] == "#fed470"
+    assert plotted[-1]["width"].tolist() == [30, 15 * scale]
+    assert legends[-1]["ncol"] == 2
+
+
+def test_show_7genes_ir_qc_zero_reads_and_invalid_count_type(tmp_path, monkeypatch):
+    _write_7genes_reports(tmp_path, "empty", 0, [0] * 8)
+    plotted = []
+    monkeypatch.setattr(mixcr.plt, "show", lambda: None)
+    monkeypatch.setattr(Axes, "barh", lambda *args, **kwargs: plotted.append(kwargs))
+    monkeypatch.setattr(Figure, "legend", lambda *args, **kwargs: None)
+
+    mixcr.show_7genes_ir_qc(tmp_path)
+
+    assert all(kwargs["width"].tolist() == [0] for kwargs in plotted)
+    with pytest.raises(ValueError, match="count_type"):
+        mixcr.show_7genes_ir_qc(tmp_path, count_type="reads")
+
+
+def test_show_7genes_ir_qc_saves_plot(tmp_path, monkeypatch):
+    _write_7genes_reports(tmp_path, "sample1", 100, [40, 10, 9, 8, 7, 6, 5, 4])
+    output_file = tmp_path / "7genes_ir_qc.png"
+    monkeypatch.setattr(mixcr.plt, "show", lambda: None)
+
+    mixcr.show_7genes_ir_qc(tmp_path, output_file=output_file)
+
+    assert output_file.is_file()
+    assert output_file.stat().st_size > 0
+
+
 def _write_assemble_report(folder, sample_id, chains):
     report = {
         "type": "assemblerReport",

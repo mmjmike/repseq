@@ -40,3 +40,13 @@
 ::: mixcr.show_qc_plot
     options:
           show_root_toc_entry: false
+
+## extract_alignment_statistics
+::: mixcr.extract_alignment_statistics
+    options:
+          show_root_toc_entry: false
+
+## show_7genes_ir_qc
+::: mixcr.show_7genes_ir_qc
+    options:
+          show_root_toc_entry: false

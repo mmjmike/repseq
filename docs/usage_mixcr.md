@@ -179,6 +179,9 @@ mx.show_report_images(output_dir)
 mx.show_qc_plot(output_dir, chart_type="align")
 mx.show_qc_plot(output_dir, chart_type="chains")
 mx.show_qc_plot(output_dir, chart_type="coverage")
+# For output from mixcr_7genes_run_batch (main alignments + seven IR subfolders):
+mx.show_7genes_ir_qc(output_dir, count_type="percent")
+mx.show_7genes_ir_qc(output_dir, count_type="abs", output_file="7genes_ir_qc.png")
 ```
 
 ![alignQc](images_docs/alignQc.svg)

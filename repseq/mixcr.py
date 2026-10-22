@@ -30,6 +30,10 @@ DEFAULT_SAMPLE_BARCODE_TAG_PATTERN = (
     r"^N{0:2}tggtatcaacgcagagt(SMPL:N{5})(UMI:N{14})N{1}gctN{16}(R1:*)\^N{20}(R2:*)"
 )
 
+SEVEN_GENES_INCOMPLETE_REARRANGEMENTS = (
+    "DJ_TRB", "VDD_TRD", "DDJ_TRD", "DD_TRD", "DJ_IGH", "VKDE_IGK", "CINTRON_KDE_IGK",
+)
+
 
 def _validate_backend(backend):
     if backend not in ["local", "slurm"]:
@@ -995,7 +999,7 @@ def mixcr_7genes_run_batch(sample_df, output_folder, mixcr_path="mixcr", memory=
         
     batch_filename = os.path.join(output_folder, "mixcr_analyze_7genes_batch.log")
     
-    list_of_incomplete_rearrangements = ["DJ_TRB", "VDD_TRD", "DDJ_TRD", "DD_TRD", "DJ_IGH", "VKDE_IGK", "CINTRON_KDE_IGK"]
+    list_of_incomplete_rearrangements = SEVEN_GENES_INCOMPLETE_REARRANGEMENTS
 
     jobs = []
     # main cycle by samples
@@ -1464,6 +1468,122 @@ def _plot_coverage_qc(folder, processing_table=None, output_file=None,
     plt.show()
     if output_file is not None:
         ax.get_figure().savefig(output_file, bbox_inches="tight")
+
+
+def extract_alignment_statistics(
+    output_folder,
+    list_of_incomplete_rearrangements=SEVEN_GENES_INCOMPLETE_REARRANGEMENTS,
+):
+    """Read main and incomplete-rearrangement alignment reports for 7GENES samples.
+
+    Args:
+        output_folder (str): Folder containing the main ``*.align.report.json`` files
+            and subfolders named after incomplete rearrangements.
+        list_of_incomplete_rearrangements (sequence or None): Subfolders to read,
+            in analysis order. Pass ``None`` to read only the main reports.
+
+    Returns:
+        pd.DataFrame: Read counts indexed by sample ID, including each alignment
+        stage, ``total_aligned``, ``totalReadsProcessed``, and ``not_aligned``.
+    """
+    report_suffix = ".align.report.json"
+    sample_ids = sorted(
+        filename[:-len(report_suffix)]
+        for filename in os.listdir(output_folder)
+        if filename.endswith(report_suffix)
+    )
+    rearrangements = (
+        () if list_of_incomplete_rearrangements is None
+        else tuple(list_of_incomplete_rearrangements)
+    )
+    rows = {}
+    for sample_id in sample_ids:
+        main_report = open_json_report(
+            os.path.join(output_folder, f"{sample_id}{report_suffix}")
+        )
+        row = {
+            "totalReadsProcessed": main_report["totalReadsProcessed"],
+            "main_aligned": main_report["aligned"],
+        }
+        for rearrangement in rearrangements:
+            report = open_json_report(
+                os.path.join(output_folder, rearrangement, f"{sample_id}{report_suffix}")
+            )
+            row[f"{rearrangement}_aligned"] = report["aligned"]
+        rows[sample_id] = row
+
+    stats = pd.DataFrame.from_dict(rows, orient="index")
+    stats.index.name = "sample_id"
+    aligned_columns = ["main_aligned"] + [f"{name}_aligned" for name in rearrangements]
+    if stats.empty:
+        return pd.DataFrame(
+            columns=["totalReadsProcessed", *aligned_columns, "total_aligned", "not_aligned"],
+            index=stats.index,
+        )
+    stats["total_aligned"] = stats[aligned_columns].sum(axis=1)
+    stats["not_aligned"] = stats["totalReadsProcessed"] - stats["total_aligned"]
+    return stats
+
+
+def show_7genes_ir_qc(folder, count_type="percent", output_file=None):
+    """Plot the alignment breakdown from a 7GENES analysis as stacked sample bars.
+
+    Args:
+        folder (str): Folder containing the main alignment reports and the seven
+            incomplete-rearrangement subfolders.
+        count_type (str): ``percent`` of main ``totalReadsProcessed`` or absolute
+            read counts (``abs``).
+        output_file (str or None): Optional path to save the plot.
+
+    Returns:
+        None
+    """
+    if count_type not in ("percent", "abs"):
+        raise ValueError("count_type must be either 'percent' or 'abs'")
+
+    stats = extract_alignment_statistics(folder)
+    if stats.empty:
+        print("No align report data found")
+        return
+
+    labels = (
+        "Successfully aligned", "DJ TRB", "VDD TRD", "DDJ TRD", "DD TRD",
+        "DJ IGH", "VKDE IGK", "CINTRON KDE IGK",
+        "No hits (not TCR/IG/Incomplete?)",
+    )
+    colors = (
+        "#3ecd8d", "#4e79a7", "#e15759", "#ff9d9a", "#f28e2b",
+        "#b07aa1", "#d37295", "#fabfd2", "#fed470",
+    )
+    columns = (
+        "main_aligned",
+        *(f"{name}_aligned" for name in SEVEN_GENES_INCOMPLETE_REARRANGEMENTS),
+        "not_aligned",
+    )
+    results = stats.loc[sorted(stats.index, reverse=True), columns]
+    if count_type == "percent":
+        totals = stats.loc[results.index, "totalReadsProcessed"].replace(0, np.nan)
+        results = results.div(totals, axis=0).fillna(0) * 100
+
+    size = len(results)
+    plot_rows = max(size, 7 if size <= 7 else 10)
+    fig, ax = plt.subplots(
+        figsize=(9, plot_rows * 0.85 * 0.5), dpi=100, constrained_layout=True,
+    )
+    ax.set_ylim(-0.5, size - 0.5)
+    left = np.zeros(size)
+    for column, label, color in zip(columns, labels, colors):
+        values = results[column].to_numpy()
+        ax.barh(y=results.index, width=values, height=0.85, left=left,
+                label=label, color=color)
+        left += values
+
+    ax.set_xlabel("%" if count_type == "percent" else "read count")
+    fig.legend(loc="outside upper center", title="Alignments rate", ncol=2, frameon=False)
+    sns.despine(left=True, bottom=True)
+    plt.show()
+    if output_file is not None:
+        fig.savefig(output_file, bbox_inches="tight")
 
 
 def show_qc_plot(folder, chart_type='align', count_type='percent', output_file=None,
