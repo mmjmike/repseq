@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.colors import to_rgba
 
 from repseq import plot as rsplot
@@ -2076,6 +2077,37 @@ def test_de_heatmap_groups_interleaved_samples_and_matches_annotation_colors():
     assert colorbar.get_position().x0 > heatmap.get_position().x1
     assert fig.legends[0]._loc == 2
     assert fig.legends[0].get_bbox_to_anchor()._bbox.x0 > heatmap.get_position().x1
+
+
+@pytest.mark.parametrize("group_count", [2, 20])
+def test_de_heatmap_keeps_guides_clear_of_plot_labels(group_count):
+    statistics_table, metadata = _de_heatmap_inputs()
+    if group_count > 2:
+        statistics_table["feature"] = ["A longer feature identifier", "feature_b"]
+        for group_index in range(group_count - 2):
+            sample = f"sample_{group_index}"
+            group = f"A long group label for cohort {group_index}"
+            metadata.loc[len(metadata)] = [sample, group]
+            statistics_table[sample] = [0, 1]
+
+    fig = rsplot.de_heatmap(
+        statistics_table, metadata, show_values=False, height=4, aspect=0.85
+    )
+    canvas = FigureCanvasAgg(fig)
+    canvas.draw()
+    renderer = canvas.get_renderer()
+    colorbar = next(ax for ax in fig.axes if ax.get_ylabel() == "log10(Count)")
+    legend = fig.legends[0]
+    assert len(legend.get_texts()) == group_count
+
+    colorbar_bounds = colorbar.get_tightbbox(renderer)
+    legend_bounds = legend.get_window_extent(renderer)
+    assert not colorbar_bounds.overlaps(legend_bounds)
+    plot_bounds = [ax.get_tightbbox(renderer) for ax in fig.axes if ax != colorbar]
+    for bounds in [colorbar_bounds, legend_bounds]:
+        assert all(not bounds.overlaps(plot) for plot in plot_bounds)
+        assert fig.bbox.contains(*bounds.min)
+        assert fig.bbox.contains(*bounds.max)
 
 
 def test_de_heatmap_preserves_samples_when_groups_are_already_contiguous():

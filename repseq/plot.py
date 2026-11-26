@@ -20,6 +20,7 @@ import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap, to_rgb
 from matplotlib.lines import Line2D
 from matplotlib.patches import Ellipse, Patch
+from matplotlib.transforms import Bbox
 from scipy.cluster.hierarchy import dendrogram, leaves_list, linkage
 
 
@@ -2914,6 +2915,55 @@ def _de_group_boundaries(sample_order, sample_groups):
     ]
 
 
+def _layout_de_heatmap_guides(grid, handles):
+    fig = grid.fig
+    width, height = fig.get_size_inches()
+    pad = 0.2
+    heatmap = grid.ax_heatmap.get_position()
+    grid.cax.set_position([0, heatmap.y0, 0.18 / width, 0.5 * heatmap.height])
+    legend = fig.legend(
+        handles=handles,
+        title="Group",
+        loc="upper left",
+        borderaxespad=0,
+        frameon=False,
+    )
+
+    fig.draw_without_rendering()
+    to_inches = fig.dpi_scale_trans.inverted()
+    plot_axes = [ax for ax in fig.axes if ax is not grid.cax]
+    plot = Bbox.union([ax.get_tightbbox() for ax in plot_axes]).transformed(to_inches)
+    bar = grid.cax.get_tightbbox().transformed(to_inches)
+    legend_bounds = legend.get_window_extent().transformed(to_inches)
+
+    guide_left = plot.x1 + pad
+    guide_top = plot.y1
+    bar_top = guide_top - legend_bounds.height - pad
+    left = min(0, plot.x0 - pad)
+    bottom = min(0, plot.y0 - pad, bar_top - bar.height - pad)
+    guide_width = max(legend_bounds.width, bar.width)
+    new_width = max(width, guide_left + guide_width + pad) - left
+    new_height = max(height, guide_top + pad) - bottom
+
+    for ax in fig.axes:
+        position = ax.get_position()
+        x_pos = position.x0 * width
+        y_pos = position.y0 * height
+        if ax is grid.cax:
+            x_pos += guide_left - bar.x0
+            y_pos += bar_top - bar.y1
+        ax.set_position([
+            (x_pos - left) / new_width,
+            (y_pos - bottom) / new_height,
+            position.width * width / new_width,
+            position.height * height / new_height,
+        ])
+    fig.set_size_inches(new_width, new_height)
+    legend.set_bbox_to_anchor(
+        ((guide_left - left) / new_width, (guide_top - bottom) / new_height)
+    )
+
+
 def de_heatmap(
     statistics_table,
     samples_metadata,
@@ -2948,7 +2998,8 @@ def de_heatmap(
     group_palette : palette name, sequence, or dict, optional
         Colors shared by sample-group and ``enriched_in`` annotations.
     height, aspect : float
-        Figure height and width multiplier.
+        Base figure height and width multiplier. The figure expands as needed
+        to fit the group legend and count colorbar beside the heatmap.
 
     Returns
     -------
@@ -3146,17 +3197,7 @@ def de_heatmap(
         Patch(facecolor=color_map[group], label=str(group))
         for group in color_levels
     ]
-    if handles:
-        grid.fig.subplots_adjust(right=0.78)
-        grid.cax.set_position([0.84, 0.18, 0.025, 0.48])
-        grid.fig.legend(
-            handles=handles,
-            title="Group",
-            loc="upper left",
-            bbox_to_anchor=(0.82, 0.95),
-            ncol=1,
-            frameon=False,
-        )
+    _layout_de_heatmap_guides(grid, handles)
     return _close_and_return(grid.fig)
 
 
